@@ -21,7 +21,7 @@ namespace VantageLite.Diagnostics
             sb.AppendLine("CLR: " + SafeGet(delegate { return Environment.Version.ToString(); }));
             sb.AppendLine("Process arch: " + (Environment.Is64BitProcess ? "x64" : "x86"));
             sb.AppendLine("Exe: " + SafeGet(GetExecutablePath));
-            sb.AppendLine("Working set: " + SafeGet(GetWorkingSetMb) + " MB");
+            sb.AppendLine("Memory: " + GetMemorySummary());
             sb.AppendLine("WebView2 runtime: " + GetWebView2Version());
             sb.AppendLine("-------------------");
             return sb.ToString().TrimEnd();
@@ -42,6 +42,42 @@ namespace VantageLite.Diagnostics
                 process.Refresh();
                 return (process.WorkingSet64 / 1024 / 1024).ToString();
             }
+        }
+
+        /// <summary>
+        /// 宿主进程 + 所有 msedgewebview2 进程的内存总和。
+        /// 注意：统计的是整机所有 WebView2 实例，不只是本程序。
+        /// </summary>
+        public static string GetMemorySummary()
+        {
+            long webViewBytes = 0;
+            int processCount = 0;
+
+            try
+            {
+                Process[] processes = Process.GetProcessesByName("msedgewebview2");
+                for (int i = 0; i < processes.Length; i++)
+                {
+                    try
+                    {
+                        webViewBytes += processes[i].WorkingSet64;
+                        processCount++;
+                    }
+                    catch
+                    {
+                    }
+                    finally
+                    {
+                        processes[i].Dispose();
+                    }
+                }
+            }
+            catch
+            {
+            }
+
+            return "host=" + SafeGet(GetWorkingSetMb) + "MB, webview2="
+                + (webViewBytes / 1024 / 1024) + "MB (" + processCount + " processes)";
         }
 
         private static string GetWebView2Version()

@@ -42,11 +42,19 @@ System.InvalidOperationException: ...
 
 ## 运行中记录
 
-- 每次导航的 URL
+- 每次导航的 URL（带 `[tab N]` 前缀）
 - 导航失败原因（`WebErrorStatus`）
+- 被新导航取代的 `ConnectionAborted` / `OperationCanceled`（仅 Debug）
 - 新窗口请求
+- 标签创建/切换/关闭，以及 LRU 丢弃
+- 标签状态：`[tabs] total=... live=... active=...; host=...MB, webview2=...MB (... processes)`
 - WebView2 进程异常（`ProcessFailedKind`）
 - 未处理异常与完整堆栈
+
+## 内存统计说明
+
+`webview2=` 统计的是**整机所有** `msedgewebview2.exe` 进程，不只是本程序。
+单开本程序时可以直接用来观察标签内存变化；同时运行其他 WebView2 应用时数值会偏高。
 
 ## 注意
 

@@ -1,7 +1,6 @@
 using System;
 using System.Windows.Forms;
 using Microsoft.Web.WebView2.Core;
-using Microsoft.Web.WebView2.WinForms;
 using VantageLite.App;
 using VantageLite.Browser;
 using VantageLite.Diagnostics;
@@ -9,18 +8,20 @@ using VantageLite.Diagnostics;
 namespace VantageLite.UI
 {
     /// <summary>
-    /// 主窗口：装配 UI、初始化 WebView2、处理导航事件与快捷键。
-    /// 依赖：Browser / Diagnostics / App。改动注意：布局在 MainForm.Layout.cs。
+    /// 主窗口：创建 WebView2 环境、装配标签管理器、处理导航与快捷键。
+    /// 依赖：Browser / Diagnostics / App。改动注意：布局在 MainForm.Layout.cs，事件在 MainForm.Events.cs。
     /// </summary>
     public sealed partial class MainForm : Form
     {
         private const string DefaultHomeUrl = "https://asystech.cn/start/index.html";
 
         private readonly CommandLineOptions _options;
+
         private NavigationBar _navigationBar;
-        private WebView2 _webView;
-        private CoreWebView2 _core;
-        private bool _isLoading;
+        private TabStrip _tabStrip;
+        private Panel _contentHost;
+        private TabManager _tabManager;
+        private BrowserTab _attachedTab;
 
         public MainForm()
             : this(new CommandLineOptions())
@@ -37,6 +38,11 @@ namespace VantageLite.UI
             FormClosed += MainForm_FormClosed;
         }
 
+        private BrowserTab ActiveTab
+        {
+            get { return _tabManager == null ? null : _tabManager.ActiveTab; }
+        }
+
         private async void MainForm_Load(object sender, EventArgs e)
         {
             try
@@ -44,12 +50,23 @@ namespace VantageLite.UI
                 Log.Info("Creating WebView2 environment...");
                 CoreWebView2Environment environment = await WebViewEnvironment.CreateAsync(_options);
 
-                await _webView.EnsureCoreWebView2Async(environment);
-                _core = _webView.CoreWebView2;
-                ConfigureBrowser();
+                _tabManager = new TabManager(
+                    _contentHost,
+                    environment,
+                    _options.EnableDevTools,
+                    _options.MaxLiveTabs);
 
-                Log.Info("WebView2 initialized.");
-                NavigateTo(_options.StartUrl ?? DefaultHomeUrl);
+                _tabManager.TabsChanged += TabManager_TabsChanged;
+                _tabManager.ActiveTabChanged += TabManager_ActiveTabChanged;
+                _tabManager.Empty += TabManager_Empty;
+                _tabManager.NewWindowRequested += TabManager_NewWindowRequested;
+
+                _tabStrip.TabSelected += TabStrip_TabSelected;
+                _tabStrip.TabCloseRequested += TabStrip_TabCloseRequested;
+                _tabStrip.NewTabRequested += TabStrip_NewTabRequested;
+
+                Log.Info("WebView2 environment ready. max live tabs = " + _options.MaxLiveTabs);
+                await _tabManager.CreateTabAsync(DefaultHomeUrl);
             }
             catch (Exception ex)
             {
@@ -64,123 +81,13 @@ namespace VantageLite.UI
             }
         }
 
-        private void ConfigureBrowser()
-        {
-            _core.Settings.AreDevToolsEnabled = _options.EnableDevTools;
-            _core.Settings.AreDefaultContextMenusEnabled = true;
-            _core.Settings.IsStatusBarEnabled = true;
-            _core.Settings.IsSwipeNavigationEnabled = false;
-
-            _core.SourceChanged += Core_SourceChanged;
-            _core.DocumentTitleChanged += Core_DocumentTitleChanged;
-            _core.HistoryChanged += Core_HistoryChanged;
-            _core.NavigationStarting += Core_NavigationStarting;
-            _core.NavigationCompleted += Core_NavigationCompleted;
-            _core.NewWindowRequested += Core_NewWindowRequested;
-            _core.ProcessFailed += Core_ProcessFailed;
-        }
-
-        private void NavigateTo(string address)
-        {
-            if (_core == null)
-            {
-                Log.Warn("Navigate ignored before WebView2 initialization: " + address);
-                return;
-            }
-
-            string url = UrlHelper.Normalize(address);
-            if (url == null)
-            {
-                return;
-            }
-
-            Log.Info("Navigate: " + url);
-            _core.Navigate(url);
-        }
-
-        private void GoBack()
-        {
-            if (_core != null && _core.CanGoBack)
-            {
-                _core.GoBack();
-            }
-        }
-
-        private void GoForward()
-        {
-            if (_core != null && _core.CanGoForward)
-            {
-                _core.GoForward();
-            }
-        }
-
-        private void Reload()
-        {
-            if (_core != null)
-            {
-                _core.Reload();
-            }
-        }
-
-        private void StopLoading()
-        {
-            if (_core != null)
-            {
-                _core.Stop();
-            }
-        }
-
-        private void UpdateNavigationState()
-        {
-            if (_core == null)
-            {
-                return;
-            }
-
-            _navigationBar.SetNavigationState(_core.CanGoBack, _core.CanGoForward);
-        }
-
-        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
-        {
-            if (keyData == (Keys.Control | Keys.L))
-            {
-                _navigationBar.FocusAddressBar();
-                return true;
-            }
-
-            if (keyData == Keys.F5 || keyData == (Keys.Control | Keys.R))
-            {
-                Reload();
-                return true;
-            }
-
-            if (keyData == (Keys.Alt | Keys.Left))
-            {
-                GoBack();
-                return true;
-            }
-
-            if (keyData == (Keys.Alt | Keys.Right))
-            {
-                GoForward();
-                return true;
-            }
-
-            if (keyData == (Keys.Control | Keys.W))
-            {
-                Close();
-                return true;
-            }
-
-            return base.ProcessCmdKey(ref msg, keyData);
-        }
-
         private void MainForm_FormClosed(object sender, FormClosedEventArgs e)
         {
             Log.Info("Main window closed.");
-            if (_webView != null)
+            if (_tabManager != null)
             {
-                _webView.Dispose();
+                _tabManager.Dispose();
+                _tabManager = null;
             }
         }
     }

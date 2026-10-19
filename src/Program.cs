@@ -88,6 +88,7 @@ namespace VantageLite
             Console.WriteLine("  --log-file=PATH       指定日志文件路径");
             Console.WriteLine("  --console             日志同时输出到控制台");
             Console.WriteLine("  --user-data-dir=PATH  指定用户数据目录（独立 profile）");
+            Console.WriteLine("  --max-live-tabs=N     同时存活的标签上限，默认 5（范围 1-50）");
             Console.WriteLine("  --url=URL             启动页（也可直接传 URL）");
             Console.WriteLine("  --no-devtools         禁用 F12 开发者工具");
             Console.WriteLine("  --version             显示版本");

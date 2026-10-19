@@ -17,6 +17,7 @@ namespace VantageLite.App
         public string UserDataDir { get; set; }
         public string StartUrl { get; set; }
         public bool EnableDevTools { get; set; }
+        public int MaxLiveTabs { get; set; }
         public bool ShowHelp { get; set; }
         public bool ShowVersion { get; set; }
         public List<string> Warnings { get; private set; }
@@ -25,6 +26,7 @@ namespace VantageLite.App
         {
             LogLevel = LogLevel.Info;
             EnableDevTools = true;
+            MaxLiveTabs = 5;
             Warnings = new List<string>();
         }
 
@@ -92,6 +94,20 @@ namespace VantageLite.App
                 if (TryReadValue(args, ref i, lower, "--user-data-dir", out value))
                 {
                     options.UserDataDir = value;
+                    continue;
+                }
+
+                if (TryReadValue(args, ref i, lower, "--max-live-tabs", out value))
+                {
+                    int maxLiveTabs;
+                    if (int.TryParse(value, out maxLiveTabs) && maxLiveTabs >= 1 && maxLiveTabs <= 50)
+                    {
+                        options.MaxLiveTabs = maxLiveTabs;
+                    }
+                    else
+                    {
+                        options.Warnings.Add("无效的 --max-live-tabs: " + value + "（范围 1-50）");
+                    }
                     continue;
                 }
 

@@ -1,13 +1,12 @@
 using System;
 using System.Drawing;
 using System.Windows.Forms;
-using Microsoft.Web.WebView2.WinForms;
 
 namespace VantageLite.UI
 {
     /// <summary>
-    /// MainForm 的界面搭建部分：只放控件创建、布局、事件接线。
-    /// 依赖：NavigationBar / WebView2。改动注意：业务逻辑留在 MainForm.cs。
+    /// MainForm 的界面搭建部分：只放控件创建、布局、导航条事件接线。
+    /// 依赖：NavigationBar / TabStrip。改动注意：业务逻辑留在 MainForm.cs。
     /// </summary>
     public sealed partial class MainForm
     {
@@ -22,14 +21,19 @@ namespace VantageLite.UI
             MinimumSize = new Size(800, 560);
             BackColor = Color.FromArgb(24, 27, 33);
 
-            _webView = new WebView2();
-            _webView.Dock = DockStyle.Fill;
-            _webView.DefaultBackgroundColor = Color.White;
+            _contentHost = new Panel();
+            _contentHost.Dock = DockStyle.Fill;
+            _contentHost.BackColor = Color.White;
+
+            _tabStrip = new TabStrip();
+            _tabStrip.Dock = DockStyle.Top;
 
             _navigationBar = new NavigationBar();
             _navigationBar.Dock = DockStyle.Top;
 
-            Controls.Add(_webView);
+            // 添加顺序决定停靠优先级：最后添加的 Top 最靠上。
+            Controls.Add(_contentHost);
+            Controls.Add(_tabStrip);
             Controls.Add(_navigationBar);
 
             ResumeLayout(true);

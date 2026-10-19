@@ -24,6 +24,7 @@
 | `src/Theming/ThemePalette.cs` | 明暗两套配色 | 80 |
 | `src/Theming/ThemeManager.cs` | 系统主题检测、切换事件、DWM 标题栏 | 140 |
 | `src/Theming/IconFont.cs` | Fluent / MDL2 图标字体与码位 | 70 |
+| `src/Theming/ThemeFonts.cs` | 系统 UI 字体 | 20 |
 | `src/Browser/UrlHelper.cs` | 输入规范化、搜索回退 | 55 |
 | `src/Browser/WebViewEnvironment.cs` | 环境创建、Runtime 检测 | 60 |
 | `src/Browser/WebView2Bootstrap.cs` | 单文件 Loader 路径 | 30 |

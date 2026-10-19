@@ -46,7 +46,7 @@ namespace VantageLite.Browser
             {
                 BrowserTab tab = _tabs[i];
 
-                if (tab == ActiveTab || !tab.IsLive || tab.IsSuspended || tab.Visible)
+                if (tab.IsDisposed || tab == ActiveTab || !tab.IsLive || tab.IsSuspended || tab.Visible)
                 {
                     continue;
                 }
@@ -66,7 +66,7 @@ namespace VantageLite.Browser
             if (liveCount > _maxLiveTabs)
             {
                 List<BrowserTab> candidates = _tabs
-                    .Where(t => t != ActiveTab && t.IsLive)
+                    .Where(t => !t.IsDisposed && t != ActiveTab && t.IsLive)
                     .OrderBy(t => t.LastActivatedUtc)
                     .ToList();
 
@@ -92,7 +92,7 @@ namespace VantageLite.Browser
                 {
                     BrowserTab tab = _tabs[i];
 
-                    if (tab == ActiveTab || !tab.IsSuspended)
+                    if (tab.IsDisposed || tab == ActiveTab || !tab.IsSuspended)
                     {
                         continue;
                     }
@@ -116,11 +116,21 @@ namespace VantageLite.Browser
 
         private async Task<bool> TryDiscardAsync(BrowserTab tab)
         {
+            if (tab.IsDisposed || !tab.IsLive)
+            {
+                return false;
+            }
+
             bool dirty = tab.IsSuspended ? tab.HasUnsavedInput : await tab.IsDirtyAsync();
+
+            if (tab.IsDisposed || !tab.IsLive)
+            {
+                return false;
+            }
 
             if (dirty)
             {
-                Log.Info("[tabs] discard skipped (unsaved input): tab " + tab.Id);
+                Log.Debug("[tabs] discard skipped (unsaved input): tab " + tab.Id);
                 return false;
             }
 

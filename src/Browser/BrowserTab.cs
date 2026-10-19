@@ -29,6 +29,7 @@ namespace VantageLite.Browser
         private int _pendingScrollX;
         private int _pendingScrollY;
         private bool _hasUnsavedInput;
+        private bool _disposed;
 
         public int Id
         {
@@ -37,12 +38,17 @@ namespace VantageLite.Browser
 
         public bool IsLive
         {
-            get { return _webView != null; }
+            get { return _webView != null && !_webView.IsDisposed; }
         }
 
         public bool IsDiscarded
         {
-            get { return _webView == null; }
+            get { return !IsLive; }
+        }
+
+        public bool IsDisposed
+        {
+            get { return _disposed; }
         }
 
         public bool IsSuspended
@@ -109,6 +115,8 @@ namespace VantageLite.Browser
 
         public async Task EnsureLiveAsync()
         {
+            DropDisposedWebView();
+
             if (_webView != null)
             {
                 return;

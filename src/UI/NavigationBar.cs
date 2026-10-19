@@ -29,6 +29,12 @@ namespace VantageLite.UI
 
         public NavigationBar()
         {
+            SetStyle(
+                ControlStyles.ResizeRedraw |
+                ControlStyles.OptimizedDoubleBuffer |
+                ControlStyles.AllPaintingInWmPaint,
+                true);
+
             _toolTip = new ToolTip();
             BuildControls();
             ApplyTheme();
@@ -134,15 +140,16 @@ namespace VantageLite.UI
 
             _addressBox = new TextBox();
             _addressBox.BorderStyle = BorderStyle.None;
-            _addressBox.Font = new Font("Segoe UI", 10.5F);
+            _addressBox.Font = ThemeFonts.Ui(10.5F);
             _addressBox.Dock = DockStyle.Fill;
             _addressBox.KeyDown += AddressBox_KeyDown;
             _addressBox.GotFocus += delegate { _addressBox.SelectAll(); };
 
-            _addressHost = new Panel();
+            _addressHost = new BufferedPanel();
             _addressHost.Dock = DockStyle.Fill;
             _addressHost.Padding = new Padding(10, 4, 10, 4);
             _addressHost.Paint += AddressHost_Paint;
+            _addressHost.Resize += delegate { _addressHost.Invalidate(); };
             _addressHost.Controls.Add(_addressBox);
 
             Controls.Add(_addressHost);
@@ -211,6 +218,19 @@ namespace VantageLite.UI
             if (handler != null)
             {
                 handler(this, EventArgs.Empty);
+            }
+        }
+
+        private sealed class BufferedPanel : Panel
+        {
+            public BufferedPanel()
+            {
+                DoubleBuffered = true;
+                SetStyle(
+                    ControlStyles.ResizeRedraw |
+                    ControlStyles.OptimizedDoubleBuffer |
+                    ControlStyles.AllPaintingInWmPaint,
+                    true);
             }
         }
     }

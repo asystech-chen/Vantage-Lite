@@ -35,7 +35,7 @@ namespace VantageLite.UI
             Width = 180;
             Height = 30;
             Margin = new Padding(0, 0, 2, 0);
-            Font = new Font("Segoe UI", 9F);
+            Font = ThemeFonts.Ui(9F);
             Cursor = Cursors.Default;
 
             _indicator = new Panel();
@@ -83,11 +83,25 @@ namespace VantageLite.UI
             UpdateVisual();
         }
 
+        protected override void OnResize(EventArgs e)
+        {
+            base.OnResize(e);
+
+            if (_closeButton != null)
+            {
+                _closeButton.Visible = Width >= 88;
+            }
+
+            Invalidate();
+        }
+
         protected override void OnPaint(PaintEventArgs e)
         {
             base.OnPaint(e);
 
-            int rightPadding = _closeButton.Width + 14;
+            int rightPadding = (_closeButton != null && _closeButton.Visible)
+                ? _closeButton.Width + 14
+                : 10;
             Rectangle textRect = new Rectangle(
                 10,
                 2,

@@ -20,12 +20,12 @@ namespace VantageLite.Browser
         {
             BackColor = ThemeManager.Current.WebViewBackground;
 
-            if (_webView != null)
+            if (_webView != null && !_webView.IsDisposed)
             {
                 _webView.DefaultBackgroundColor = ThemeManager.Current.WebViewBackground;
             }
 
-            if (_core != null && !_isSuspended)
+            if (_core != null && !_isSuspended && !_disposed)
             {
                 _core.Profile.PreferredColorScheme = ThemeManager.IsDark
                     ? CoreWebView2PreferredColorScheme.Dark
@@ -39,7 +39,9 @@ namespace VantageLite.Browser
         /// </summary>
         public async Task<bool> SuspendAsync()
         {
-            if (_webView == null || _core == null || _isSuspended)
+            DropDisposedWebView();
+
+            if (_webView == null || _core == null || _isSuspended || _disposed)
             {
                 return false;
             }
@@ -49,6 +51,12 @@ namespace VantageLite.Browser
                 // 先记录脏表单状态，挂起后不能再执行脚本查询。
                 _hasUnsavedInput = await IsDirtyAsync();
 
+                DropDisposedWebView();
+                if (_webView == null || _core == null)
+                {
+                    return false;
+                }
+
                 bool suspended = await _core.TrySuspendAsync();
                 _isSuspended = suspended;
                 Log.Info("[tab " + _id + "] suspend: " + (suspended ? "ok" : "refused"));
@@ -56,6 +64,12 @@ namespace VantageLite.Browser
             }
             catch (Exception ex)
             {
+                if (_disposed || _webView == null || _webView.IsDisposed)
+                {
+                    Log.Debug("[tab " + _id + "] suspend skipped (disposed)");
+                    return false;
+                }
+
                 Log.Warn("[tab " + _id + "] suspend failed: " + ex.Message);
                 return false;
             }
@@ -63,7 +77,9 @@ namespace VantageLite.Browser
 
         public void Resume()
         {
-            if (_webView == null)
+            DropDisposedWebView();
+
+            if (_webView == null || _disposed)
             {
                 return;
             }
@@ -81,7 +97,9 @@ namespace VantageLite.Browser
         /// </summary>
         public async Task<bool> IsDirtyAsync()
         {
-            if (_core == null)
+            DropDisposedWebView();
+
+            if (_core == null || _disposed)
             {
                 return false;
             }
@@ -102,7 +120,9 @@ namespace VantageLite.Browser
         /// </summary>
         public async Task<bool> DiscardAsync()
         {
-            if (_webView == null)
+            DropDisposedWebView();
+
+            if (_webView == null || _disposed)
             {
                 return false;
             }
@@ -163,6 +183,8 @@ namespace VantageLite.Browser
 
         protected override void Dispose(bool disposing)
         {
+            _disposed = true;
+
             if (disposing && _webView != null)
             {
                 Controls.Remove(_webView);
@@ -172,6 +194,16 @@ namespace VantageLite.Browser
             }
 
             base.Dispose(disposing);
+        }
+
+        private void DropDisposedWebView()
+        {
+            if (_webView != null && _webView.IsDisposed)
+            {
+                _webView = null;
+                _core = null;
+                _isSuspended = false;
+            }
         }
 
     }

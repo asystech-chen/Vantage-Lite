@@ -34,7 +34,7 @@ namespace VantageLite.UI
             _panel = new FlowLayoutPanel();
             _panel.Dock = DockStyle.Fill;
             _panel.WrapContents = false;
-            _panel.AutoScroll = true;
+            _panel.AutoScroll = false;
             _panel.FlowDirection = FlowDirection.LeftToRight;
             _panel.Padding = Padding.Empty;
             _panel.Margin = Padding.Empty;
@@ -143,14 +143,14 @@ namespace VantageLite.UI
                 return 180;
             }
 
-            int available = _panel.ClientSize.Width - _newTabButton.Width - 16;
+            int available = _panel.ClientSize.Width - _newTabButton.Width - 16 - tabCount * 2;
             if (available <= 0)
             {
-                return 180;
+                return 160;
             }
 
             int width = available / tabCount;
-            return Math.Max(96, Math.Min(200, width));
+            return Math.Max(64, Math.Min(200, width));
         }
 
         private void OnItemSelectRequested(object sender, EventArgs e)

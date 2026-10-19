@@ -4,7 +4,7 @@ Windows 极简浏览器外壳，基于 **WebView2 (Edge Chromium)**。
 
 - 目标：启动即用、无账号、无同步、无推荐、无后台服务
 - 非目标：扩展、密码管理、与 Vantage (Firefox) 配置兼容
-- 当前版本：0.4.0（M2 挂起/脏表单保护 + 单文件便携）
+- 当前版本：0.4.1（M2 + 单文件便携 + UI 修复）
 - 已实现：多标签、后台挂起、脏表单保护、单文件 exe、明暗主题跟随系统
 
 ## 构建
@@ -74,6 +74,7 @@ VantageLite.exe --user-data-dir=D:\tmp\vl-profile --url=https://asystech.cn
 - 原生标题栏同步明暗（DWM）
 - 网页内容同步 `prefers-color-scheme`
 - 图标使用 Segoe Fluent Icons / Segoe MDL2 Assets
+- 正文使用 Windows 系统 UI 字体（SystemFonts.MessageBoxFont）
 
 ## 快捷键
 

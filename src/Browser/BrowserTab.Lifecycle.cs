@@ -1,6 +1,8 @@
 using System;
 using System.Windows.Forms;
+using Microsoft.Web.WebView2.Core;
 using VantageLite.Diagnostics;
+using VantageLite.Theming;
 
 namespace VantageLite.Browser
 {
@@ -10,6 +12,26 @@ namespace VantageLite.Browser
     /// </summary>
     public sealed partial class BrowserTab
     {
+        /// <summary>
+        /// 跟随系统明暗主题：窗口底色 + 网页 prefers-color-scheme。
+        /// </summary>
+        public void ApplyTheme()
+        {
+            BackColor = ThemeManager.Current.WebViewBackground;
+
+            if (_webView != null)
+            {
+                _webView.DefaultBackgroundColor = ThemeManager.Current.WebViewBackground;
+            }
+
+            if (_core != null)
+            {
+                _core.Profile.PreferredColorScheme = ThemeManager.IsDark
+                    ? CoreWebView2PreferredColorScheme.Dark
+                    : CoreWebView2PreferredColorScheme.Light;
+            }
+        }
+
         /// <summary>
         /// 销毁 WebView2 释放内存，但保留标签本身和 URL/标题。
         /// </summary>

@@ -23,7 +23,6 @@ namespace VantageLite.UI
 
             _contentHost = new Panel();
             _contentHost.Dock = DockStyle.Fill;
-            _contentHost.BackColor = Color.White;
 
             _tabStrip = new TabStrip();
             _tabStrip.Dock = DockStyle.Top;
@@ -31,10 +30,10 @@ namespace VantageLite.UI
             _navigationBar = new NavigationBar();
             _navigationBar.Dock = DockStyle.Top;
 
-            // 添加顺序决定停靠优先级：最后添加的 Top 最靠上。
+            // 添加顺序决定停靠优先级：最后添加的 Top 最靠上。标签条在上，地址栏在下。
             Controls.Add(_contentHost);
-            Controls.Add(_tabStrip);
             Controls.Add(_navigationBar);
+            Controls.Add(_tabStrip);
 
             ResumeLayout(true);
         }

@@ -4,8 +4,8 @@ Windows 极简浏览器外壳，基于 **WebView2 (Edge Chromium)**。
 
 - 目标：启动即用、无账号、无同步、无推荐、无后台服务
 - 非目标：扩展、密码管理、主题、与 Vantage (Firefox) 配置兼容
-- 当前版本：M1（多标签 + LRU 标签丢弃）
-- 已实现：多标签、标签条、后台标签丢弃、进程树内存统计
+- 当前版本：0.3.0（M1 多标签 + UI-1 主题与布局）
+- 已实现：多标签、标签条、后台标签丢弃、进程树内存统计、明暗主题跟随系统
 
 ## 构建
 
@@ -63,6 +63,14 @@ VantageLite.exe --user-data-dir=D:\tmp\vl-profile --url=https://asystech.cn
 ```
 
 exe 同目录放一个 `portable.txt` 可切换为便携模式，数据写到 `.\data\`。
+
+## 外观
+
+- 标签条在最上方，地址栏在下方
+- 跟随 Windows 明暗主题（`AppsUseLightTheme`），切换时实时更新
+- 原生标题栏同步明暗（DWM）
+- 网页内容同步 `prefers-color-scheme`
+- 图标使用 Segoe Fluent Icons / Segoe MDL2 Assets
 
 ## 快捷键
 

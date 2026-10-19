@@ -1,6 +1,7 @@
 using System;
 using Microsoft.Web.WebView2.Core;
 using VantageLite.Diagnostics;
+using VantageLite.Theming;
 
 namespace VantageLite.Browser
 {
@@ -16,6 +17,9 @@ namespace VantageLite.Browser
             _core.Settings.AreDefaultContextMenusEnabled = true;
             _core.Settings.IsStatusBarEnabled = true;
             _core.Settings.IsSwipeNavigationEnabled = false;
+            _core.Profile.PreferredColorScheme = ThemeManager.IsDark
+                ? CoreWebView2PreferredColorScheme.Dark
+                : CoreWebView2PreferredColorScheme.Light;
 
             _core.SourceChanged += Core_SourceChanged;
             _core.DocumentTitleChanged += Core_DocumentTitleChanged;

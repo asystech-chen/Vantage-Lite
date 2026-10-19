@@ -33,6 +33,7 @@ namespace VantageLite.UI
             _options = options ?? new CommandLineOptions();
             BuildLayout();
             WireNavigationEvents();
+            InitializeTheme();
 
             Load += MainForm_Load;
             FormClosed += MainForm_FormClosed;
@@ -84,6 +85,8 @@ namespace VantageLite.UI
         private void MainForm_FormClosed(object sender, FormClosedEventArgs e)
         {
             Log.Info("Main window closed.");
+            ShutdownTheme();
+
             if (_tabManager != null)
             {
                 _tabManager.Dispose();

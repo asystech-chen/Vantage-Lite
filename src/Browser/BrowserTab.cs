@@ -1,10 +1,10 @@
 using System;
-using System.Drawing;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 using VantageLite.Diagnostics;
+using VantageLite.Theming;
 
 namespace VantageLite.Browser
 {
@@ -85,7 +85,7 @@ namespace VantageLite.Browser
             _url = initialUrl;
 
             Dock = DockStyle.Fill;
-            BackColor = Color.White;
+            BackColor = ThemeManager.Current.WebViewBackground;
         }
 
         public async Task EnsureLiveAsync()
@@ -98,7 +98,7 @@ namespace VantageLite.Browser
             Log.Info("[tab " + _id + "] creating WebView2");
             WebView2 view = new WebView2();
             view.Dock = DockStyle.Fill;
-            view.DefaultBackgroundColor = Color.White;
+            view.DefaultBackgroundColor = ThemeManager.Current.WebViewBackground;
 
             try
             {

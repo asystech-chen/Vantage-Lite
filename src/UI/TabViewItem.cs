@@ -2,59 +2,55 @@ using System;
 using System.Drawing;
 using System.Windows.Forms;
 using VantageLite.Browser;
+using VantageLite.Theming;
 
 namespace VantageLite.UI
 {
     /// <summary>
-    /// 单个标签按钮。由 TabStrip 创建和更新。
-    /// 依赖：BrowserTab（只读展示）。改动注意：只负责外观和点击事件。
+    /// 单个标签按钮：标题、关闭按钮、活动指示线。
+    /// 依赖：BrowserTab（只读展示）/ ThemeManager。改动注意：只负责外观和点击事件。
     /// </summary>
     internal sealed class TabViewItem : Panel
     {
-        private static readonly Color TabColor = Color.FromArgb(34, 37, 45);
-        private static readonly Color ActiveTabColor = Color.FromArgb(48, 52, 62);
-        private static readonly Color AccentColor = Color.FromArgb(64, 156, 255);
-
         private readonly Label _titleLabel;
         private readonly Button _closeButton;
         private readonly Panel _indicator;
+
+        private BrowserTab _tab;
+        private bool _active;
+        private bool _hovered;
 
         public TabViewItem(int tabId)
         {
             TabId = tabId;
 
             Width = 180;
-            Height = 28;
+            Height = 30;
             Margin = new Padding(0, 0, 2, 0);
-            BackColor = TabColor;
             Cursor = Cursors.Hand;
 
             _indicator = new Panel();
-            _indicator.Dock = DockStyle.Bottom;
+            _indicator.Dock = DockStyle.Top;
             _indicator.Height = 2;
-            _indicator.BackColor = TabColor;
 
             _closeButton = new Button();
-            _closeButton.Text = "×";
+            _closeButton.Text = IconFont.Close;
             _closeButton.Dock = DockStyle.Right;
-            _closeButton.Width = 20;
+            _closeButton.Width = 22;
             _closeButton.FlatStyle = FlatStyle.Flat;
             _closeButton.FlatAppearance.BorderSize = 0;
-            _closeButton.BackColor = TabColor;
-            _closeButton.ForeColor = Color.Gainsboro;
-            _closeButton.Font = new Font("Segoe UI", 9F);
+            _closeButton.Font = IconFont.Create(8F);
             _closeButton.TabStop = false;
             _closeButton.Cursor = Cursors.Hand;
             _closeButton.Click += delegate { Raise(CloseRequested); };
-            _closeButton.MouseEnter += delegate { _closeButton.ForeColor = Color.White; };
-            _closeButton.MouseLeave += delegate { _closeButton.ForeColor = Color.Gainsboro; };
+            _closeButton.MouseEnter += OnCloseMouseEnter;
+            _closeButton.MouseLeave += OnCloseMouseLeave;
 
             _titleLabel = new Label();
             _titleLabel.Dock = DockStyle.Fill;
             _titleLabel.TextAlign = ContentAlignment.MiddleLeft;
             _titleLabel.AutoEllipsis = true;
-            _titleLabel.Padding = new Padding(8, 0, 2, 2);
-            _titleLabel.ForeColor = Color.Gainsboro;
+            _titleLabel.Padding = new Padding(10, 0, 2, 2);
             _titleLabel.Font = new Font("Segoe UI", 9F);
             _titleLabel.Cursor = Cursors.Hand;
 
@@ -66,6 +62,13 @@ namespace VantageLite.UI
             _titleLabel.Click += delegate { Raise(SelectRequested); };
             MouseDown += OnMouseDown;
             _titleLabel.MouseDown += OnMouseDown;
+
+            MouseEnter += OnMouseEnter;
+            MouseLeave += OnMouseLeave;
+            _titleLabel.MouseEnter += OnMouseEnter;
+            _titleLabel.MouseLeave += OnMouseLeave;
+
+            ApplyTheme();
         }
 
         public int TabId { get; private set; }
@@ -75,16 +78,64 @@ namespace VantageLite.UI
 
         public void Update(BrowserTab tab, bool active)
         {
-            Color background = active ? ActiveTabColor : TabColor;
+            _tab = tab;
+            _active = active;
+            UpdateVisual();
+        }
+
+        public void ApplyTheme()
+        {
+            UpdateVisual();
+        }
+
+        private void UpdateVisual()
+        {
+            ThemePalette palette = ThemeManager.Current;
+            Color background = _active
+                ? palette.TabActive
+                : (_hovered ? palette.TabHover : palette.TabInactive);
+
             BackColor = background;
             _closeButton.BackColor = background;
-            _indicator.BackColor = active ? AccentColor : background;
+            _indicator.BackColor = _active ? palette.Accent : background;
 
-            string prefix = tab.IsDiscarded ? "◌ " : string.Empty;
-            _titleLabel.Text = prefix + tab.DisplayTitle;
-            _titleLabel.ForeColor = active
-                ? Color.White
-                : (tab.IsDiscarded ? Color.Gray : Color.Gainsboro);
+            if (_tab == null)
+            {
+                _titleLabel.Text = "新标签页";
+                _titleLabel.ForeColor = palette.TextSecondary;
+                _closeButton.ForeColor = palette.TextSecondary;
+                return;
+            }
+
+            string prefix = _tab.IsDiscarded ? "◌ " : string.Empty;
+            _titleLabel.Text = prefix + _tab.DisplayTitle;
+            _titleLabel.ForeColor = _active
+                ? palette.TextPrimary
+                : (_tab.IsDiscarded ? palette.TextDisabled : palette.TextSecondary);
+            _closeButton.ForeColor = _active ? palette.TextPrimary : palette.TextSecondary;
+        }
+
+        private void OnMouseEnter(object sender, EventArgs e)
+        {
+            _hovered = true;
+            UpdateVisual();
+        }
+
+        private void OnMouseLeave(object sender, EventArgs e)
+        {
+            _hovered = false;
+            UpdateVisual();
+        }
+
+        private void OnCloseMouseEnter(object sender, EventArgs e)
+        {
+            _closeButton.BackColor = ThemeManager.Current.CloseHover;
+            _closeButton.ForeColor = Color.White;
+        }
+
+        private void OnCloseMouseLeave(object sender, EventArgs e)
+        {
+            UpdateVisual();
         }
 
         private void OnMouseDown(object sender, MouseEventArgs e)

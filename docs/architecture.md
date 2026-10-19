@@ -20,6 +20,9 @@
 | `src/Diagnostics/LogLevel.cs` | 日志级别枚举 | 14 |
 | `src/Diagnostics/Log.cs` | 线程安全日志 | 160 |
 | `src/Diagnostics/DiagnosticsInfo.cs` | OS / CLR / WebView2 版本 / 进程树内存 | 120 |
+| `src/Theming/ThemePalette.cs` | 明暗两套配色 | 80 |
+| `src/Theming/ThemeManager.cs` | 系统主题检测、切换事件、DWM 标题栏 | 140 |
+| `src/Theming/IconFont.cs` | Fluent / MDL2 图标字体与码位 | 70 |
 | `src/Browser/UrlHelper.cs` | 输入规范化、搜索回退 | 55 |
 | `src/Browser/WebViewEnvironment.cs` | 环境创建、Runtime 检测 | 56 |
 | `src/Browser/BrowserTab.cs` | 单标签状态与导航 API | 191 |
@@ -27,15 +30,16 @@
 | `src/Browser/BrowserTab.Lifecycle.cs` | 丢弃与销毁 | 60 |
 | `src/Browser/TabManager.cs` | 标签创建/切换/关闭 | 196 |
 | `src/Browser/TabManager.Internal.cs` | 查找、LRU 丢弃、日志、事件转发 | 110 |
-| `src/UI/MainForm.cs` | 装配、环境初始化、生命周期 | 94 |
+| `src/UI/MainForm.cs` | 装配、环境初始化、生命周期 | 100 |
+| `src/UI/MainForm.Theme.cs` | 主题初始化与切换 | 60 |
 | `src/UI/MainForm.Layout.cs` | 控件创建与布局 | 67 |
 | `src/UI/MainForm.Events.cs` | 标签事件转发与活动标签绑定 | 170 |
 | `src/UI/MainForm.Navigation.cs` | 导航与标签操作 | 102 |
 | `src/UI/MainForm.Shortcuts.cs` | 快捷键 | 106 |
 | `src/UI/MainForm.State.cs` | 活动标签状态同步 | 44 |
-| `src/UI/NavigationBar.cs` | 导航条控件 | 170 |
-| `src/UI/TabStrip.cs` | 标签条容器 | 153 |
-| `src/UI/TabViewItem.cs` | 单个标签按钮 | 106 |
+| `src/UI/NavigationBar.cs` | 导航条控件 | 220 |
+| `src/UI/TabStrip.cs` | 标签条容器 | 200 |
+| `src/UI/TabViewItem.cs` | 单个标签按钮 | 150 |
 
 ## 改哪里
 
@@ -49,6 +53,9 @@
 | 改窗口布局/尺寸 | `MainForm.Layout.cs` |
 | 改导航按钮/地址栏 UI | `NavigationBar.cs` |
 | 改标签条外观 | `TabViewItem.cs` |
+| 改主题配色 | `ThemePalette.cs` |
+| 改主题检测/切换 | `ThemeManager.cs` |
+| 改图标 | `IconFont.cs` |
 | 改标签条行为/排序 | `TabStrip.cs` |
 | 改标签生命周期 | `TabManager.cs` |
 | 改 LRU 丢弃策略 | `TabManager.Internal.cs` |
@@ -63,6 +70,7 @@
 |---|---|
 | M0 | 单标签、地址栏、导航、日志、诊断 |
 | M1 | 多标签、标签条、LRU 丢弃、进程树内存统计 |
+| UI-1 | 标签条置顶、明暗主题跟随系统、Fluent 图标、标签样式 |
 
 ## 后续模块（未创建）
 

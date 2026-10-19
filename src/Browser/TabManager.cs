@@ -171,6 +171,14 @@ namespace VantageLite.Browser
             LogTabState("close");
         }
 
+        public void ApplyTheme()
+        {
+            for (int i = 0; i < _tabs.Count; i++)
+            {
+                _tabs[i].ApplyTheme();
+            }
+        }
+
         public async Task ActivateNextAsync(int direction)
         {
             if (_tabs.Count == 0)

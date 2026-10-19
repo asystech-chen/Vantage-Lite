@@ -3,21 +3,19 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
 using VantageLite.Browser;
+using VantageLite.Theming;
 
 namespace VantageLite.UI
 {
     /// <summary>
     /// 标签条：显示所有标签、当前活动标签、关闭按钮和新建按钮。
-    /// 依赖：BrowserTab（只读展示）。改动注意：Sync 必须保持控件顺序与标签顺序一致。
+    /// 依赖：BrowserTab（只读展示）/ ThemeManager。改动注意：Sync 必须保持控件顺序与标签顺序一致。
     /// </summary>
     public sealed class TabStrip : UserControl
     {
         public event EventHandler<int> TabSelected;
         public event EventHandler<int> TabCloseRequested;
         public event EventHandler NewTabRequested;
-
-        private static readonly Color StripColor = Color.FromArgb(26, 29, 36);
-        private static readonly Color HoverColor = Color.FromArgb(55, 60, 72);
 
         private readonly FlowLayoutPanel _panel;
         private readonly Button _newTabButton;
@@ -30,38 +28,62 @@ namespace VantageLite.UI
             _toolTip = new ToolTip();
 
             Dock = DockStyle.Top;
-            Height = 34;
-            BackColor = StripColor;
-            Padding = new Padding(4, 2, 4, 0);
+            Height = 36;
+            Padding = new Padding(8, 4, 8, 0);
 
             _panel = new FlowLayoutPanel();
             _panel.Dock = DockStyle.Fill;
             _panel.WrapContents = false;
             _panel.AutoScroll = true;
             _panel.FlowDirection = FlowDirection.LeftToRight;
-            _panel.BackColor = StripColor;
             _panel.Padding = Padding.Empty;
             _panel.Margin = Padding.Empty;
 
             _newTabButton = new Button();
-            _newTabButton.Text = "+";
-            _newTabButton.Width = 28;
-            _newTabButton.Height = 26;
+            _newTabButton.Text = IconFont.Add;
+            _newTabButton.Width = 30;
+            _newTabButton.Height = 28;
             _newTabButton.FlatStyle = FlatStyle.Flat;
             _newTabButton.FlatAppearance.BorderSize = 0;
-            _newTabButton.BackColor = StripColor;
-            _newTabButton.ForeColor = Color.Gainsboro;
-            _newTabButton.Font = new Font("Segoe UI", 12F);
+            _newTabButton.Font = IconFont.Create(11F);
             _newTabButton.Margin = new Padding(2, 0, 0, 0);
             _newTabButton.TabStop = false;
             _newTabButton.Cursor = Cursors.Hand;
             _newTabButton.Click += delegate { Raise(NewTabRequested); };
-            _newTabButton.MouseEnter += delegate { _newTabButton.BackColor = HoverColor; };
-            _newTabButton.MouseLeave += delegate { _newTabButton.BackColor = StripColor; };
             _toolTip.SetToolTip(_newTabButton, "新建标签页 (Ctrl+T)");
 
             _panel.Controls.Add(_newTabButton);
             Controls.Add(_panel);
+
+            ApplyTheme();
+            ThemeManager.ThemeChanged += ThemeManager_ThemeChanged;
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                ThemeManager.ThemeChanged -= ThemeManager_ThemeChanged;
+                _toolTip.Dispose();
+            }
+
+            base.Dispose(disposing);
+        }
+
+        public void ApplyTheme()
+        {
+            ThemePalette palette = ThemeManager.Current;
+            BackColor = palette.TabStripBackground;
+            _panel.BackColor = palette.TabStripBackground;
+            _newTabButton.BackColor = palette.TabStripBackground;
+            _newTabButton.ForeColor = palette.TextSecondary;
+            _newTabButton.FlatAppearance.MouseOverBackColor = palette.ButtonHover;
+            _newTabButton.FlatAppearance.MouseDownBackColor = palette.ButtonPressed;
+
+            foreach (TabViewItem item in _items.Values)
+            {
+                item.ApplyTheme();
+            }
         }
 
         public void Sync(IList<BrowserTab> tabs, BrowserTab activeTab)
@@ -89,6 +111,8 @@ namespace VantageLite.UI
                 item.Dispose();
             }
 
+            int width = CalculateTabWidth(tabs.Count);
+
             for (int i = 0; i < tabs.Count; i++)
             {
                 BrowserTab tab = tabs[i];
@@ -103,12 +127,30 @@ namespace VantageLite.UI
                     _panel.Controls.Add(item);
                 }
 
+                item.Width = width;
                 item.Update(tab, tab == activeTab);
                 _toolTip.SetToolTip(item, tab.DisplayTitle + "\n" + (tab.Url ?? string.Empty));
                 _panel.Controls.SetChildIndex(item, Math.Min(i, _panel.Controls.Count - 1));
             }
 
             _panel.Controls.SetChildIndex(_newTabButton, _panel.Controls.Count - 1);
+        }
+
+        private int CalculateTabWidth(int tabCount)
+        {
+            if (tabCount <= 0)
+            {
+                return 180;
+            }
+
+            int available = _panel.ClientSize.Width - _newTabButton.Width - 16;
+            if (available <= 0)
+            {
+                return 180;
+            }
+
+            int width = available / tabCount;
+            return Math.Max(96, Math.Min(200, width));
         }
 
         private void OnItemSelectRequested(object sender, EventArgs e)
@@ -141,6 +183,17 @@ namespace VantageLite.UI
             }
         }
 
+        private void ThemeManager_ThemeChanged(object sender, EventArgs e)
+        {
+            if (IsHandleCreated && InvokeRequired)
+            {
+                BeginInvoke(new Action(ApplyTheme));
+                return;
+            }
+
+            ApplyTheme();
+        }
+
         private void Raise(EventHandler handler)
         {
             if (handler != null)
@@ -148,6 +201,5 @@ namespace VantageLite.UI
                 handler(this, EventArgs.Empty);
             }
         }
-
     }
 }

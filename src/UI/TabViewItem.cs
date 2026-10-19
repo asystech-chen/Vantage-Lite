@@ -8,26 +8,35 @@ namespace VantageLite.UI
 {
     /// <summary>
     /// 单个标签按钮：标题、关闭按钮、活动指示线。
-    /// 依赖：BrowserTab（只读展示）/ ThemeManager。改动注意：只负责外观和点击事件。
+    /// 依赖：BrowserTab（只读展示）/ ThemeManager。
+    /// 改动注意：标题用 TextRenderer 自绘，避免 Label.AutoEllipsis 在溢出时改变垂直位置。
     /// </summary>
     internal sealed class TabViewItem : Panel
     {
-        private readonly Label _titleLabel;
         private readonly Button _closeButton;
         private readonly Panel _indicator;
 
         private BrowserTab _tab;
         private bool _active;
         private bool _hovered;
+        private string _titleText;
+        private Color _titleColor;
 
         public TabViewItem(int tabId)
         {
             TabId = tabId;
 
+            SetStyle(
+                ControlStyles.OptimizedDoubleBuffer |
+                ControlStyles.AllPaintingInWmPaint |
+                ControlStyles.UserPaint,
+                true);
+
             Width = 180;
             Height = 30;
             Margin = new Padding(0, 0, 2, 0);
-            Cursor = Cursors.Hand;
+            Font = new Font("Segoe UI", 9F);
+            Cursor = Cursors.Default;
 
             _indicator = new Panel();
             _indicator.Dock = DockStyle.Top;
@@ -41,32 +50,18 @@ namespace VantageLite.UI
             _closeButton.FlatAppearance.BorderSize = 0;
             _closeButton.Font = IconFont.Create(8F);
             _closeButton.TabStop = false;
-            _closeButton.Cursor = Cursors.Hand;
+            _closeButton.Cursor = Cursors.Default;
             _closeButton.Click += delegate { Raise(CloseRequested); };
             _closeButton.MouseEnter += OnCloseMouseEnter;
             _closeButton.MouseLeave += OnCloseMouseLeave;
 
-            _titleLabel = new Label();
-            _titleLabel.Dock = DockStyle.Fill;
-            _titleLabel.TextAlign = ContentAlignment.MiddleLeft;
-            _titleLabel.AutoEllipsis = true;
-            _titleLabel.Padding = new Padding(10, 0, 2, 2);
-            _titleLabel.Font = new Font("Segoe UI", 9F);
-            _titleLabel.Cursor = Cursors.Hand;
-
-            Controls.Add(_titleLabel);
             Controls.Add(_closeButton);
             Controls.Add(_indicator);
 
             Click += delegate { Raise(SelectRequested); };
-            _titleLabel.Click += delegate { Raise(SelectRequested); };
             MouseDown += OnMouseDown;
-            _titleLabel.MouseDown += OnMouseDown;
-
             MouseEnter += OnMouseEnter;
             MouseLeave += OnMouseLeave;
-            _titleLabel.MouseEnter += OnMouseEnter;
-            _titleLabel.MouseLeave += OnMouseLeave;
 
             ApplyTheme();
         }
@@ -88,6 +83,30 @@ namespace VantageLite.UI
             UpdateVisual();
         }
 
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            base.OnPaint(e);
+
+            int rightPadding = _closeButton.Width + 14;
+            Rectangle textRect = new Rectangle(
+                10,
+                2,
+                Math.Max(0, Width - rightPadding),
+                Height - 3);
+
+            TextRenderer.DrawText(
+                e.Graphics,
+                _titleText ?? string.Empty,
+                Font,
+                textRect,
+                _titleColor,
+                TextFormatFlags.Left |
+                TextFormatFlags.VerticalCenter |
+                TextFormatFlags.SingleLine |
+                TextFormatFlags.EndEllipsis |
+                TextFormatFlags.NoPrefix);
+        }
+
         private void UpdateVisual()
         {
             ThemePalette palette = ThemeManager.Current;
@@ -101,18 +120,21 @@ namespace VantageLite.UI
 
             if (_tab == null)
             {
-                _titleLabel.Text = "新标签页";
-                _titleLabel.ForeColor = palette.TextSecondary;
+                _titleText = "新标签页";
+                _titleColor = palette.TextSecondary;
                 _closeButton.ForeColor = palette.TextSecondary;
-                return;
+            }
+            else
+            {
+                string prefix = _tab.IsDiscarded ? "◌ " : string.Empty;
+                _titleText = prefix + _tab.DisplayTitle;
+                _titleColor = _active
+                    ? palette.TextPrimary
+                    : (_tab.IsDiscarded ? palette.TextDisabled : palette.TextSecondary);
+                _closeButton.ForeColor = _active ? palette.TextPrimary : palette.TextSecondary;
             }
 
-            string prefix = _tab.IsDiscarded ? "◌ " : string.Empty;
-            _titleLabel.Text = prefix + _tab.DisplayTitle;
-            _titleLabel.ForeColor = _active
-                ? palette.TextPrimary
-                : (_tab.IsDiscarded ? palette.TextDisabled : palette.TextSecondary);
-            _closeButton.ForeColor = _active ? palette.TextPrimary : palette.TextSecondary;
+            Invalidate();
         }
 
         private void OnMouseEnter(object sender, EventArgs e)

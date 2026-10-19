@@ -48,7 +48,7 @@ namespace VantageLite.UI
             _newTabButton.Font = IconFont.Create(11F);
             _newTabButton.Margin = new Padding(2, 0, 0, 0);
             _newTabButton.TabStop = false;
-            _newTabButton.Cursor = Cursors.Hand;
+            _newTabButton.Cursor = Cursors.Default;
             _newTabButton.Click += delegate { Raise(NewTabRequested); };
             _toolTip.SetToolTip(_newTabButton, "新建标签页 (Ctrl+T)");
 

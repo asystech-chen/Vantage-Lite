@@ -162,7 +162,7 @@ namespace VantageLite.UI
             button.Font = IconFont.Create(12F);
             button.TabStop = false;
             button.Margin = new Padding(0, 0, 2, 0);
-            button.Cursor = Cursors.Hand;
+            button.Cursor = Cursors.Default;
             _toolTip.SetToolTip(button, toolTip);
             return button;
         }

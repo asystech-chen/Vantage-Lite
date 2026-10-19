@@ -29,7 +29,7 @@ if not defined MSBUILD (
 )
 
 echo Using MSBuild: %MSBUILD%
-"%MSBUILD%" "VantageLite.csproj" /p:Configuration=Release /p:PlatformTarget=x64 /m
+"%MSBUILD%" "VantageLite.csproj" /restore /p:Configuration=Release /p:PlatformTarget=x64 /m
 if errorlevel 1 goto :failed
 
 :done

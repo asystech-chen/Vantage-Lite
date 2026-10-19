@@ -1,20 +1,31 @@
 using System;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Windows.Forms;
 using VantageLite.App;
+using VantageLite.Browser;
 using VantageLite.Diagnostics;
 using VantageLite.UI;
 
 namespace VantageLite
 {
     /// <summary>
-    /// 程序入口：解析命令行、初始化日志、安装异常保护、启动主窗口。
-    /// 依赖：App / Diagnostics / UI。改动注意：保持这里只做装配，不写业务逻辑。
+    /// 程序入口：先安装单文件程序集解析器，再装配日志、主题和主窗口。
+    /// 依赖：App / Browser.Bootstrap / Diagnostics / UI。
+    /// 改动注意：Main 的第一条语句必须是 EmbeddedAssemblies.Initialize。
     /// </summary>
     internal static class Program
     {
         [STAThread]
         private static void Main(string[] args)
+        {
+            // 不能在任何 WebView2 类型被 JIT 之前引用，否则程序集会提前加载失败。
+            EmbeddedAssemblies.Initialize();
+            Run(args);
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void Run(string[] args)
         {
             CommandLineOptions options = CommandLineOptions.Parse(args);
 
@@ -46,6 +57,10 @@ namespace VantageLite
             {
                 Log.Warn(options.Warnings[i]);
             }
+
+            // 单文件模式：先指定 Loader 路径，再调用任何 WebView2 静态 API。
+            WebView2Bootstrap.ConfigureLoader();
+            DiagnosticsInfo.CaptureBaseline();
             Log.Info(DiagnosticsInfo.Collect());
 
             Application.EnableVisualStyles();
@@ -83,16 +98,18 @@ namespace VantageLite
             Console.WriteLine("用法: VantageLite.exe [选项] [URL]");
             Console.WriteLine();
             Console.WriteLine("选项:");
-            Console.WriteLine("  --log                 启用文件日志");
-            Console.WriteLine("  --log-level=LEVEL     debug | info | warn | error | off（默认 info）");
-            Console.WriteLine("  --log-file=PATH       指定日志文件路径");
-            Console.WriteLine("  --console             日志同时输出到控制台");
-            Console.WriteLine("  --user-data-dir=PATH  指定用户数据目录（独立 profile）");
-            Console.WriteLine("  --max-live-tabs=N     同时存活的标签上限，默认 5（范围 1-50）");
-            Console.WriteLine("  --url=URL             启动页（也可直接传 URL）");
-            Console.WriteLine("  --no-devtools         禁用 F12 开发者工具");
-            Console.WriteLine("  --version             显示版本");
-            Console.WriteLine("  --help                显示本帮助");
+            Console.WriteLine("  --log                       启用文件日志");
+            Console.WriteLine("  --log-level=LEVEL           debug | info | warn | error | off（默认 info）");
+            Console.WriteLine("  --log-file=PATH             指定日志文件路径");
+            Console.WriteLine("  --console                   日志同时输出到控制台");
+            Console.WriteLine("  --user-data-dir=PATH        指定用户数据目录");
+            Console.WriteLine("  --max-live-tabs=N           最多保留的 WebView2 实例数，默认 10（1-50）");
+            Console.WriteLine("  --suspend-after-seconds=N   后台标签静默多少秒后挂起，默认 30（0=不挂起）");
+            Console.WriteLine("  --discard-after-minutes=N   挂起多少分钟后销毁，默认 60（0=不销毁）");
+            Console.WriteLine("  --url=URL                   启动页（也可直接传 URL）");
+            Console.WriteLine("  --no-devtools               禁用 F12 开发者工具");
+            Console.WriteLine("  --version                   显示版本");
+            Console.WriteLine("  --help                      显示本帮助");
         }
     }
 }

@@ -12,14 +12,10 @@
 ## 默认路径
 
 ```
-%LOCALAPPDATA%\VantageLite\Logs\vantage-lite-YYYYMMDD-HHmmss.log
+<exe目录>\Logs\vantage-lite-YYYYMMDD-HHmmss.log
 ```
 
-便携模式（exe 同目录存在 `portable.txt`）：
-
-```
-<exe目录>\data\Logs\vantage-lite-YYYYMMDD-HHmmss.log
-```
+用户数据在同目录的 `UserData\`。所有文件都跟着 exe 走。
 
 ## 格式
 
@@ -47,14 +43,17 @@ System.InvalidOperationException: ...
 - 被新导航取代的 `ConnectionAborted` / `OperationCanceled`（仅 Debug）
 - 新窗口请求
 - 标签创建/切换/关闭，以及 LRU 丢弃
-- 标签状态：`[tabs] total=... live=... active=...; host=...MB, webview2=...MB (... processes)`
+- 标签状态：`[tabs] total=... live=... suspended=... discarded=... active=...; host=...MB, ours=...MB/Np, total=...MB/Np`
 - WebView2 进程异常（`ProcessFailedKind`）
 - 未处理异常与完整堆栈
 
 ## 内存统计说明
 
-`webview2=` 统计的是**整机所有** `msedgewebview2.exe` 进程，不只是本程序。
-单开本程序时可以直接用来观察标签内存变化；同时运行其他 WebView2 应用时数值会偏高。
+- `host=` 本程序宿主进程
+- `ours=` 本程序启动后新增的 `msedgewebview2.exe` 进程（私有内存）
+- `total=` 整机所有 `msedgewebview2.exe`，包含其他应用
+
+启动时会记录已有进程作为基线，后续统计排除它们。
 
 ## 注意
 

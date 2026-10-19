@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.Web.WebView2.Core;
 using VantageLite.Diagnostics;
@@ -24,7 +25,7 @@ namespace VantageLite.Browser
                 _webView.DefaultBackgroundColor = ThemeManager.Current.WebViewBackground;
             }
 
-            if (_core != null)
+            if (_core != null && !_isSuspended)
             {
                 _core.Profile.PreferredColorScheme = ThemeManager.IsDark
                     ? CoreWebView2PreferredColorScheme.Dark
@@ -33,23 +34,94 @@ namespace VantageLite.Browser
         }
 
         /// <summary>
-        /// 销毁 WebView2 释放内存，但保留标签本身和 URL/标题。
+        /// 挂起后台标签：保留 DOM/表单/滚动位置，只暂停脚本和渲染。
+        /// 调用前控件必须不可见，否则 TrySuspendAsync 会抛 COMException。
         /// </summary>
-        public void Discard()
+        public async Task<bool> SuspendAsync()
+        {
+            if (_webView == null || _core == null || _isSuspended)
+            {
+                return false;
+            }
+
+            try
+            {
+                // 先记录脏表单状态，挂起后不能再执行脚本查询。
+                _hasUnsavedInput = await IsDirtyAsync();
+
+                bool suspended = await _core.TrySuspendAsync();
+                _isSuspended = suspended;
+                Log.Info("[tab " + _id + "] suspend: " + (suspended ? "ok" : "refused"));
+                return suspended;
+            }
+            catch (Exception ex)
+            {
+                Log.Warn("[tab " + _id + "] suspend failed: " + ex.Message);
+                return false;
+            }
+        }
+
+        public void Resume()
         {
             if (_webView == null)
             {
                 return;
             }
 
+            if (_core != null && _core.IsSuspended)
+            {
+                _core.Resume();
+            }
+
+            _isSuspended = false;
+        }
+
+        /// <summary>
+        /// 页面里是否有未提交的表单改动。
+        /// </summary>
+        public async Task<bool> IsDirtyAsync()
+        {
+            if (_core == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                string result = await _core.ExecuteScriptAsync("window.__vantageDirty === true");
+                return string.Equals(result, "true", StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 真正销毁 WebView2：先保存 URL、标题和滚动位置。
+        /// </summary>
+        public async Task<bool> DiscardAsync()
+        {
+            if (_webView == null)
+            {
+                return false;
+            }
+
             if (_core != null)
             {
+                if (_core.IsSuspended)
+                {
+                    _core.Resume();
+                }
+
                 _url = _core.Source;
                 _title = _core.DocumentTitle;
+                await CaptureScrollAsync();
             }
 
             _pendingUrl = _url;
             _restorePending = true;
+            _isSuspended = false;
 
             Controls.Remove(_webView);
             _webView.Dispose();
@@ -62,6 +134,30 @@ namespace VantageLite.Browser
             if (handler != null)
             {
                 handler(this, DisplayTitle);
+            }
+
+            return true;
+        }
+
+        private async Task CaptureScrollAsync()
+        {
+            try
+            {
+                string result = await _core.ExecuteScriptAsync("window.scrollX + ',' + window.scrollY");
+                string text = result == null ? string.Empty : result.Trim('"');
+                string[] parts = text.Split(',');
+                int x;
+                int y;
+
+                if (parts.Length == 2 && int.TryParse(parts[0], out x) && int.TryParse(parts[1], out y))
+                {
+                    _pendingScrollX = x;
+                    _pendingScrollY = y;
+                    _hasPendingScroll = true;
+                }
+            }
+            catch
+            {
             }
         }
 

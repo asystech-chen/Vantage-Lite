@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Windows.Forms;
 using Microsoft.Web.WebView2.Core;
 using VantageLite.App;
@@ -46,6 +47,30 @@ namespace VantageLite.UI
 
         private async void MainForm_Load(object sender, EventArgs e)
         {
+            if (!WebViewEnvironment.IsRuntimeAvailable)
+            {
+                DialogResult result = MessageBox.Show(
+                    this,
+                    "未检测到 WebView2 Runtime。\n\nVantage Lite 需要 Microsoft Edge WebView2 Runtime 才能运行。\n是否打开官方下载页面？",
+                    "Vantage Lite",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Warning);
+
+                if (result == DialogResult.Yes)
+                {
+                    try
+                    {
+                        Process.Start("https://developer.microsoft.com/microsoft-edge/webview2/");
+                    }
+                    catch
+                    {
+                    }
+                }
+
+                Close();
+                return;
+            }
+
             try
             {
                 Log.Info("Creating WebView2 environment...");
@@ -55,7 +80,9 @@ namespace VantageLite.UI
                     _contentHost,
                     environment,
                     _options.EnableDevTools,
-                    _options.MaxLiveTabs);
+                    _options.MaxLiveTabs,
+                    _options.SuspendAfterSeconds,
+                    _options.DiscardAfterMinutes);
 
                 _tabManager.TabsChanged += TabManager_TabsChanged;
                 _tabManager.ActiveTabChanged += TabManager_ActiveTabChanged;

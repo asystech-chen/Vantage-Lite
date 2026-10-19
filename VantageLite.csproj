@@ -6,14 +6,15 @@
     <LangVersion>7.3</LangVersion>
     <RootNamespace>VantageLite</RootNamespace>
     <AssemblyName>VantageLite</AssemblyName>
-    <Version>0.3.1</Version>
+    <Version>0.4.0</Version>
     <ApplicationIcon>Resources\vantage.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <PlatformTarget>x64</PlatformTarget>
     <Prefer32Bit>false</Prefer32Bit>
-    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
-    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
+    <AutoGenerateBindingRedirects>false</AutoGenerateBindingRedirects>
+    <GenerateBindingRedirectsOutputType>false</GenerateBindingRedirectsOutputType>
     <Deterministic>true</Deterministic>
+    <DebugType Condition="'$(Configuration)' == 'Release'">none</DebugType>
   </PropertyGroup>
 
   <ItemGroup>
@@ -22,8 +23,39 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4258.31" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4258.31" GeneratePathProperty="true" ExcludeAssets="runtime" />
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
   </ItemGroup>
+
+  <!-- 单文件：WebView2 的托管 DLL 和 x64 Loader 全部嵌入 exe，运行时从资源加载。
+       用 Target 而不是静态 ItemGroup，避免首次 restore 前包路径属性为空。 -->
+  <Target Name="EmbedWebView2Assemblies" BeforeTargets="PrepareForBuild">
+    <Error Condition="'$(PkgMicrosoft_Web_WebView2)' == ''"
+           Text="找不到 Microsoft.Web.WebView2 包路径，请先执行 dotnet restore。" />
+    <Error Condition="!Exists('$(PkgMicrosoft_Web_WebView2)\lib\net462\Microsoft.Web.WebView2.Core.dll')"
+           Text="找不到 Microsoft.Web.WebView2.Core.dll，请检查 NuGet 缓存。" />
+    <Error Condition="!Exists('$(PkgMicrosoft_Web_WebView2)\runtimes\win-x64\native\WebView2Loader.dll')"
+           Text="找不到 x64 WebView2Loader.dll，请检查 NuGet 缓存。" />
+
+    <ItemGroup>
+      <EmbeddedResource Include="$(PkgMicrosoft_Web_WebView2)\lib\net462\Microsoft.Web.WebView2.Core.dll"
+                        LogicalName="VantageLite.Embedded.Microsoft.Web.WebView2.Core.dll" />
+      <EmbeddedResource Include="$(PkgMicrosoft_Web_WebView2)\lib\net462\Microsoft.Web.WebView2.WinForms.dll"
+                        LogicalName="VantageLite.Embedded.Microsoft.Web.WebView2.WinForms.dll" />
+      <EmbeddedResource Include="$(PkgMicrosoft_Web_WebView2)\runtimes\win-x64\native\WebView2Loader.dll"
+                        LogicalName="VantageLite.Embedded.WebView2Loader.dll" />
+    </ItemGroup>
+  </Target>
+
+  <!-- 兜底：即使 NuGet 仍然把依赖复制到输出目录，Release 下也清掉，保证只有一个 exe。 -->
+  <Target Name="RemoveEmbeddedDependencies" AfterTargets="Build">
+    <ItemGroup>
+      <EmbeddedFilesToDelete Include="$(OutputPath)Microsoft.Web.WebView2.*.dll" />
+      <EmbeddedFilesToDelete Include="$(OutputPath)WebView2Loader.dll" />
+      <EmbeddedFilesToDelete Include="$(OutputPath)VantageLite.exe.config" />
+    </ItemGroup>
+    <Delete Files="@(EmbeddedFilesToDelete)" />
+    <RemoveDir Directories="$(OutputPath)runtimes" Condition="Exists('$(OutputPath)runtimes')" />
+  </Target>
 
 </Project>

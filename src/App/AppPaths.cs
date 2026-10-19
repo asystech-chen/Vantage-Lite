@@ -4,8 +4,8 @@ using System.IO;
 namespace VantageLite.App
 {
     /// <summary>
-    /// 路径约定：默认写 LocalAppData；exe 同目录存在 portable.txt 时改为便携模式。
-    /// 依赖：无（仅 System.IO）。改动注意：不要在这里创建目录，创建交给 Ensure*。
+    /// 便携路径约定：所有数据都放在 exe 同目录。
+    /// 依赖：无。改动注意：exe 必须放在可写目录，不要放 Program Files。
     /// </summary>
     public static class AppPaths
     {
@@ -14,24 +14,12 @@ namespace VantageLite.App
             get { return AppDomain.CurrentDomain.BaseDirectory; }
         }
 
-        public static bool IsPortable
-        {
-            get { return File.Exists(Path.Combine(BaseDirectory, "portable.txt")); }
-        }
-
+        /// <summary>
+        /// 程序根目录。配置、日志、WebView2 profile 都从这里派生。
+        /// </summary>
         public static string DataRoot
         {
-            get
-            {
-                if (IsPortable)
-                {
-                    return Path.Combine(BaseDirectory, "data");
-                }
-
-                return Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "VantageLite");
-            }
+            get { return BaseDirectory; }
         }
 
         public static string DefaultUserDataDir
@@ -42,6 +30,14 @@ namespace VantageLite.App
         public static string DefaultLogDir
         {
             get { return Path.Combine(DataRoot, "Logs"); }
+        }
+
+        /// <summary>
+        /// 预留：设置文件固定放在 exe 同目录。
+        /// </summary>
+        public static string ConfigFile
+        {
+            get { return Path.Combine(DataRoot, "settings.json"); }
         }
 
         public static string ResolveUserDataDir(string explicitDir)

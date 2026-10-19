@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
 using Microsoft.Web.WebView2.Core;
@@ -6,11 +7,37 @@ using Microsoft.Web.WebView2.Core;
 namespace VantageLite.Diagnostics
 {
     /// <summary>
-    /// 启动时采集环境信息，写进日志帮助定位问题。
-    /// 依赖：WebView2 Core。改动注意：任何一项探测失败都不能抛异常。
+    /// 启动时采集环境信息，并区分“本程序新增的 WebView2 进程”和整机总量。
+    /// 依赖：WebView2 Core。改动注意：CaptureBaseline 必须在创建 WebView2 环境之前调用。
     /// </summary>
     public static class DiagnosticsInfo
     {
+        private static readonly HashSet<int> BaselinePids = new HashSet<int>();
+
+        /// <summary>
+        /// 记录启动时已经存在的 msedgewebview2 进程，后续统计时排除它们。
+        /// </summary>
+        public static void CaptureBaseline()
+        {
+            BaselinePids.Clear();
+            Process[] processes = Process.GetProcessesByName("msedgewebview2");
+
+            for (int i = 0; i < processes.Length; i++)
+            {
+                try
+                {
+                    BaselinePids.Add(processes[i].Id);
+                }
+                catch
+                {
+                }
+                finally
+                {
+                    processes[i].Dispose();
+                }
+            }
+        }
+
         public static string Collect()
         {
             StringBuilder sb = new StringBuilder();
@@ -27,31 +54,16 @@ namespace VantageLite.Diagnostics
             return sb.ToString().TrimEnd();
         }
 
-        private static string GetExecutablePath()
-        {
-            using (Process process = Process.GetCurrentProcess())
-            {
-                return process.MainModule.FileName;
-            }
-        }
-
-        private static string GetWorkingSetMb()
-        {
-            using (Process process = Process.GetCurrentProcess())
-            {
-                process.Refresh();
-                return (process.WorkingSet64 / 1024 / 1024).ToString();
-            }
-        }
-
         /// <summary>
-        /// 宿主进程 + 所有 msedgewebview2 进程的内存总和。
-        /// 注意：统计的是整机所有 WebView2 实例，不只是本程序。
+        /// host = 本程序宿主；ours = 本程序启动后新增的 WebView2 进程；total = 整机全部。
+        /// 使用私有内存，避免 WorkingSet 重复计算共享页。
         /// </summary>
         public static string GetMemorySummary()
         {
-            long webViewBytes = 0;
-            int processCount = 0;
+            long oursBytes = 0;
+            long totalBytes = 0;
+            int oursCount = 0;
+            int totalCount = 0;
 
             try
             {
@@ -60,8 +72,15 @@ namespace VantageLite.Diagnostics
                 {
                     try
                     {
-                        webViewBytes += processes[i].WorkingSet64;
-                        processCount++;
+                        long bytes = processes[i].PrivateMemorySize64;
+                        totalBytes += bytes;
+                        totalCount++;
+
+                        if (!BaselinePids.Contains(processes[i].Id))
+                        {
+                            oursBytes += bytes;
+                            oursCount++;
+                        }
                     }
                     catch
                     {
@@ -76,8 +95,33 @@ namespace VantageLite.Diagnostics
             {
             }
 
-            return "host=" + SafeGet(GetWorkingSetMb) + "MB, webview2="
-                + (webViewBytes / 1024 / 1024) + "MB (" + processCount + " processes)";
+            return "host=" + (GetHostPrivateBytes() / 1024 / 1024) + "MB"
+                + ", ours=" + (oursBytes / 1024 / 1024) + "MB/" + oursCount + "p"
+                + ", total=" + (totalBytes / 1024 / 1024) + "MB/" + totalCount + "p";
+        }
+
+        private static long GetHostPrivateBytes()
+        {
+            try
+            {
+                using (Process process = Process.GetCurrentProcess())
+                {
+                    process.Refresh();
+                    return process.PrivateMemorySize64;
+                }
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
+        private static string GetExecutablePath()
+        {
+            using (Process process = Process.GetCurrentProcess())
+            {
+                return process.MainModule.FileName;
+            }
         }
 
         private static string GetWebView2Version()

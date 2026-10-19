@@ -75,6 +75,7 @@ namespace VantageLite.Browser
 
             if (e.IsSuccess)
             {
+                RestorePendingScroll();
                 return;
             }
 
@@ -119,6 +120,26 @@ namespace VantageLite.Browser
             if (handler != null)
             {
                 handler(this, loading);
+            }
+        }
+
+        private void RestorePendingScroll()
+        {
+            if (!_hasPendingScroll || _core == null)
+            {
+                return;
+            }
+
+            int x = _pendingScrollX;
+            int y = _pendingScrollY;
+            _hasPendingScroll = false;
+
+            try
+            {
+                _ = _core.ExecuteScriptAsync("window.scrollTo(" + x + "," + y + ")");
+            }
+            catch
+            {
             }
         }
     }

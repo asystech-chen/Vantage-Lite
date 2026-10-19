@@ -26,45 +26,69 @@ Output: C:\Users\<you>\vantage-lite\bin\Release\net48\
 ## 产物
 
 ```
-bin\Release\net48\
-├── VantageLite.exe
-├── VantageLite.exe.config
-├── Microsoft.Web.WebView2.Core.dll
-├── Microsoft.Web.WebView2.WinForms.dll
-├── WebView2Loader.dll
-└── runtimes\...
+bin\Release\net48\VantageLite.exe
 ```
 
-分发时打包整个目录。只拷 exe 会缺少 WebView2 托管 DLL 和 Loader。
+**只有一个 exe。** 下列内容全部在构建时嵌入：
+
+- `Microsoft.Web.WebView2.Core.dll`
+- `Microsoft.Web.WebView2.WinForms.dll`
+- `WebView2Loader.dll`（x64）
+
+运行时：
+
+- 托管 DLL 通过 `AssemblyResolve` 从 exe 资源加载
+- 原生 Loader 解压到 `%TEMP%\VantageLite\Loader\x64-<pid>\`
+- 用 `CoreWebView2Environment.SetLoaderDllFolderPath` 指定该目录
+
+## 便携数据
+
+```
+<exe目录>\
+├── VantageLite.exe
+├── UserData\        WebView2 profile（Cookie、缓存、LocalStorage）
+└── Logs\            日志
+```
+
+不写注册表、不写 `%LOCALAPPDATA%`。请把 exe 放在可写目录，不要放 `Program Files`。
 
 ## 常见问题
 
-### NuGet 还原失败
+### 构建时报找不到 WebView2 程序集
 
-检查网络和 NuGet 源：
+先还原：
 
 ```bat
-dotnet nuget list source
+dotnet restore
 ```
 
-需要能访问 nuget.org。项目固定了两个包：
+项目用 `GeneratePathProperty` 从 NuGet 缓存取 DLL 路径。如果包缓存损坏，清掉 `%USERPROFILE%\.nuget\packages\microsoft.web.webview2` 后重新还原。
 
-- `Microsoft.Web.WebView2` 1.0.4258.31
-- `Microsoft.NETFramework.ReferenceAssemblies` 1.0.3（用于在没有 VS 的机器上编译 net48）
+### 输出目录仍然有 DLL
 
-### 提示找不到 System.Windows.Forms
-
-项目使用 SDK 风格 + 显式引用。确认没有改动 csproj 中的 `<Reference>` 段。
+确认 `VantageLite.csproj` 里的 `RemoveEmbeddedDependencies` target 没有被删掉。该 target 会在构建后清理残留依赖。
 
 ### 启动提示缺少 WebView2 Runtime
 
-安装 Evergreen Runtime：
+这是预期行为。Vantage Lite 会弹窗询问是否打开官方下载页：
 
 https://developer.microsoft.com/microsoft-edge/webview2/
+
+安装 Evergreen Runtime 后重新启动即可。
 
 ### 生成的 exe 是 32 位
 
 确认 `PlatformTarget` 为 `x64`，且构建时没有被外部参数覆盖。
+
+### 双击 exe 没反应
+
+用命令行启动看错误：
+
+```bat
+VantageLite.exe --log --console --log-level=debug
+```
+
+如果连日志都没有，检查 exe 是否被杀软拦截，或 exe 目录是否可写。
 
 ## 升级 WebView2 SDK
 
@@ -72,4 +96,4 @@ https://developer.microsoft.com/microsoft-edge/webview2/
 dotnet add package Microsoft.Web.WebView2
 ```
 
-或修改 csproj 中的版本号后重新构建。
+csproj 里嵌入路径写死了 `net462` 和 `win-x64`；升级后如果包结构变化，需要同步修改 `EmbeddedResource` 段。

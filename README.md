@@ -3,9 +3,9 @@
 Windows 极简浏览器外壳，基于 **WebView2 (Edge Chromium)**。
 
 - 目标：启动即用、无账号、无同步、无推荐、无后台服务
-- 非目标：扩展、密码管理、主题、与 Vantage (Firefox) 配置兼容
-- 当前版本：0.3.1（UI-1 + 标签文字溢出修复）
-- 已实现：多标签、标签条、后台标签丢弃、进程树内存统计、明暗主题跟随系统
+- 非目标：扩展、密码管理、与 Vantage (Firefox) 配置兼容
+- 当前版本：0.4.0（M2 挂起/脏表单保护 + 单文件便携）
+- 已实现：多标签、后台挂起、脏表单保护、单文件 exe、明暗主题跟随系统
 
 ## 构建
 
@@ -15,13 +15,14 @@ Windows 极简浏览器外壳，基于 **WebView2 (Edge Chromium)**。
 build.cmd
 ```
 
-产物目录：
+产物：
 
 ```
-bin\Release\net48\
+bin\Release\net48\VantageLite.exe
 ```
 
-分发时请打包**整个目录**（包含 `WebView2Loader.dll` 和 `Microsoft.Web.WebView2.*.dll`），不要只拷 exe。
+WebView2 的托管 DLL 和 x64 Loader 已嵌入 exe，**分发只需要这一个文件**。
+运行时会在 exe 同目录创建 `UserData\` 和 `Logs\`，请放在可写目录。
 
 ## 运行
 
@@ -42,7 +43,9 @@ bin\Release\net48\VantageLite.exe
 | `--log-file=PATH` | 指定日志文件 |
 | `--console` | 日志同时输出到控制台 |
 | `--user-data-dir=PATH` | 指定用户数据目录（独立 profile） |
-| `--max-live-tabs=N` | 同时存活的标签上限，默认 5（范围 1-50） |
+| `--max-live-tabs=N` | 最多保留的 WebView2 实例数，默认 10（1-50） |
+| `--suspend-after-seconds=N` | 后台标签静默多少秒后挂起，默认 30（0=不挂起） |
+| `--discard-after-minutes=N` | 挂起多少分钟后销毁，默认 60（0=不销毁） |
 | `--url=URL` | 指定启动页，也可直接传 URL |
 | `--no-devtools` | 禁用 F12 开发者工具 |
 | `--version` | 显示版本 |
@@ -59,10 +62,10 @@ VantageLite.exe --user-data-dir=D:\tmp\vl-profile --url=https://asystech.cn
 默认日志位置：
 
 ```
-%LOCALAPPDATA%\VantageLite\Logs\vantage-lite-YYYYMMDD-HHmmss.log
+<exe目录>\Logs\vantage-lite-YYYYMMDD-HHmmss.log
 ```
 
-exe 同目录放一个 `portable.txt` 可切换为便携模式，数据写到 `.\data\`。
+用户数据：`<exe目录>\UserData\`。所有文件都跟着 exe 走，不写 `%LOCALAPPDATA%`。
 
 ## 外观
 
@@ -86,34 +89,36 @@ exe 同目录放一个 `portable.txt` 可切换为便携模式，数据写到 `.
 | `Ctrl+9` | 切换到最后一个标签 |
 | `F12` | 开发者工具 |
 
-## M1 测试清单
+## M2 测试清单
 
 1. `build.cmd` 输出 `Build OK`
-2. 启动后能打开 ASYS 起始页
-3. `Ctrl+T` 新建标签，标签条出现第二个标签
-4. 在多个标签间切换，页面状态互不影响
-5. `Ctrl+W` 关闭当前标签；关掉最后一个标签时窗口关闭
-6. 页面里的 `target=_blank` 链接会在新标签打开
-7. `Ctrl+Tab` / `Ctrl+Shift+Tab` 循环切换
-8. 打开 6 个以上标签，日志出现 `discarded`，被丢弃标签标题前有 `◌`
-9. 切回被丢弃的标签，能恢复原 URL 并重新加载
-10. 日志里的 `[tabs]` 行包含 `total/live/active` 和 `host/webview2` 内存
-11. 快速连续导航时，`ConnectionAborted` 只出现在 Debug 级别，不再是 WARN
+2. `bin\Release\net48\` 里只有 `VantageLite.exe`（没有 DLL）
+3. 双击 exe 能打开 ASYS 起始页
+4. 新建标签并切换，功能正常
+5. 填一个表单（不提交），切到别的标签等 30 秒以上
+6. 切回原标签，表单内容仍在（说明是挂起不是销毁）
+7. 日志出现 `suspend: ok`，`[tabs]` 行包含 `suspended=`
+8. 把 `--suspend-after-seconds=0` 启动，后台标签不应挂起
+9. 把 `--max-live-tabs=2` 开 3 个标签，超限时优先销毁无表单标签
+10. 有未提交表单的标签不会被销毁（日志出现 `discard skipped`）
+11. 日志里的 `ours=` 只统计本程序新增的 WebView2 进程
+12. 退出后重开，确认 `UserData` 和 `Logs` 都在 exe 目录
 
-## 已知限制（M1）
+## 已知限制（M2）
 
 - 无会话恢复：关闭窗口后标签不保留
 - 无书签、历史、下载管理
 - 无自动更新
 - 未签名，首次运行可能触发 SmartScreen
-- 标签丢弃只按 LRU，不考虑页面是否有未提交表单
+- 脏表单检测只覆盖顶层文档的 `input/change`，跨域 iframe 和复杂 SPA 可能漏判
 
 ## 目录
 
 ```
-src/App          命令行、路径、异常保护
-src/Diagnostics  日志与环境信息
-src/Browser      URL 规范化、WebView2 环境、标签管理
+src/App          命令行、路径、异常保护、单文件装配
+src/Diagnostics  日志、环境信息、内存基线
+src/Browser      URL、WebView2 环境、标签生命周期
+src/Theming      明暗配色、主题检测、图标字体
 src/UI           窗口、导航条、标签条
 docs/            架构、构建、日志说明
 ```

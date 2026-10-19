@@ -12,7 +12,8 @@
 
 | 文件 | 职责 | 行数 |
 |---|---|---|
-| `src/Program.cs` | 入口、日志初始化、异常保护、启动窗口 | 97 |
+| `src/Program.cs` | 入口、单文件引导、日志初始化 | 130 |
+| `src/App/EmbeddedAssemblies.cs` | 嵌入 DLL 解析、Loader 解压 | 110 |
 | `src/App/CommandLineOptions.cs` | 命令行解析 | 155 |
 | `src/App/AppPaths.cs` | 默认路径、便携模式、日志路径 | 88 |
 | `src/App/ConsoleHelper.cs` | WinExe 附加控制台 | 41 |
@@ -24,12 +25,15 @@
 | `src/Theming/ThemeManager.cs` | 系统主题检测、切换事件、DWM 标题栏 | 140 |
 | `src/Theming/IconFont.cs` | Fluent / MDL2 图标字体与码位 | 70 |
 | `src/Browser/UrlHelper.cs` | 输入规范化、搜索回退 | 55 |
-| `src/Browser/WebViewEnvironment.cs` | 环境创建、Runtime 检测 | 56 |
+| `src/Browser/WebViewEnvironment.cs` | 环境创建、Runtime 检测 | 60 |
+| `src/Browser/WebView2Bootstrap.cs` | 单文件 Loader 路径 | 30 |
+| `src/Browser/DirtyFormScript.cs` | 脏表单标记脚本 | 20 |
 | `src/Browser/BrowserTab.cs` | 单标签状态与导航 API | 191 |
 | `src/Browser/BrowserTab.Events.cs` | WebView2 事件处理 | 121 |
-| `src/Browser/BrowserTab.Lifecycle.cs` | 丢弃与销毁 | 60 |
-| `src/Browser/TabManager.cs` | 标签创建/切换/关闭 | 196 |
-| `src/Browser/TabManager.Internal.cs` | 查找、LRU 丢弃、日志、事件转发 | 110 |
+| `src/Browser/BrowserTab.Lifecycle.cs` | 挂起/恢复/丢弃/滚动保存 | 170 |
+| `src/Browser/TabManager.cs` | 标签创建/切换/关闭 | 225 |
+| `src/Browser/TabManager.Internal.cs` | 查找、日志、事件转发 | 100 |
+| `src/Browser/TabManager.Maintenance.cs` | 挂起、硬上限销毁、脏表单跳过 | 130 |
 | `src/UI/MainForm.cs` | 装配、环境初始化、生命周期 | 100 |
 | `src/UI/MainForm.Theme.cs` | 主题初始化与切换 | 60 |
 | `src/UI/MainForm.Layout.cs` | 控件创建与布局 | 67 |
@@ -71,6 +75,7 @@
 | M0 | 单标签、地址栏、导航、日志、诊断 |
 | M1 | 多标签、标签条、LRU 丢弃、进程树内存统计 |
 | UI-1 | 标签条置顶、明暗主题跟随系统、Fluent 图标、标签样式 |
+| M2 | 后台挂起、脏表单保护、单文件 exe、便携数据目录、内存基线 |
 
 ## 后续模块（未创建）
 
@@ -80,11 +85,16 @@
 | M3 会话恢复 | `Services/SessionStore.cs` |
 | M4 设置/更新 | `UI/SettingsForm.cs`、`Services/Updater.cs` |
 
-## 标签丢弃设计
+## 标签生命周期设计
 
-- 每个标签对应一个 `BrowserTab`，内部持有一个 WebView2
-- 非活动标签隐藏控件，但保持 WebView2 存活
-- 存活数量超过 `--max-live-tabs`（默认 5）时，按 `LastActivatedUtc` 丢弃最久未用的**非活动**标签
-- 丢弃 = 释放 WebView2，保留 `BrowserTab`、URL、标题；标签条显示 `◌`
-- 切回被丢弃标签时重建 WebView2，并重新导航到保存的 URL
-- 当前活动标签永远不会被丢弃
+```
+Active      可见，Normal
+Background  隐藏，TrySuspendAsync()，保留 DOM/表单/滚动
+Discarded   仅超硬上限或挂起超时，且表单不脏；保存 URL + 滚动位置
+```
+
+- 默认后台静默 30 秒后挂起
+- `--max-live-tabs` 是 WebView2 实例硬上限（默认 10）
+- 挂起超过 `--discard-after-minutes`（默认 60）才允许真正销毁
+- 销毁前检查 `window.__vantageDirty`，有未提交表单则跳过
+- 活动标签永远不挂起、不销毁

@@ -5,8 +5,8 @@ using VantageLite.Diagnostics;
 namespace VantageLite.Browser
 {
     /// <summary>
-    /// TabManager 的内部辅助：销毁、查找、LRU 丢弃、状态日志（partial）。
-    /// 依赖：LINQ / Log / DiagnosticsInfo。改动注意：丢弃候选永远排除活动标签。
+    /// TabManager 的内部辅助：销毁、查找、状态日志、事件转发（partial）。
+    /// 依赖：Log / DiagnosticsInfo。改动注意：这里不做挂起/丢弃决策，策略在 TabManager.Maintenance.cs。
     /// </summary>
     public sealed partial class TabManager
     {
@@ -18,6 +18,12 @@ namespace VantageLite.Browser
             }
 
             _disposed = true;
+
+            if (_maintenanceTimer != null)
+            {
+                _maintenanceTimer.Stop();
+                _maintenanceTimer.Dispose();
+            }
 
             for (int i = _tabs.Count - 1; i >= 0; i--)
             {
@@ -41,35 +47,18 @@ namespace VantageLite.Browser
             return null;
         }
 
-        private void EnforceLimit()
-        {
-            int liveCount = _tabs.Count(t => t.IsLive);
-
-            while (liveCount > _maxLiveTabs)
-            {
-                BrowserTab candidate = _tabs
-                    .Where(t => t.IsLive && t != ActiveTab)
-                    .OrderBy(t => t.LastActivatedUtc)
-                    .FirstOrDefault();
-
-                if (candidate == null)
-                {
-                    break;
-                }
-
-                candidate.Discard();
-                liveCount--;
-            }
-        }
-
         private void LogTabState(string reason)
         {
             int liveCount = _tabs.Count(t => t.IsLive);
+            int suspendedCount = _tabs.Count(t => t.IsSuspended);
+            int discardedCount = _tabs.Count(t => t.IsDiscarded);
             string active = ActiveTab == null ? "none" : ActiveTab.Id.ToString();
 
             Log.Info("[tabs] " + reason
                 + ": total=" + _tabs.Count
                 + " live=" + liveCount
+                + " suspended=" + suspendedCount
+                + " discarded=" + discardedCount
                 + " active=" + active
                 + "; " + DiagnosticsInfo.GetMemorySummary());
         }

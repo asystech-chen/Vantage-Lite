@@ -18,6 +18,8 @@ namespace VantageLite.App
         public string StartUrl { get; set; }
         public bool EnableDevTools { get; set; }
         public int MaxLiveTabs { get; set; }
+        public int SuspendAfterSeconds { get; set; }
+        public int DiscardAfterMinutes { get; set; }
         public bool ShowHelp { get; set; }
         public bool ShowVersion { get; set; }
         public List<string> Warnings { get; private set; }
@@ -26,7 +28,9 @@ namespace VantageLite.App
         {
             LogLevel = LogLevel.Info;
             EnableDevTools = true;
-            MaxLiveTabs = 5;
+            MaxLiveTabs = 10;
+            SuspendAfterSeconds = 30;
+            DiscardAfterMinutes = 60;
             Warnings = new List<string>();
         }
 
@@ -107,6 +111,34 @@ namespace VantageLite.App
                     else
                     {
                         options.Warnings.Add("无效的 --max-live-tabs: " + value + "（范围 1-50）");
+                    }
+                    continue;
+                }
+
+                if (TryReadValue(args, ref i, lower, "--suspend-after-seconds", out value))
+                {
+                    int seconds;
+                    if (int.TryParse(value, out seconds) && seconds >= 0 && seconds <= 3600)
+                    {
+                        options.SuspendAfterSeconds = seconds;
+                    }
+                    else
+                    {
+                        options.Warnings.Add("无效的 --suspend-after-seconds: " + value + "（范围 0-3600）");
+                    }
+                    continue;
+                }
+
+                if (TryReadValue(args, ref i, lower, "--discard-after-minutes", out value))
+                {
+                    int minutes;
+                    if (int.TryParse(value, out minutes) && minutes >= 0 && minutes <= 1440)
+                    {
+                        options.DiscardAfterMinutes = minutes;
+                    }
+                    else
+                    {
+                        options.Warnings.Add("无效的 --discard-after-minutes: " + value + "（范围 0-1440）");
                     }
                     continue;
                 }

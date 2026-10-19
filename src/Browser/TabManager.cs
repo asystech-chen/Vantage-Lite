@@ -9,7 +9,7 @@ namespace VantageLite.Browser
 {
     /// <summary>
     /// 标签生命周期管理：创建、切换、关闭、LRU 丢弃。
-    /// 依赖：BrowserTab / Log。改动注意：EnforceLimit 绝不能丢弃当前活动标签。
+    /// 依赖：BrowserTab / Log。改动注意：活动标签永远不挂起、不销毁。
     /// </summary>
     public sealed partial class TabManager : IDisposable
     {
@@ -17,10 +17,14 @@ namespace VantageLite.Browser
         private readonly CoreWebView2Environment _environment;
         private readonly bool _enableDevTools;
         private readonly int _maxLiveTabs;
+        private readonly int _suspendAfterSeconds;
+        private readonly int _discardAfterMinutes;
         private readonly List<BrowserTab> _tabs;
+        private readonly Timer _maintenanceTimer;
 
         private int _nextId;
         private bool _disposed;
+        private bool _maintenanceBusy;
 
         public event EventHandler TabsChanged;
         public event EventHandler ActiveTabChanged;
@@ -31,14 +35,23 @@ namespace VantageLite.Browser
             Control host,
             CoreWebView2Environment environment,
             bool enableDevTools,
-            int maxLiveTabs)
+            int maxLiveTabs,
+            int suspendAfterSeconds,
+            int discardAfterMinutes)
         {
             _host = host;
             _environment = environment;
             _enableDevTools = enableDevTools;
             _maxLiveTabs = Math.Max(1, maxLiveTabs);
+            _suspendAfterSeconds = Math.Max(0, suspendAfterSeconds);
+            _discardAfterMinutes = Math.Max(0, discardAfterMinutes);
             _tabs = new List<BrowserTab>();
             _nextId = 1;
+
+            _maintenanceTimer = new Timer();
+            _maintenanceTimer.Interval = 5000;
+            _maintenanceTimer.Tick += MaintenanceTimer_Tick;
+            _maintenanceTimer.Start();
         }
 
         public IList<BrowserTab> Tabs
@@ -96,13 +109,20 @@ namespace VantageLite.Browser
                 }
 
                 tab.Visible = true;
+                tab.Resume();
                 tab.FocusContent();
                 RaiseTabsChanged();
                 return;
             }
 
+            if (ActiveTab != null)
+            {
+                ActiveTab.LastDeactivatedUtc = DateTime.UtcNow;
+            }
+
             ActiveTab = tab;
             tab.LastActivatedUtc = DateTime.UtcNow;
+            tab.LastDeactivatedUtc = DateTime.MinValue;
 
             for (int i = 0; i < _tabs.Count; i++)
             {
@@ -120,11 +140,14 @@ namespace VantageLite.Browser
                     Log.Error("[tabs] restore failed for tab " + tab.Id, ex);
                 }
             }
+            else
+            {
+                tab.Resume();
+            }
 
             tab.FocusContent();
             RaiseActiveChanged();
             RaiseTabsChanged();
-            EnforceLimit();
             LogTabState("activate");
         }
 
@@ -167,7 +190,6 @@ namespace VantageLite.Browser
             }
 
             RaiseTabsChanged();
-            EnforceLimit();
             LogTabState("close");
         }
 

@@ -24,6 +24,11 @@ namespace VantageLite.Browser
         private string _url;
         private string _title;
         private bool _restorePending;
+        private bool _isSuspended;
+        private bool _hasPendingScroll;
+        private int _pendingScrollX;
+        private int _pendingScrollY;
+        private bool _hasUnsavedInput;
 
         public int Id
         {
@@ -39,6 +44,18 @@ namespace VantageLite.Browser
         {
             get { return _webView == null; }
         }
+
+        public bool IsSuspended
+        {
+            get { return _isSuspended; }
+        }
+
+        public bool HasUnsavedInput
+        {
+            get { return _hasUnsavedInput; }
+        }
+
+        public DateTime LastDeactivatedUtc { get; set; }
 
         public string Url
         {
@@ -83,6 +100,8 @@ namespace VantageLite.Browser
             _enableDevTools = enableDevTools;
             _pendingUrl = initialUrl;
             _url = initialUrl;
+            LastActivatedUtc = DateTime.UtcNow;
+            LastDeactivatedUtc = DateTime.MinValue;
 
             Dock = DockStyle.Fill;
             BackColor = ThemeManager.Current.WebViewBackground;
@@ -107,6 +126,10 @@ namespace VantageLite.Browser
                 _webView = view;
                 _core = view.CoreWebView2;
                 ConfigureCore();
+                _isSuspended = false;
+
+                // 页面内表单改动标记，用于丢弃前的脏数据保护。
+                await _core.AddScriptToExecuteOnDocumentCreatedAsync(DirtyFormScript.Source);
             }
             catch
             {

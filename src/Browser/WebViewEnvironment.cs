@@ -27,6 +27,11 @@ namespace VantageLite.Browser
             }
         }
 
+        public static bool IsRuntimeAvailable
+        {
+            get { return !string.IsNullOrEmpty(RuntimeVersion); }
+        }
+
         public static async Task<CoreWebView2Environment> CreateAsync(CommandLineOptions options)
         {
             string runtimeVersion = RuntimeVersion;

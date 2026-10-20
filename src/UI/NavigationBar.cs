@@ -272,6 +272,8 @@ namespace VantageLite.UI
     internal sealed class GlyphButton : Button
     {
         private string _glyph;
+        private bool _hover;
+        private bool _pressed;
 
         public GlyphButton(string glyph)
         {
@@ -285,6 +287,8 @@ namespace VantageLite.UI
                 ControlStyles.OptimizedDoubleBuffer |
                 ControlStyles.AllPaintingInWmPaint,
                 true);
+            SetStyle(ControlStyles.Selectable, false);
+            TabStop = false;
         }
 
         public string Glyph
@@ -297,10 +301,68 @@ namespace VantageLite.UI
             }
         }
 
+        protected override bool ShowFocusCues
+        {
+            get { return false; }
+        }
+
+        protected override void OnMouseEnter(EventArgs e)
+        {
+            _hover = true;
+            Invalidate();
+            base.OnMouseEnter(e);
+        }
+
+        protected override void OnMouseLeave(EventArgs e)
+        {
+            _hover = false;
+            _pressed = false;
+            Invalidate();
+            base.OnMouseLeave(e);
+        }
+
+        protected override void OnMouseDown(MouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Left)
+            {
+                _pressed = true;
+                Invalidate();
+            }
+
+            base.OnMouseDown(e);
+        }
+
+        protected override void OnMouseUp(MouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Left)
+            {
+                _pressed = false;
+                Invalidate();
+            }
+
+            base.OnMouseUp(e);
+        }
+
         protected override void OnPaint(PaintEventArgs e)
         {
-            // 让基类绘制背景/边框/悬停状态，图标由这里按主题绘制。
-            base.OnPaint(e);
+            Color background = BackColor;
+
+            if (Enabled)
+            {
+                if (_pressed)
+                {
+                    background = FlatAppearance.MouseDownBackColor;
+                }
+                else if (_hover)
+                {
+                    background = FlatAppearance.MouseOverBackColor;
+                }
+            }
+
+            using (SolidBrush brush = new SolidBrush(background))
+            {
+                e.Graphics.FillRectangle(brush, ClientRectangle);
+            }
 
             Color color = Enabled ? ForeColor : ThemeManager.Current.TextDisabled;
 

@@ -39,6 +39,8 @@ namespace VantageLite.UI
             Dock = DockStyle.Top;
             Height = 30;
             Padding = new Padding(6, 2, 6, 2);
+            TabStop = false;
+            SetStyle(ControlStyles.Selectable, false);
 
             _buttons = new List<Button>();
             _toolTip = new ToolTip();
@@ -146,10 +148,11 @@ namespace VantageLite.UI
         private Button CreateItemButton(BookmarkNode node)
         {
             string text = node.IsFolder ? node.Title + " ▾" : node.Title;
-            Button button = new Button();
+            Button button = new FlatButton();
             button.TextAlign = ContentAlignment.MiddleLeft;
             button.Padding = new Padding(4, 0, 4, 0);
             button.Height = 24;
+            button.Margin = new Padding(0, 0, 2, 0);
             button.FlatStyle = FlatStyle.Flat;
             button.UseVisualStyleBackColor = false;
             button.FlatAppearance.BorderSize = 0;
@@ -887,6 +890,7 @@ namespace VantageLite.UI
     internal static class MenuPositioner
     {
         private static readonly List<ToolStripDropDown> OpenMenus = new List<ToolStripDropDown>();
+        private static System.Windows.Forms.Timer _mouseWatch;
 
         public static bool HasOpenMenu
         {
@@ -958,18 +962,40 @@ namespace VantageLite.UI
                 x = bounds.Right - size.Width;
             }
 
-            if (y + size.Height > bounds.Bottom)
-            {
-                // 底部放不下时贴着窗口底部向上撑，而不是翻到锚点上方盖住工具栏。
-                y = bounds.Bottom - size.Height;
-            }
-
+            // 垂直方向交给 WinForms 自己处理（放不下会自动向上/加滚动），
+            // 手动夹取会把菜单推离锚点，造成和工具栏间距异常。
             x = Math.Max(bounds.Left, x);
-            y = Math.Max(bounds.Top, Math.Min(y, Math.Max(bounds.Top, bounds.Bottom - size.Height)));
 
             Track(menu);
             menu.Closed += delegate { Untrack(menu); };
+            StartMouseWatch();
             menu.Show(new Point(x, y));
+        }
+
+        private static void StartMouseWatch()
+        {
+            if (_mouseWatch == null)
+            {
+                _mouseWatch = new System.Windows.Forms.Timer();
+                _mouseWatch.Interval = 15;
+                _mouseWatch.Tick += delegate
+                {
+                    if (!HasOpenMenu)
+                    {
+                        _mouseWatch.Stop();
+                        return;
+                    }
+
+                    // 低层消息可能被 WebView2 吞掉，这里直接看鼠标按键状态与光标位置。
+                    if (Control.MouseButtons != MouseButtons.None &&
+                        !ContainsScreenPoint(Cursor.Position))
+                    {
+                        CloseOpenMenus();
+                    }
+                };
+            }
+
+            _mouseWatch.Start();
         }
 
         private static void Track(ToolStripDropDown menu)

@@ -993,6 +993,9 @@ function clearDrop(){
                 + ";--btn:" + Hex(palette.ButtonHover)
                 + ";--card:" + Hex(palette.ChromeBackground)
                 + ";--input:" + Hex(palette.AddressBackground) + "}"
+                + ":focus{outline:none}"
+                + "a:focus{text-decoration:underline}"
+                + "input:focus,select:focus{border-color:var(--link)}"
                 + "body{margin:0;padding:28px 36px;background:var(--bg);color:var(--fg);"
                 + "font:14px/1.6 \"Segoe UI\",\"Microsoft YaHei\",sans-serif}"
                 + "h1{font-size:18px;font-weight:600;margin:0 0 4px}"

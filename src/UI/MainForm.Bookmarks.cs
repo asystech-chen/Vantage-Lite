@@ -251,6 +251,12 @@ namespace VantageLite.UI
 
         private async void TabManager_WebMessage(object sender, string message)
         {
+            if (message != null && message.IndexOf("dismissMenus", StringComparison.Ordinal) >= 0)
+            {
+                MenuPositioner.CloseOpenMenus();
+                return;
+            }
+
             Log.Info("[bookmarks] message: " + message);
 
             BookmarkCommand command = JsonFile.Parse<BookmarkCommand>(message);

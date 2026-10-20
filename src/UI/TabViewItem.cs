@@ -57,7 +57,7 @@ namespace VantageLite.UI
             _indicator.Dock = DockStyle.Top;
             _indicator.Height = 2;
 
-            _closeButton = new Button();
+            _closeButton = new FlatButton();
             _closeButton.Text = IconFont.Close;
             _closeButton.Dock = DockStyle.Right;
             _closeButton.Width = 22;

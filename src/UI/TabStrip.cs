@@ -52,7 +52,7 @@ namespace VantageLite.UI
             MouseUp += TabStrip_MouseUp;
             MouseDown += TabStrip_MouseDown;
 
-            _newTabButton = new Button();
+            _newTabButton = new FlatButton();
             _newTabButton.Text = IconFont.Add;
             _newTabButton.Width = 30;
             _newTabButton.Height = 28;

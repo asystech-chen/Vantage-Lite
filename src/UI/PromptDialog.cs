@@ -7,6 +7,132 @@ using VantageLite.Theming;
 namespace VantageLite.UI
 {
     /// <summary>
+    /// 完全自绘的平面按钮：不画系统边框/焦点虚框，禁用态用主题色。
+    /// 依赖：ThemeManager。改动注意：支持图片+文字和纯文字两种布局。
+    /// </summary>
+    internal class FlatButton : Button
+    {
+        private bool _hover;
+        private bool _pressed;
+
+        public FlatButton()
+        {
+            FlatStyle = FlatStyle.Flat;
+            UseVisualStyleBackColor = false;
+            FlatAppearance.BorderSize = 0;
+            TabStop = false;
+            SetStyle(
+                ControlStyles.UserPaint |
+                ControlStyles.OptimizedDoubleBuffer |
+                ControlStyles.AllPaintingInWmPaint |
+                ControlStyles.ResizeRedraw,
+                true);
+            SetStyle(ControlStyles.Selectable, false);
+        }
+
+        protected override bool ShowFocusCues
+        {
+            get { return false; }
+        }
+
+        protected override void OnMouseEnter(EventArgs e)
+        {
+            _hover = true;
+            Invalidate();
+            base.OnMouseEnter(e);
+        }
+
+        protected override void OnMouseLeave(EventArgs e)
+        {
+            _hover = false;
+            _pressed = false;
+            Invalidate();
+            base.OnMouseLeave(e);
+        }
+
+        protected override void OnMouseDown(MouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Left)
+            {
+                _pressed = true;
+                Invalidate();
+            }
+
+            base.OnMouseDown(e);
+        }
+
+        protected override void OnMouseUp(MouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Left)
+            {
+                _pressed = false;
+                Invalidate();
+            }
+
+            base.OnMouseUp(e);
+        }
+
+        protected override void OnEnabledChanged(EventArgs e)
+        {
+            Invalidate();
+            base.OnEnabledChanged(e);
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            Color background = BackColor;
+
+            if (Enabled)
+            {
+                if (_pressed)
+                {
+                    background = FlatAppearance.MouseDownBackColor;
+                }
+                else if (_hover)
+                {
+                    background = FlatAppearance.MouseOverBackColor;
+                }
+            }
+
+            using (SolidBrush brush = new SolidBrush(background))
+            {
+                e.Graphics.FillRectangle(brush, ClientRectangle);
+            }
+
+            int x = Padding.Left;
+
+            if (Image != null)
+            {
+                int y = Math.Max(0, (Height - Image.Height) / 2);
+                e.Graphics.DrawImage(Image, new Rectangle(x, y, Image.Width, Image.Height));
+                x += Image.Width + 4;
+            }
+
+            Color foreground = Enabled ? ForeColor : ThemeManager.Current.TextDisabled;
+            Rectangle textBounds = new Rectangle(x, 0, Math.Max(0, Width - x - Padding.Right), Height);
+
+            TextFormatFlags flags =
+                TextFormatFlags.VerticalCenter |
+                TextFormatFlags.NoPrefix |
+                TextFormatFlags.EndEllipsis |
+                TextFormatFlags.SingleLine;
+
+            if (TextAlign == ContentAlignment.MiddleCenter ||
+                TextAlign == ContentAlignment.TopCenter ||
+                TextAlign == ContentAlignment.BottomCenter)
+            {
+                flags |= TextFormatFlags.HorizontalCenter;
+            }
+            else
+            {
+                flags |= TextFormatFlags.Left;
+            }
+
+            TextRenderer.DrawText(e.Graphics, Text, Font, textBounds, foreground, flags);
+        }
+    }
+
+    /// <summary>
     /// 简单的单行输入对话框。依赖：ThemeManager。改动注意：只在 UI 线程调用。
     /// </summary>
     internal static class PromptDialog
@@ -44,7 +170,7 @@ namespace VantageLite.UI
                 box.BackColor = palette.AddressBackground;
                 box.ForeColor = palette.TextPrimary;
 
-                Button ok = new Button();
+                Button ok = new FlatButton();
                 ok.Text = "确定";
                 ok.DialogResult = DialogResult.OK;
                 ok.Left = 208;
@@ -52,7 +178,7 @@ namespace VantageLite.UI
                 ok.Width = 74;
                 ApplyButtonTheme(ok, palette);
 
-                Button cancel = new Button();
+                Button cancel = new FlatButton();
                 cancel.Text = "取消";
                 cancel.DialogResult = DialogResult.Cancel;
                 cancel.Left = 290;
@@ -238,12 +364,13 @@ namespace VantageLite.UI
 
         private static Button CreateButton(string text, ThemePalette palette)
         {
-            Button button = new Button();
+            Button button = new FlatButton();
             button.Text = text;
             button.FlatStyle = FlatStyle.Flat;
             button.UseVisualStyleBackColor = false;
             button.BackColor = palette.ChromeBackground;
             button.ForeColor = palette.TextPrimary;
+            button.FlatAppearance.BorderSize = 1;
             button.FlatAppearance.BorderColor = palette.AddressBorder;
             button.FlatAppearance.MouseOverBackColor = palette.ButtonHover;
             button.FlatAppearance.MouseDownBackColor = palette.ButtonPressed;
@@ -366,7 +493,7 @@ namespace VantageLite.UI
 
         private static Button CreateButton(string text, ThemePalette palette)
         {
-            Button button = new Button();
+            Button button = new FlatButton();
             button.Text = text;
             button.Height = 30;
             button.Width = 84;
@@ -374,6 +501,7 @@ namespace VantageLite.UI
             button.UseVisualStyleBackColor = false;
             button.BackColor = palette.ChromeBackground;
             button.ForeColor = palette.TextPrimary;
+            button.FlatAppearance.BorderSize = 1;
             button.FlatAppearance.BorderColor = palette.AddressBorder;
             button.FlatAppearance.MouseOverBackColor = palette.ButtonHover;
             button.FlatAppearance.MouseDownBackColor = palette.ButtonPressed;
@@ -474,7 +602,7 @@ namespace VantageLite.UI
 
         private static Button CreateButton(string text, DialogResult result, ThemePalette palette)
         {
-            Button button = new Button();
+            Button button = new FlatButton();
             button.Text = text;
             button.DialogResult = result;
             button.Width = 84;
@@ -483,6 +611,7 @@ namespace VantageLite.UI
             button.UseVisualStyleBackColor = false;
             button.BackColor = palette.ChromeBackground;
             button.ForeColor = palette.TextPrimary;
+            button.FlatAppearance.BorderSize = 1;
             button.FlatAppearance.BorderColor = palette.AddressBorder;
             button.FlatAppearance.MouseOverBackColor = palette.ButtonHover;
             button.FlatAppearance.MouseDownBackColor = palette.ButtonPressed;

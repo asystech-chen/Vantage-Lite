@@ -116,21 +116,29 @@ namespace VantageLite.UI
             RenderInternalPage(_faviconRefreshAddress, false);
         }
 
-        private async void ShowBookmarkManager()
+        private void ShowBookmarkManager()
+        {
+            OpenInternalPage(BookmarksAddress);
+        }
+
+        /// <summary>
+        /// 内置页面统一入口：已存在相同页面就切过去并刷新，否则新建标签。
+        /// </summary>
+        private async void OpenInternalPage(string address)
         {
             if (_tabManager == null)
             {
                 return;
             }
 
-            // 已经开着管理器就直接切过去，避免开一堆重复标签。
             for (int i = 0; i < _tabManager.Tabs.Count; i++)
             {
                 BrowserTab existing = _tabManager.Tabs[i];
 
-                if (string.Equals(existing.Url, BookmarksAddress, StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(existing.Url, address, StringComparison.OrdinalIgnoreCase))
                 {
                     await _tabManager.ActivateTabAsync(existing.Id);
+                    RenderInternalPage(address, true);
                     return;
                 }
             }
@@ -138,11 +146,11 @@ namespace VantageLite.UI
             try
             {
                 await _tabManager.CreateTabAsync("about:blank");
-                RenderInternalPage(BookmarksAddress, true);
+                RenderInternalPage(address, true);
             }
             catch (Exception ex)
             {
-                Log.Error("Open bookmarks manager failed", ex);
+                Log.Error("Open internal page failed: " + address, ex);
             }
         }
 
@@ -347,14 +355,14 @@ namespace VantageLite.UI
             menu.Font = VantageLite.Theming.ThemeFonts.Ui(9.5F);
 
             menu.Items.Add(AddMenuItem("新建标签页", delegate { CreateNewTab(); }));
-            menu.Items.Add(AddMenuItem("历史", delegate { ShowInternalPage(HistoryAddress); }));
+            menu.Items.Add(AddMenuItem("历史", delegate { OpenInternalPage(HistoryAddress); }));
             menu.Items.Add(AddMenuItem("书签管理器", delegate { ShowBookmarkManager(); }));
             menu.Items.Add(AddMenuItem(
                 _bookmarksBar.Visible ? "隐藏书签栏" : "显示书签栏",
                 delegate { ToggleBookmarksBar(); }));
 
             menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add(AddMenuItem("关于 Vantage Lite", delegate { ShowInternalPage(AboutAddress); }));
+            menu.Items.Add(AddMenuItem("关于 Vantage Lite", delegate { OpenInternalPage(AboutAddress); }));
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add(AddMenuItem("退出", delegate { Close(); }));
 

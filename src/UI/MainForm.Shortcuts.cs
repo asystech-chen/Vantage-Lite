@@ -74,7 +74,7 @@ namespace VantageLite.UI
 
             if (keyData == (Keys.Control | Keys.H))
             {
-                ShowInternalPage("about:history");
+                OpenInternalPage("about:history");
                 return true;
             }
 

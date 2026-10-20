@@ -208,7 +208,12 @@ namespace VantageLite.UI
 
             button.MouseUp += delegate (object sender, MouseEventArgs e)
             {
-                if (e.Button == MouseButtons.Right)
+                if (e.Button == MouseButtons.Left)
+                {
+                    _dragArmed = false;
+                    _dragNode = null;
+                }
+                else if (e.Button == MouseButtons.Right)
                 {
                     ShowItemMenu(button, node);
                 }

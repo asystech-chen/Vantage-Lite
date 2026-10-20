@@ -241,6 +241,7 @@ namespace VantageLite.UI
                 : (_hovered ? palette.TabHover : palette.TabInactive);
 
             BackColor = background;
+            _closeButton.UseVisualStyleBackColor = false;
             _closeButton.BackColor = background;
             _indicator.BackColor = _active ? palette.Accent : background;
 

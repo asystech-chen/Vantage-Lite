@@ -23,6 +23,7 @@ namespace VantageLite.UI
         {
             AttachActiveTab();
             UpdateFromActiveTab();
+            ApplyInternalPageTheme(ActiveTab);
         }
 
         private void TabStrip_TabSelected(object sender, int id)
@@ -223,12 +224,11 @@ namespace VantageLite.UI
                 return;
             }
 
-            MessageBox.Show(
+            MessageDialog.Show(
                 this,
                 "浏览器渲染进程异常退出：\n" + kind,
                 "Vantage Lite",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Warning);
+                MessageBoxButtons.OK);
         }
 
     }

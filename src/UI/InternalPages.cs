@@ -472,8 +472,18 @@ function clearDrop(){
         {
             if (folder)
             {
+                // 与书签栏一致，优先用 Windows 自带文件夹图标。
+                string shell = ShellIcons.FolderDataUri();
+                if (!string.IsNullOrEmpty(shell))
+                {
+                    return "<img class=\"fav\" src=\"" + shell + "\">";
+                }
+
                 return "<svg class=\"fav\" viewBox=\"0 0 16 16\">"
-                    + "<path d=\"M1.5 4.5h4.2l1.5 2h7.3v6.8h-13z\" fill=\"#d6aa3c\"/></svg>";
+                    + "<path d=\"M1.5 3.5h4.3l1.4 1.7h7.3a1 1 0 0 1 1 1v6.3a1 1 0 0 1-1 1h-13"
+                    + "a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1z\" fill=\"#e3b23c\"/>"
+                    + "<path d=\"M1.5 5.6h13v6.9a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1z\" fill=\"#f2c94c\"/>"
+                    + "</svg>";
             }
 
             // 优先使用已缓存的 favicon（支持 <link rel=icon> 的非根路径图标）。
@@ -549,66 +559,102 @@ function clearDrop(){
         private static string Page(string title, string subtitle, string body)
         {
             bool dark = ThemeManager.IsDark;
-            string background = dark ? "#1e1f22" : "#ffffff";
-            string foreground = dark ? "#e4e4e4" : "#222222";
-            string muted = dark ? "#9aa0a6" : "#888888";
-            string border = dark ? "#33363b" : "#eeeeee";
-            string link = dark ? "#6cb6ff" : "#1a66c9";
-            string buttonBg = dark ? "#2b2f36" : "#f1f4f8";
+            ThemePalette palette = ThemeManager.Current;
 
             return "<!doctype html><html><head><meta charset=\"utf-8\"><base target=\"_blank\">"
                 + "<title>" + Escape(title) + "</title><style>"
-                + ":root{color-scheme:" + (dark ? "dark" : "light") + "}"
-                + "body{margin:0;padding:28px 36px;background:" + background + ";color:" + foreground + ";"
+                + ":root{color-scheme:" + (dark ? "dark" : "light")
+                + ";--bg:" + Hex(palette.WebViewBackground)
+                + ";--fg:" + Hex(palette.TextPrimary)
+                + ";--muted:" + Hex(palette.TextSecondary)
+                + ";--border:" + Hex(palette.AddressBorder)
+                + ";--link:" + Hex(palette.Accent)
+                + ";--btn:" + Hex(palette.ButtonHover) + "}"
+                + "body{margin:0;padding:28px 36px;background:var(--bg);color:var(--fg);"
                 + "font:14px/1.6 \"Segoe UI\",\"Microsoft YaHei\",sans-serif}"
                 + "h1{font-size:18px;font-weight:600;margin:0 0 4px}"
-                + ".sub{color:" + muted + ";font-size:12px;margin-bottom:20px}"
+                + ".sub{color:var(--muted);font-size:12px;margin-bottom:20px}"
                 + "ul{list-style:none;padding:0;margin:0}"
-                + "li{padding:6px 0;border-bottom:1px solid " + border + "}"
-                + "a{color:" + link + ";text-decoration:none}"
+                + "li{padding:6px 0;border-bottom:1px solid var(--border)}"
+                + "a{color:var(--link);text-decoration:none}"
                 + "a:hover{text-decoration:underline}"
-                + ".url{color:" + muted + ";font-size:12px;word-break:break-all}"
-                + ".empty{color:" + muted + ";padding:24px 0}"
+                + ".url{color:var(--muted);font-size:12px;word-break:break-all}"
+                + ".empty{color:var(--muted);padding:24px 0}"
                 + ".tree .tree{padding-left:20px}"
                 + ".row{display:flex;align-items:center;gap:8px}"
                 + ".name{font-weight:600}"
                 + "button{font:12px/1 \"Segoe UI\",\"Microsoft YaHei\",sans-serif;padding:4px 8px;"
-                + "border:1px solid " + border + ";border-radius:4px;background:" + buttonBg + ";color:" + foreground + ";cursor:pointer}"
-                + "button:hover{border-color:" + link + "}"
-                + ".more{margin-left:auto;border:none;background:transparent;color:" + muted + ";font-size:16px;padding:0 8px}"
-                + ".more:hover{background:" + buttonBg + ";border-radius:4px}"
+                + "border:1px solid var(--border);border-radius:4px;background:var(--btn);color:var(--fg);cursor:pointer}"
+                + "button:hover{border-color:var(--link)}"
+                + ".more{margin-left:auto;border:none;background:transparent;color:var(--muted);font-size:16px;padding:0 8px}"
+                + ".more:hover{background:var(--btn);border-radius:4px}"
                 + ".bar{display:flex;align-items:center;gap:8px;margin-bottom:12px}"
-                + ".clip{color:" + muted + ";font-size:12px;margin-left:4px}"
-                + ".status{color:" + muted + ";font-size:12px;margin-left:auto}"
+                + ".clip{color:var(--muted);font-size:12px;margin-left:4px}"
+                + ".status{color:var(--muted);font-size:12px;margin-left:auto}"
                 + ".folder-head{display:flex;align-items:center;gap:6px;cursor:pointer}"
                 + ".fav{width:16px;height:16px;flex:0 0 16px;display:block;border-radius:2px}"
-                + ".tri{width:14px;color:" + muted + ";font-size:10px}"
-                + ".menu{position:absolute;display:none;background:" + background + ";border:1px solid " + border
+                + ".tri{width:14px;color:var(--muted);font-size:10px}"
+                + ".menu{position:absolute;display:none;background:var(--bg);border:1px solid var(--border)"
                 + ";border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,.35);padding:4px;z-index:10;min-width:160px}"
                 + ".menu div{padding:6px 10px;border-radius:4px;cursor:pointer;font-size:13px}"
-                + ".menu div:hover{background:" + buttonBg + "}"
+                + ".menu div:hover{background:var(--btn)}"
                 + ".menu .danger{color:#d9534f}"
                 + ".field{display:flex;flex-direction:column;gap:4px;margin-bottom:16px}"
-                + ".field span{color:" + muted + ";font-size:12px}"
+                + ".field span{color:var(--muted);font-size:12px}"
                 + ".check{display:flex;align-items:center;gap:8px;margin:8px 0 18px}"
                 + ".actions{display:flex;align-items:center;gap:12px}"
-                + "input[type=number]{padding:6px;font:14px \"Segoe UI\",\"Microsoft YaHei\",sans-serif;box-sizing:border-box}"
-                + ".about .line{display:flex;gap:16px;padding:10px 0;border-bottom:1px solid " + border + "}"
-                + ".about .k{width:150px;color:" + muted + "}"
+                + "input[type=number],input[type=text]{padding:6px;font:14px \"Segoe UI\",\"Microsoft YaHei\",sans-serif;"
+                + "box-sizing:border-box;background:var(--btn);color:var(--fg);border:1px solid var(--border);border-radius:4px}"
+                + ".about .line{display:flex;gap:16px;padding:10px 0;border-bottom:1px solid var(--border)}"
+                + ".about .k{width:150px;color:var(--muted)}"
                 + ".about .v{word-break:break-all}"
                 + ".drop-into{background:rgba(76,154,255,.16);border-radius:4px}"
-                + ".drop-before{box-shadow:inset 0 2px 0 " + link + "}"
-                + ".drop-after{box-shadow:inset 0 -2px 0 " + link + "}"
+                + ".drop-before{box-shadow:inset 0 2px 0 var(--link)}"
+                + ".drop-after{box-shadow:inset 0 -2px 0 var(--link)}"
                 + ".modal{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;align-items:center;justify-content:center}"
-                + ".panel{background:" + background + ";padding:20px;border-radius:8px;min-width:320px;box-shadow:0 10px 30px rgba(0,0,0,.3)}"
+                + ".panel{background:var(--bg);padding:20px;border-radius:8px;min-width:320px;box-shadow:0 10px 30px rgba(0,0,0,.3)}"
                 + ".panel-title{font-weight:600;margin-bottom:10px}"
-                + "select{width:100%;padding:6px;font:14px \"Segoe UI\",\"Microsoft YaHei\",sans-serif}"
-                + "input[type=text]{width:100%;padding:6px;font:14px \"Segoe UI\",\"Microsoft YaHei\",sans-serif;box-sizing:border-box;margin-top:6px}"
+                + "select{width:100%;padding:6px;font:14px \"Segoe UI\",\"Microsoft YaHei\",sans-serif;"
+                + "background:var(--btn);color:var(--fg);border:1px solid var(--border);border-radius:4px}"
                 + ".warn{background:#c0392b;color:#fff;padding:8px 12px;border-radius:4px;margin-bottom:12px}"
                 + ".panel-buttons{margin-top:14px;display:flex;gap:8px;justify-content:flex-end}"
-                + "</style></head><body><h1>" + Escape(title) + "</h1>"
+                + "</style><script>var VLT_THEME=" + ThemeJson() + ";"
+                + "function vantageApplyTheme(dark){var t=VLT_THEME[dark?'dark':'light'];if(!t){return;}"
+                + "var s=document.documentElement.style;s.setProperty('color-scheme',dark?'dark':'light');"
+                + "s.setProperty('--bg',t.bg);s.setProperty('--fg',t.fg);s.setProperty('--muted',t.muted);"
+                + "s.setProperty('--border',t.border);s.setProperty('--link',t.link);s.setProperty('--btn',t.btn);}"
+                + "</script></head><body><h1>" + Escape(title) + "</h1>"
                 + "<div class=\"sub\">" + Escape(subtitle) + "</div>"
                 + body + "</body></html>";
+        }
+
+        /// <summary>
+        /// 主题切换时注入内置页的脚本；页面里没有定义时安全跳过。
+        /// </summary>
+        public static string ThemeScript()
+        {
+            return "if(window.vantageApplyTheme){vantageApplyTheme("
+                + (ThemeManager.IsDark ? "true" : "false") + ");}";
+        }
+
+        private static string ThemeJson()
+        {
+            return "{dark:" + ThemeObject(ThemePalette.Dark) + ",light:" + ThemeObject(ThemePalette.Light) + "}";
+        }
+
+        private static string ThemeObject(ThemePalette palette)
+        {
+            return "{bg:'" + Hex(palette.WebViewBackground)
+                + "',fg:'" + Hex(palette.TextPrimary)
+                + "',muted:'" + Hex(palette.TextSecondary)
+                + "',border:'" + Hex(palette.AddressBorder)
+                + "',link:'" + Hex(palette.Accent)
+                + "',btn:'" + Hex(palette.ButtonHover) + "'}";
+        }
+
+        private static string Hex(System.Drawing.Color color)
+        {
+            return "#" + color.R.ToString("x2") + color.G.ToString("x2") + color.B.ToString("x2");
         }
 
         private static string DisplayTitle(string title, string url)

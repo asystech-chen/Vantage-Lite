@@ -242,6 +242,27 @@ namespace VantageLite.Browser
             }
         }
 
+        /// <summary>
+        /// 在内置页里执行脚本（例如主题切换时更新 CSS 变量）。挂起/未就绪时安全跳过。
+        /// </summary>
+        public void ExecuteScript(string script)
+        {
+            CoreWebView2 core = _core;
+
+            if (core == null || _disposed || _isSuspended)
+            {
+                return;
+            }
+
+            try
+            {
+                core.ExecuteScriptAsync(script ?? string.Empty);
+            }
+            catch
+            {
+            }
+        }
+
         public void PostWebMessage(string text)
         {
             CoreWebView2 core = _core;

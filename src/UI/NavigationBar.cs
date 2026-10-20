@@ -40,6 +40,7 @@ namespace VantageLite.UI
                 true);
 
             _toolTip = new ToolTip();
+            ThemeManager.ApplyToolTip(_toolTip);
             BuildControls();
             ApplyTheme();
             ThemeManager.ThemeChanged += ThemeManager_ThemeChanged;
@@ -68,6 +69,7 @@ namespace VantageLite.UI
             Button[] buttons = { _backButton, _forwardButton, _reloadButton, _homeButton, _bookmarkButton, _menuButton };
             for (int i = 0; i < buttons.Length; i++)
             {
+                buttons[i].UseVisualStyleBackColor = false;
                 buttons[i].BackColor = palette.ChromeBackground;
                 buttons[i].ForeColor = palette.TextPrimary;
                 buttons[i].FlatAppearance.MouseOverBackColor = palette.ButtonHover;

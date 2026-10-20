@@ -58,6 +58,9 @@ namespace VantageLite.UI
                 _settings.MaxLiveTabs = AppSettings.DefaultMaxLiveTabs;
             }
 
+            // 先确定明暗主题，再建控件，避免书签栏等控件在浅色配色下初始化。
+            VantageLite.Theming.ThemeManager.Initialize();
+
             BuildLayout();
             WireNavigationEvents();
             InitializeTheme();
@@ -99,12 +102,11 @@ namespace VantageLite.UI
         {
             if (!WebViewEnvironment.IsRuntimeAvailable)
             {
-                DialogResult result = MessageBox.Show(
+                DialogResult result = MessageDialog.Show(
                     this,
                     "未检测到 WebView2 Runtime。\n\nVantage Lite 需要 Microsoft Edge WebView2 Runtime 才能运行。\n是否打开官方下载页面？",
                     "Vantage Lite",
-                    MessageBoxButtons.YesNo,
-                    MessageBoxIcon.Warning);
+                    MessageBoxButtons.YesNo);
 
                 if (result == DialogResult.Yes)
                 {
@@ -154,12 +156,11 @@ namespace VantageLite.UI
             catch (Exception ex)
             {
                 Log.Error("WebView2 初始化失败", ex);
-                MessageBox.Show(
+                MessageDialog.Show(
                     this,
                     "浏览器内核初始化失败：\n" + ex.Message,
                     "Vantage Lite",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
+                    MessageBoxButtons.OK);
                 Close();
             }
         }

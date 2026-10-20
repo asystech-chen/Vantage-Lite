@@ -370,12 +370,11 @@ namespace VantageLite.UI
 
         private void ClearHistory()
         {
-            DialogResult result = MessageBox.Show(
+            DialogResult result = MessageDialog.Show(
                 this,
                 "清空全部浏览历史？",
                 "Vantage Lite",
-                MessageBoxButtons.YesNo,
-                MessageBoxIcon.Question);
+                MessageBoxButtons.YesNo);
 
             if (result != DialogResult.Yes)
             {
@@ -397,6 +396,7 @@ namespace VantageLite.UI
             ContextMenuStrip menu = new ContextMenuStrip();
             menu.ShowImageMargin = false;
             menu.Font = VantageLite.Theming.ThemeFonts.Ui(9.5F);
+            VantageLite.Theming.ThemeManager.ApplyMenuTheme(menu);
 
             menu.Items.Add(AddMenuItem("新建标签页", delegate { CreateNewTab(); }));
             menu.Items.Add(AddMenuItem("历史", delegate { OpenInternalPage(HistoryAddress); }));

@@ -32,6 +32,7 @@ namespace VantageLite.UI
         {
             _items = new Dictionary<int, TabViewItem>();
             _toolTip = new ToolTip();
+            ThemeManager.ApplyToolTip(_toolTip);
 
             Dock = DockStyle.Top;
             Height = 36;
@@ -84,6 +85,7 @@ namespace VantageLite.UI
             ThemePalette palette = ThemeManager.Current;
             BackColor = palette.TabStripBackground;
             _panel.BackColor = palette.TabStripBackground;
+            _newTabButton.UseVisualStyleBackColor = false;
             _newTabButton.BackColor = palette.TabStripBackground;
             _newTabButton.ForeColor = palette.TextSecondary;
             _newTabButton.FlatAppearance.MouseOverBackColor = palette.ButtonHover;

@@ -42,6 +42,7 @@ namespace VantageLite.UI
 
             _buttons = new List<Button>();
             _toolTip = new ToolTip();
+            ThemeManager.ApplyToolTip(_toolTip);
 
             _panel = new FlowLayoutPanel();
             _panel.Dock = DockStyle.Fill;
@@ -90,6 +91,7 @@ namespace VantageLite.UI
 
             if (_store == null || _store.ToolbarFolder == null)
             {
+                ApplyTheme();
                 return;
             }
 
@@ -104,6 +106,7 @@ namespace VantageLite.UI
                 _hintLabel.Font = ThemeFonts.Ui(9F);
                 _hintLabel.Margin = new Padding(4, 6, 0, 0);
                 _panel.Controls.Add(_hintLabel);
+                ApplyTheme();
                 return;
             }
 
@@ -114,6 +117,8 @@ namespace VantageLite.UI
                 _panel.Controls.Add(button);
                 _buttons.Add(button);
             }
+
+            ApplyTheme();
         }
 
         public void ApplyTheme()
@@ -121,6 +126,16 @@ namespace VantageLite.UI
             ThemePalette palette = ThemeManager.Current;
             BackColor = palette.ChromeBackground;
             _panel.BackColor = palette.ChromeBackground;
+
+            if (_hintLabel != null && !_hintLabel.IsDisposed)
+            {
+                _hintLabel.ForeColor = palette.TextDisabled;
+            }
+
+            if (_dropLine != null && !_dropLine.IsDisposed)
+            {
+                _dropLine.BackColor = palette.Accent;
+            }
 
             for (int i = 0; i < _buttons.Count; i++)
             {
@@ -136,6 +151,7 @@ namespace VantageLite.UI
             button.Padding = new Padding(4, 0, 4, 0);
             button.Height = 24;
             button.FlatStyle = FlatStyle.Flat;
+            button.UseVisualStyleBackColor = false;
             button.FlatAppearance.BorderSize = 0;
             button.TabStop = false;
             button.Cursor = Cursors.Default;
@@ -274,16 +290,22 @@ namespace VantageLite.UI
         {
             if (_folderIcon == null)
             {
-                Bitmap bitmap = new Bitmap(16, 16);
-                using (Graphics graphics = Graphics.FromImage(bitmap))
-                using (Font font = IconFont.Create(12F))
-                using (SolidBrush brush = new SolidBrush(Color.FromArgb(214, 170, 60)))
-                {
-                    graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
-                    graphics.DrawString(IconFont.Folder, font, brush, -1, -2);
-                }
+                // 优先用 Windows 资源管理器的文件夹图标，取不到再退回字体图标。
+                _folderIcon = ShellIcons.Folder();
 
-                _folderIcon = bitmap;
+                if (_folderIcon == null)
+                {
+                    Bitmap bitmap = new Bitmap(16, 16);
+                    using (Graphics graphics = Graphics.FromImage(bitmap))
+                    using (Font font = IconFont.Create(12F))
+                    using (SolidBrush brush = new SolidBrush(Color.FromArgb(214, 170, 60)))
+                    {
+                        graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+                        graphics.DrawString(IconFont.Folder, font, brush, -1, -2);
+                    }
+
+                    _folderIcon = bitmap;
+                }
             }
 
             return _folderIcon;
@@ -492,8 +514,7 @@ namespace VantageLite.UI
                 ? "删除文件夹「" + node.Title + "」及其中的全部内容？"
                 : "删除书签「" + node.Title + "」？";
 
-            if (MessageBox.Show(this, message, "书签工具栏", MessageBoxButtons.YesNo,
-                    MessageBoxIcon.Warning) == DialogResult.Yes)
+            if (MessageDialog.Show(this, message, "书签工具栏", MessageBoxButtons.YesNo) == DialogResult.Yes)
             {
                 _store.Remove(node.Id);
                 NotifyChanged();
@@ -535,6 +556,7 @@ namespace VantageLite.UI
             ContextMenuStrip menu = new ContextMenuStrip();
             menu.ShowImageMargin = false;
             menu.Font = ThemeFonts.Ui(9.5F);
+            ThemeManager.ApplyMenuTheme(menu);
             return menu;
         }
 
@@ -586,6 +608,7 @@ namespace VantageLite.UI
         private void ApplyButtonTheme(Button button)
         {
             ThemePalette palette = ThemeManager.Current;
+            button.UseVisualStyleBackColor = false;
             button.BackColor = palette.ChromeBackground;
             button.ForeColor = palette.TextPrimary;
             button.FlatAppearance.MouseOverBackColor = palette.ButtonHover;

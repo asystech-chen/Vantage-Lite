@@ -19,7 +19,7 @@ namespace VantageLite.UI
             StartPosition = FormStartPosition.CenterScreen;
             ClientSize = new Size(1200, 800);
             MinimumSize = new Size(800, 560);
-            BackColor = Color.FromArgb(24, 27, 33);
+            BackColor = VantageLite.Theming.ThemeManager.Current.WindowBackground;
 
             _contentHost = new Panel();
             _contentHost.Dock = DockStyle.Fill;

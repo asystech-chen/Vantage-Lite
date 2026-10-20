@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.Windows.Forms;
 using VantageLite.Browser;
+using VantageLite.Diagnostics;
 using VantageLite.Theming;
 
 namespace VantageLite.UI
@@ -49,7 +50,7 @@ namespace VantageLite.UI
             }
 
             int count = _lastTabs.Count;
-            int buttonWidth = _newTabButton == null ? 0 : _newTabButton.Width + 2;
+            int buttonWidth = _newTabButton == null ? 0 : _newTabButton.Width + ItemGap;
             int tabsViewport = Math.Max(1, viewportWidth - buttonWidth);
             int width = CalculateTabWidth(count, tabsViewport);
             int tabsTotal = count * (width + ItemGap);
@@ -97,6 +98,10 @@ namespace VantageLite.UI
             int panelWidth = Math.Max(tabsTotal, overflow ? tabsViewport : viewportWidth);
             _panel.SetBounds(-_scrollOffset, 0, panelWidth, viewportHeight);
 
+            Log.Debug("tab layout: dpi=" + DeviceDpi + " viewport=" + viewportWidth + "x" + viewportHeight +
+                " count=" + count + " tabWidth=" + width + " button=" + (_newTabButton == null ? 0 : _newTabButton.Width) +
+                "x" + (_newTabButton == null ? 0 : _newTabButton.Height));
+
             if (_newTabButton != null)
             {
                 _newTabButton.Left = overflow
@@ -112,12 +117,12 @@ namespace VantageLite.UI
         {
             if (tabCount <= 0)
             {
-                return MaxTabWidth;
+                return ScaledMaxTabWidth;
             }
 
             int natural = available / tabCount - ItemGap;
 
-            return Math.Max(CalculateMinTabWidth(), Math.Min(MaxTabWidth, natural));
+            return Math.Max(CalculateMinTabWidth(), Math.Min(ScaledMaxTabWidth, natural));
         }
 
         /// <summary>
@@ -126,8 +131,29 @@ namespace VantageLite.UI
         private int CalculateMinTabWidth()
         {
             int text = TextRenderer.MeasureText("国国", _measureFont).Width;
-            int width = 8 + 16 + 6 + text + 10;
-            return Math.Max(MinTabWidth, width);
+            // 8(左) + 16(图标) + 6(间距) + 10(右)，全部按 DPI 缩放。
+            int width = WindowChrome.Scale(this, 40) + text;
+            return Math.Max(ScaledMinTabWidth, width);
+        }
+
+        private int ScaledMaxTabWidth
+        {
+            get { return WindowChrome.Scale(this, MaxTabWidth); }
+        }
+
+        private int ScaledMinTabWidth
+        {
+            get { return WindowChrome.Scale(this, MinTabWidth); }
+        }
+
+        private int ScaledFadeWidth
+        {
+            get { return WindowChrome.Scale(this, FadeWidth); }
+        }
+
+        private int ScaledScrollStep
+        {
+            get { return WindowChrome.Scale(this, ScrollStep); }
         }
 
         private int IndexOfActive()
@@ -171,8 +197,9 @@ namespace VantageLite.UI
         /// </summary>
         private void UpdateFades(int width, int tabsViewport)
         {
-            int leftFade = _scrollOffset > 0 ? FadeWidth : 0;
-            int rightFade = _scrollOffset < _maxScroll ? FadeWidth : 0;
+            int fadeWidth = ScaledFadeWidth;
+            int leftFade = _scrollOffset > 0 ? fadeWidth : 0;
+            int rightFade = _scrollOffset < _maxScroll ? fadeWidth : 0;
 
             for (int i = 0; i < _lastTabs.Count; i++)
             {
@@ -237,11 +264,11 @@ namespace VantageLite.UI
 
             if (vertical)
             {
-                ScrollBy(delta > 0 ? -ScrollStep : ScrollStep);
+                ScrollBy(delta > 0 ? -ScaledScrollStep : ScaledScrollStep);
             }
             else
             {
-                ScrollBy(delta > 0 ? ScrollStep : -ScrollStep);
+                ScrollBy(delta > 0 ? ScaledScrollStep : -ScaledScrollStep);
             }
 
             return true;

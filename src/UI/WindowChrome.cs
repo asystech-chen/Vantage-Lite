@@ -40,6 +40,15 @@ namespace VantageLite.UI
         /// <summary>Mica 是否已成功启用；失败时退回主题纯色。</summary>
         public static bool MicaEnabled { get; private set; }
 
+        /// <summary>主窗口当前 DPI，供运行时创建的菜单/浮层换算尺寸。</summary>
+        public static int GlobalDpi = 96;
+
+        /// <summary>按全局 DPI 换算像素值（无控件上下文时使用）。</summary>
+        public static int Scale(int value)
+        {
+            return (int)Math.Round(value * GlobalDpi / 96.0);
+        }
+
         /// <summary>
         /// 标题栏/标签条的底色。Mica 生效时用纯黑，让 DWM 透出桌面材质。
         /// </summary>
@@ -126,6 +135,13 @@ namespace VantageLite.UI
 
             MARGINS margins = new MARGINS();
             DwmExtendFrameIntoClientArea(form.Handle, ref margins);
+        }
+
+        /// <summary>按当前 DPI 换算像素值。</summary>
+        public static int Scale(Control control, int value)
+        {
+            int dpi = control == null ? 96 : control.DeviceDpi;
+            return (int)Math.Round(value * dpi / 96.0);
         }
 
         /// <summary>缩放边框宽度：按当前 DPI 换算，保证高 DPI 下仍好抓。</summary>

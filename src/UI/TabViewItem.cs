@@ -66,7 +66,7 @@ namespace VantageLite.UI
             _closeButton.Width = 22;
             _closeButton.FlatStyle = FlatStyle.Flat;
             _closeButton.FlatAppearance.BorderSize = 0;
-            _closeButton.Font = IconFont.Create(8F);
+            _closeButton.Font = IconFont.CreatePx(11f);
             _closeButton.TabStop = false;
             _closeButton.Cursor = Cursors.Default;
             _closeButton.FlatAppearance.MouseOverBackColor = ThemeManager.Current.CloseHover;
@@ -85,6 +85,33 @@ namespace VantageLite.UI
             MouseMove += delegate { UpdateCloseVisibility(); };
 
             ApplyTheme();
+        }
+
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            ApplyMetrics();
+        }
+
+        protected override void OnDpiChangedAfterParent(EventArgs e)
+        {
+            base.OnDpiChangedAfterParent(e);
+            ApplyMetrics();
+        }
+
+        private void ApplyMetrics()
+        {
+            if (_closeButton != null)
+            {
+                _closeButton.Width = WindowChrome.Scale(this, 22);
+            }
+
+            if (_indicator != null)
+            {
+                _indicator.Height = WindowChrome.Scale(this, 2);
+            }
+
+            Invalidate();
         }
 
         public int TabId { get; private set; }
@@ -203,7 +230,8 @@ namespace VantageLite.UI
             // 宽标签一直显示；窄标签（溢出时）鼠标移上去才显示，避免常驻挤掉标题。
             bool over = ClientRectangle.Contains(PointToClient(Cursor.Position));
             _closeButton.Visible =
-                (Width >= 88 || over) && _fadeLeft + _fadeRight < Width - 24;
+                (Width >= WindowChrome.Scale(this, 88) || over) &&
+                _fadeLeft + _fadeRight < Width - WindowChrome.Scale(this, 24);
         }
 
         protected override void OnPaint(PaintEventArgs e)
@@ -211,11 +239,11 @@ namespace VantageLite.UI
             base.OnPaint(e);
 
             int rightPadding = (_closeButton != null && _closeButton.Visible)
-                ? _closeButton.Width + 14
-                : 10;
+                ? _closeButton.Width + WindowChrome.Scale(this, 14)
+                : WindowChrome.Scale(this, 10);
 
-            const int iconSize = 16;
-            int left = 8;
+            int iconSize = WindowChrome.Scale(this, 16);
+            int left = WindowChrome.Scale(this, 8);
             Image icon = _tab == null ? null : _tab.Favicon;
 
             if (_loading)
@@ -239,17 +267,18 @@ namespace VantageLite.UI
             {
                 using (SolidBrush brush = new SolidBrush(ThemeManager.Current.TextDisabled))
                 {
-                    e.Graphics.FillEllipse(brush, left + 5, (Height - 6) / 2, 6, 6);
+                    int dot = WindowChrome.Scale(this, 6);
+                    e.Graphics.FillEllipse(brush, left + WindowChrome.Scale(this, 5), (Height - dot) / 2, dot, dot);
                 }
             }
 
-            left += iconSize + 6;
+            left += iconSize + WindowChrome.Scale(this, 6);
 
             Rectangle textRect = new Rectangle(
                 left,
-                2,
+                WindowChrome.Scale(this, 2),
                 Math.Max(0, Width - left - rightPadding),
-                Height - 3);
+                Height - WindowChrome.Scale(this, 3));
 
             TextRenderer.DrawText(
                 e.Graphics,

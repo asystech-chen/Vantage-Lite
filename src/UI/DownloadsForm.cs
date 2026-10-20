@@ -20,6 +20,11 @@ namespace VantageLite.UI
         private const int MaxPopupHeight = 470;
         private const int MinPopupHeight = 170;
 
+        private static int S(int value)
+        {
+            return WindowChrome.Scale(value);
+        }
+
         private readonly DownloadManager _manager;
         private readonly FlowLayoutPanel _list;
         private readonly Label _empty;
@@ -48,7 +53,7 @@ namespace VantageLite.UI
             FormBorderStyle = FormBorderStyle.None;
             ShowInTaskbar = false;
             StartPosition = FormStartPosition.Manual;
-            ClientSize = new Size(340, 380);
+            ClientSize = new Size(S(340), S(380));
             MinimizeBox = false;
             MaximizeBox = false;
             KeyPreview = true;
@@ -76,12 +81,12 @@ namespace VantageLite.UI
             _title.Text = "本次下载";
             _title.AutoSize = true;
             _title.Font = ThemeFonts.Ui(11F);
-            _title.SetBounds(14, 12, 200, 22);
+            _title.SetBounds(S(14), S(12), S(200), S(22));
 
             _clearButton = new FlatButton();
             _clearButton.Text = "清空已完成";
-            _clearButton.Width = 88;
-            _clearButton.Height = 22;
+            _clearButton.Width = S(88);
+            _clearButton.Height = S(22);
             _clearButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             _clearButton.FlatStyle = FlatStyle.Flat;
             _clearButton.FlatAppearance.BorderSize = 0;
@@ -89,23 +94,23 @@ namespace VantageLite.UI
             _clearButton.TabStop = false;
             _clearButton.Cursor = Cursors.Default;
             _clearButton.Click += delegate { _manager.ClearFinished(); };
-            _clearButton.SetBounds(ClientSize.Width - 128, 11, 88, 22);
+            _clearButton.SetBounds(ClientSize.Width - S(128), S(11), S(88), S(22));
 
             _closeButton = new FlatButton();
             _closeButton.Text = IconFont.Close;
-            _closeButton.Width = 24;
-            _closeButton.Height = 24;
+            _closeButton.Width = S(24);
+            _closeButton.Height = S(24);
             _closeButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             _closeButton.FlatStyle = FlatStyle.Flat;
             _closeButton.FlatAppearance.BorderSize = 0;
-            _closeButton.Font = IconFont.Create(8F);
+            _closeButton.Font = IconFont.CreatePx(11f);
             _closeButton.TabStop = false;
             _closeButton.Cursor = Cursors.Default;
             _closeButton.Click += delegate { Close(); };
-            _closeButton.SetBounds(ClientSize.Width - 32, 10, 24, 24);
+            _closeButton.SetBounds(ClientSize.Width - S(32), S(10), S(24), S(24));
 
             _list = new FlowLayoutPanel();
-            _list.SetBounds(10, 42, ClientSize.Width - 20, ClientSize.Height - 86);
+            _list.SetBounds(S(10), S(42), ClientSize.Width - S(20), ClientSize.Height - S(86));
             _list.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             _list.FlowDirection = FlowDirection.TopDown;
             _list.WrapContents = false;
@@ -115,7 +120,7 @@ namespace VantageLite.UI
 
             _viewAll = new FlatButton();
             _viewAll.Text = "查看所有下载";
-            _viewAll.Height = 26;
+            _viewAll.Height = S(26);
             _viewAll.Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom;
             _viewAll.FlatStyle = FlatStyle.Flat;
             _viewAll.FlatAppearance.BorderSize = 0;
@@ -131,13 +136,13 @@ namespace VantageLite.UI
                     handler(this, EventArgs.Empty);
                 }
             };
-            _viewAll.SetBounds(10, ClientSize.Height - 34, ClientSize.Width - 20, 26);
+            _viewAll.SetBounds(S(10), ClientSize.Height - S(34), ClientSize.Width - S(20), S(26));
 
             _empty = new Label();
             _empty.Text = "本次会话暂无下载";
             _empty.AutoSize = false;
             _empty.TextAlign = ContentAlignment.MiddleCenter;
-            _empty.SetBounds(10, 120, ClientSize.Width - 20, 40);
+            _empty.SetBounds(S(10), S(120), ClientSize.Width - S(20), S(40));
             _empty.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
 
             Controls.Add(_title);
@@ -225,9 +230,9 @@ namespace VantageLite.UI
         {
             int count = _manager.SessionItems.Count;
             int desired = count == 0
-                ? MinPopupHeight
-                : HeaderHeight + count * RowHeight + FooterHeight;
-            int height = Math.Max(MinPopupHeight, Math.Min(MaxPopupHeight, desired));
+                ? S(MinPopupHeight)
+                : S(HeaderHeight) + count * S(RowHeight) + S(FooterHeight);
+            int height = Math.Max(S(MinPopupHeight), Math.Min(S(MaxPopupHeight), desired));
 
             if (ClientSize.Height != height)
             {
@@ -237,12 +242,12 @@ namespace VantageLite.UI
 
         private void LayoutChrome()
         {
-            int width = Math.Max(120, ClientSize.Width - 20);
-            int listHeight = Math.Max(40, ClientSize.Height - HeaderHeight - FooterHeight);
+            int width = Math.Max(S(120), ClientSize.Width - S(20));
+            int listHeight = Math.Max(S(40), ClientSize.Height - S(HeaderHeight) - S(FooterHeight));
 
-            _list.SetBounds(10, HeaderHeight, width, listHeight);
-            _viewAll.SetBounds(10, ClientSize.Height - 34, width, 26);
-            _empty.SetBounds(10, HeaderHeight + Math.Max(0, (listHeight - 40) / 2), width, 40);
+            _list.SetBounds(S(10), S(HeaderHeight), width, listHeight);
+            _viewAll.SetBounds(S(10), ClientSize.Height - S(34), width, S(26));
+            _empty.SetBounds(S(10), S(HeaderHeight) + Math.Max(0, (listHeight - S(40)) / 2), width, S(40));
 
             UpdateRowWidths();
         }
@@ -256,7 +261,7 @@ namespace VantageLite.UI
 
             Rectangle area = Screen.FromControl(this).WorkingArea;
 
-            if (Top + Height > area.Bottom - 8)
+            if (Top + Height > area.Bottom - S(8))
             {
                 Top = Math.Max(area.Top + 8, area.Bottom - 8 - Height);
             }
@@ -389,13 +394,18 @@ namespace VantageLite.UI
         private readonly GlyphButton _delete;
         private readonly GlyphButton _retry;
 
+        private static int S(int value)
+        {
+            return WindowChrome.Scale(value);
+        }
+
         public DownloadRow(DownloadManager manager, DownloadItem item)
         {
             _manager = manager;
             _item = item;
 
-            Height = 88;
-            Margin = new Padding(0, 0, 0, 6);
+            Height = S(88);
+            Margin = new Padding(0, 0, 0, S(6));
             BackColor = ThemeManager.Current.ChromeBackground;
 
             SetStyle(
@@ -407,23 +417,23 @@ namespace VantageLite.UI
             _name.AutoSize = false;
             _name.AutoEllipsis = true;
             _name.Font = ThemeFonts.Ui(9.5F);
-            _name.SetBounds(10, 8, 300, 20);
+            _name.SetBounds(S(10), S(8), S(300), S(20));
 
             _status = new Label();
             _status.AutoSize = false;
             _status.AutoEllipsis = true;
             _status.Font = ThemeFonts.Ui(8.5F);
-            _status.SetBounds(10, 28, 300, 16);
+            _status.SetBounds(S(10), S(28), S(300), S(16));
 
             _progress = new ProgressLine();
-            _progress.SetBounds(10, 48, 300, 4);
+            _progress.SetBounds(S(10), S(48), S(300), S(4));
 
             _buttons = new FlowLayoutPanel();
             _buttons.FlowDirection = FlowDirection.RightToLeft;
             _buttons.WrapContents = false;
             _buttons.Padding = Padding.Empty;
             _buttons.Margin = Padding.Empty;
-            _buttons.SetBounds(10, 58, 300, 22);
+            _buttons.SetBounds(S(10), S(58), S(300), S(22));
 
             _toolTip = new ToolTip();
             ThemeManager.ApplyToolTip(_toolTip);
@@ -584,14 +594,14 @@ namespace VantageLite.UI
         private GlyphButton MakeIconButton(string glyph, string toolTip)
         {
             GlyphButton button = new GlyphButton(glyph);
-            button.Width = 26;
-            button.Height = 22;
-            button.Font = IconFont.Create(9F);
+            button.Width = S(26);
+            button.Height = S(22);
+            button.Font = IconFont.CreatePx(12f);
             button.FlatStyle = FlatStyle.Flat;
             button.FlatAppearance.BorderSize = 0;
             button.TabStop = false;
             button.Cursor = Cursors.Default;
-            button.Margin = new Padding(2, 0, 0, 0);
+            button.Margin = new Padding(S(2), 0, 0, 0);
             _toolTip.SetToolTip(button, toolTip);
             return button;
         }
@@ -669,7 +679,7 @@ namespace VantageLite.UI
                 ControlStyles.AllPaintingInWmPaint |
                 ControlStyles.UserPaint,
                 true);
-            Height = 4;
+            Height = WindowChrome.Scale(4);
         }
 
         public double Value

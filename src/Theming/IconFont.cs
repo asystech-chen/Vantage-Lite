@@ -36,6 +36,14 @@ namespace VantageLite.Theming
             return new Font(Family, size, FontStyle.Regular, GraphicsUnit.Point);
         }
 
+        /// <summary>
+        /// 按像素创建图标字体：不随系统 DPI 放大，避免小按钮里的图标过大被裁成省略号。
+        /// </summary>
+        public static Font CreatePx(float pixels)
+        {
+            return new Font(Family, pixels, FontStyle.Regular, GraphicsUnit.Pixel);
+        }
+
         private static string DetectFamily()
         {
             try

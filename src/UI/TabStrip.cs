@@ -88,7 +88,7 @@ namespace VantageLite.UI
             _newTabButton.Height = 28;
             _newTabButton.FlatStyle = FlatStyle.Flat;
             _newTabButton.FlatAppearance.BorderSize = 0;
-            _newTabButton.Font = IconFont.Create(11F);
+            _newTabButton.Font = IconFont.CreatePx(15f);
             _newTabButton.TabStop = false;
             _newTabButton.Cursor = Cursors.Default;
             _newTabButton.Click += delegate { Raise(NewTabRequested); };
@@ -103,6 +103,33 @@ namespace VantageLite.UI
             ApplyTheme();
             ThemeManager.ThemeChanged += ThemeManager_ThemeChanged;
             Application.AddMessageFilter(this);
+        }
+
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            ApplyMetrics();
+        }
+
+        protected override void OnDpiChangedAfterParent(EventArgs e)
+        {
+            base.OnDpiChangedAfterParent(e);
+            ApplyMetrics();
+            LayoutTabs(true);
+        }
+
+        private void ApplyMetrics()
+        {
+            int side = WindowChrome.Scale(this, 8);
+            Padding = new Padding(side, 0, side, WindowChrome.Scale(this, 4));
+
+            if (_newTabButton != null)
+            {
+                _newTabButton.Width = WindowChrome.Scale(this, 30);
+                _newTabButton.Height = WindowChrome.Scale(this, 28);
+            }
+
+            Invalidate();
         }
 
         protected override void Dispose(bool disposing)

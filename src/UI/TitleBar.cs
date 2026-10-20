@@ -59,11 +59,30 @@ namespace VantageLite.UI
             Padding = new Padding(0, 0, ButtonWidth * ButtonCount, 0);
             BackColor = WindowChrome.BackdropColor;
 
-            _glyphFont = IconFont.Create(10F);
+            _glyphFont = IconFont.CreatePx(13f);
 
             _tabs = new TabStrip();
             _tabs.Dock = DockStyle.Fill;
             Controls.Add(_tabs);
+        }
+
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            ApplyMetrics();
+        }
+
+        protected override void OnDpiChangedAfterParent(EventArgs e)
+        {
+            base.OnDpiChangedAfterParent(e);
+            ApplyMetrics();
+        }
+
+        private void ApplyMetrics()
+        {
+            Height = WindowChrome.Scale(this, WindowChrome.TitleBarHeight);
+            Padding = new Padding(0, 0, WindowChrome.Scale(this, ButtonWidth) * ButtonCount, 0);
+            Invalidate();
         }
 
         /// <summary>标签条本体，MainForm 直接接线。</summary>
@@ -267,23 +286,32 @@ namespace VantageLite.UI
 
         private Rectangle ButtonRect(int index)
         {
+            int width = ButtonWidthFromPadding();
+
             return new Rectangle(
-                Width - (ButtonCount - index) * ButtonWidth,
+                Width - (ButtonCount - index) * width,
                 0,
-                ButtonWidth,
+                width,
                 Height);
+        }
+
+        private int ButtonWidthFromPadding()
+        {
+            int width = Padding.Right / ButtonCount;
+            return width > 0 ? width : ButtonWidth;
         }
 
         private int HitButton(Point point)
         {
-            int start = Width - ButtonCount * ButtonWidth;
+            int width = ButtonWidthFromPadding();
+            int start = Width - ButtonCount * width;
 
             if (point.X < start || point.X >= Width || point.Y < 0 || point.Y >= Height)
             {
                 return -1;
             }
 
-            int index = (point.X - start) / ButtonWidth;
+            int index = (point.X - start) / width;
             return index < 0 || index >= ButtonCount ? -1 : index;
         }
 

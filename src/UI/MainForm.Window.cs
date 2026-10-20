@@ -54,6 +54,7 @@ namespace VantageLite.UI
         {
             base.OnHandleCreated(e);
 
+            WindowChrome.GlobalDpi = DeviceDpi;
             ApplyChrome();
             ApplyTheme();
         }
@@ -62,6 +63,7 @@ namespace VantageLite.UI
         {
             base.OnDpiChanged(e);
 
+            WindowChrome.GlobalDpi = e.DeviceDpiNew;
             UpdateWindowChromeState();
 
             if (IsHandleCreated)
@@ -79,6 +81,9 @@ namespace VantageLite.UI
             }
 
             int glassHeight = Padding.Top + (_titleBar == null ? WindowChrome.TitleBarHeight : _titleBar.Height);
+            VantageLite.Diagnostics.Log.Info("dpi=" + DeviceDpi + " titleBar=" + (_titleBar == null ? 0 : _titleBar.Height) +
+                " navBar=" + (_navigationBar == null ? 0 : _navigationBar.Height) +
+                " bookmarksBar=" + (_bookmarksBar == null ? 0 : _bookmarksBar.Height));
             WindowChrome.Apply(this, glassHeight, _settings != null && _settings.EnableMica);
         }
 

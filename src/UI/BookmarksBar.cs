@@ -105,7 +105,7 @@ namespace VantageLite.UI
             _overflowButton.Width = 28;
             _overflowButton.FlatStyle = FlatStyle.Flat;
             _overflowButton.FlatAppearance.BorderSize = 0;
-            _overflowButton.Font = IconFont.Create(10F);
+            _overflowButton.Font = IconFont.CreatePx(13f);
             _overflowButton.TabStop = false;
             _overflowButton.Cursor = Cursors.Default;
             _overflowButton.Visible = false;
@@ -135,6 +135,56 @@ namespace VantageLite.UI
 
             ApplyTheme();
             ThemeManager.ThemeChanged += ThemeManager_ThemeChanged;
+        }
+
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            ApplyMetrics();
+        }
+
+        protected override void OnDpiChangedAfterParent(EventArgs e)
+        {
+            base.OnDpiChangedAfterParent(e);
+            ApplyMetrics();
+            Relayout();
+        }
+
+        private void ApplyMetrics()
+        {
+            Height = WindowChrome.Scale(this, 30);
+            Padding = new Padding(
+                WindowChrome.Scale(this, 6),
+                WindowChrome.Scale(this, 2),
+                WindowChrome.Scale(this, 6),
+                WindowChrome.Scale(this, 2));
+
+            if (_overflowButton != null)
+            {
+                _overflowButton.Width = WindowChrome.Scale(this, 28);
+            }
+
+            if (_dropLine != null)
+            {
+                _dropLine.Height = WindowChrome.Scale(this, 2);
+            }
+
+            for (int i = 0; i < _buttons.Count; i++)
+            {
+                ApplyButtonMetrics(_buttons[i]);
+            }
+        }
+
+        private void ApplyButtonMetrics(Button button)
+        {
+            if (button == null)
+            {
+                return;
+            }
+
+            button.Height = WindowChrome.Scale(this, 24);
+            button.Padding = new Padding(WindowChrome.Scale(this, 4), 0, WindowChrome.Scale(this, 4), 0);
+            button.Margin = new Padding(0, 0, WindowChrome.Scale(this, 2), 0);
         }
 
         protected override void Dispose(bool disposing)
@@ -237,9 +287,9 @@ namespace VantageLite.UI
             string text = node.Title;
             Button button = new FlatButton();
             button.TextAlign = ContentAlignment.MiddleLeft;
-            button.Padding = new Padding(4, 0, 4, 0);
-            button.Height = 24;
-            button.Margin = new Padding(0, 0, 2, 0);
+            button.Padding = new Padding(WindowChrome.Scale(this, 4), 0, WindowChrome.Scale(this, 4), 0);
+            button.Height = WindowChrome.Scale(this, 24);
+            button.Margin = new Padding(0, 0, WindowChrome.Scale(this, 2), 0);
             button.FlatStyle = FlatStyle.Flat;
             button.UseVisualStyleBackColor = false;
             button.FlatAppearance.BorderSize = 0;
@@ -250,19 +300,21 @@ namespace VantageLite.UI
             button.ImageAlign = ContentAlignment.MiddleLeft;
             button.TextImageRelation = TextImageRelation.ImageBeforeText;
 
-            int iconSpace = 22;
+            int iconSpace = WindowChrome.Scale(this, 22);
 
             // 宽度上限至少能完整放下「新建文件夹」，高 DPI 下也不会被截成「11…」。
-            int folderReference = TextRenderer.MeasureText("新建文件夹", button.Font).Width + 24 + iconSpace;
-            int maxWidth = Math.Max(242, folderReference);
+            int folderReference = TextRenderer.MeasureText("新建文件夹", button.Font).Width +
+                WindowChrome.Scale(this, 24) + iconSpace;
+            int maxWidth = Math.Max(WindowChrome.Scale(this, 242), folderReference);
 
             // AutoEllipsis 会额外弹出“完整文本”系统提示，和自定义 ToolTip 重叠；
             // 这里手动截断，保证只有一个提示来源。
-            text = Shorten(text, button.Font, maxWidth - 16 - iconSpace);
+            text = Shorten(text, button.Font, maxWidth - WindowChrome.Scale(this, 16) - iconSpace);
             button.Text = text;
 
-            int width = TextRenderer.MeasureText(text, button.Font).Width + 20 + iconSpace;
-            button.Width = Math.Max(66, Math.Min(maxWidth, width));
+            int width = TextRenderer.MeasureText(text, button.Font).Width +
+                WindowChrome.Scale(this, 20) + iconSpace;
+            button.Width = Math.Max(WindowChrome.Scale(this, 66), Math.Min(maxWidth, width));
 
             if (node.IsFolder)
             {
@@ -400,7 +452,7 @@ namespace VantageLite.UI
                 {
                     Bitmap bitmap = new Bitmap(16, 16);
                     using (Graphics graphics = Graphics.FromImage(bitmap))
-                    using (Font font = IconFont.Create(12F))
+                    using (Font font = IconFont.CreatePx(16f))
                     using (SolidBrush brush = new SolidBrush(Color.FromArgb(214, 170, 60)))
                     {
                         graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
@@ -749,7 +801,7 @@ namespace VantageLite.UI
             ContextMenuStrip menu = new ContextMenuStrip();
             menu.ShowImageMargin = showIcons;
             menu.ShowCheckMargin = false;
-            menu.ImageScalingSize = new Size(16, 16);
+            menu.ImageScalingSize = new Size(WindowChrome.Scale(16), WindowChrome.Scale(16));
             menu.Font = ThemeFonts.Ui(9.5F);
             ThemeManager.ApplyMenuTheme(menu);
             return menu;
@@ -1327,9 +1379,9 @@ namespace VantageLite.UI
                 ForeColor = Color.White;
                 Font = ThemeFonts.Ui(9F);
 
-                int width = TextRenderer.MeasureText(text ?? string.Empty, Font).Width + 24;
-                Width = Math.Max(80, Math.Min(280, width));
-                Height = 26;
+                int width = TextRenderer.MeasureText(text ?? string.Empty, Font).Width + WindowChrome.Scale(24);
+                Width = Math.Max(WindowChrome.Scale(80), Math.Min(WindowChrome.Scale(280), width));
+                Height = WindowChrome.Scale(26);
                 Opacity = 0.92;
 
                 Label label = new Label();
@@ -1384,9 +1436,9 @@ namespace VantageLite.UI
                 FormBorderStyle = FormBorderStyle.None;
                 ShowInTaskbar = false;
                 StartPosition = FormStartPosition.Manual;
-                Width = 240;
+                Width = WindowChrome.Scale(240);
                 BackColor = ThemeManager.Current.WindowBackground;
-                Height = Math.Min(360, 10 + nodes.Count * 30);
+                Height = Math.Min(WindowChrome.Scale(360), WindowChrome.Scale(10) + nodes.Count * WindowChrome.Scale(30));
 
                 _list = new FlowLayoutPanel();
                 _list.Dock = DockStyle.Fill;
@@ -1558,9 +1610,9 @@ namespace VantageLite.UI
 
                     Text = node.Title;
                     TextAlign = ContentAlignment.MiddleLeft;
-                    Height = 26;
-                    Width = popup.Width - 16;
-                    Margin = new Padding(0, 0, 0, 2);
+                    Height = WindowChrome.Scale(26);
+                    Width = popup.Width - WindowChrome.Scale(16);
+                    Margin = new Padding(0, 0, 0, WindowChrome.Scale(2));
                     FlatStyle = FlatStyle.Flat;
                     FlatAppearance.BorderSize = 0;
                     Font = ThemeFonts.Ui(9.5F);
@@ -1967,7 +2019,7 @@ namespace VantageLite.UI
             Point screen = _panel.PointToScreen(new Point(x, button.Top));
             Point local = PointToClient(screen);
 
-            _dropLine.SetBounds(local.X, local.Y, 2, button.Height);
+            _dropLine.SetBounds(local.X, local.Y, WindowChrome.Scale(2), button.Height);
             _dropLine.BackColor = ThemeManager.Current.Accent;
             _dropLine.Visible = true;
             _dropLine.BringToFront();

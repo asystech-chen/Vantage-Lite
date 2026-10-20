@@ -1,6 +1,8 @@
 using System;
 using System.Diagnostics;
 using System.Drawing;
+using System.Drawing.Imaging;
+using System.IO;
 using System.Windows.Forms;
 using VantageLite.Theming;
 
@@ -148,6 +150,8 @@ namespace VantageLite.UI
             using (Form form = new Form())
             {
                 form.Text = title;
+                form.AutoScaleMode = AutoScaleMode.Dpi;
+                form.AutoScaleDimensions = new SizeF(96F, 96F);
                 form.StartPosition = FormStartPosition.CenterParent;
                 form.FormBorderStyle = FormBorderStyle.FixedDialog;
                 form.ClientSize = new Size(380, 132);
@@ -224,167 +228,6 @@ namespace VantageLite.UI
     }
 
     /// <summary>
-    /// 关于窗口：参考 Vantage 的关于对话框（图标 + 名称 + 版本 + 说明 + 链接）。
-    /// 依赖：ThemeManager / AppIcon。改动注意：模态窗口，只读信息。
-    /// </summary>
-    internal static class AboutDialog
-    {
-        public static bool Show(IWin32Window owner, string version)
-        {
-            bool diagnosticsRequested = false;
-
-            using (Form form = new Form())
-            {
-                ThemePalette palette = ThemeManager.Current;
-
-                form.Text = "关于 Vantage Lite";
-                form.StartPosition = FormStartPosition.CenterParent;
-                form.FormBorderStyle = FormBorderStyle.FixedDialog;
-                form.ClientSize = new Size(470, 340);
-                form.MinimizeBox = false;
-                form.MaximizeBox = false;
-                form.ShowInTaskbar = false;
-                form.Font = ThemeFonts.Ui(9.5F);
-                form.BackColor = palette.WindowBackground;
-                form.ForeColor = palette.TextPrimary;
-
-                PictureBox icon = new PictureBox();
-                icon.SetBounds(28, 26, 64, 64);
-                icon.SizeMode = PictureBoxSizeMode.Zoom;
-                icon.Image = LoadIcon(64);
-
-                Label title = new Label();
-                title.Text = "Vantage Lite";
-                title.Font = ThemeFonts.Ui(15F);
-                title.ForeColor = palette.TextPrimary;
-                title.SetBounds(108, 28, 330, 28);
-
-                Label versionLabel = new Label();
-                versionLabel.Text = "版本 " + (string.IsNullOrWhiteSpace(version) ? "unknown" : version);
-                versionLabel.ForeColor = palette.TextSecondary;
-                versionLabel.SetBounds(110, 60, 320, 20);
-
-                Label description = new Label();
-                description.Text = "轻量、可控的 Windows 浏览器\n基于 WebView2，本地数据，无账号、无遥测。";
-                description.ForeColor = palette.TextPrimary;
-                description.SetBounds(28, 118, 414, 52);
-
-                LinkLabel repo = new LinkLabel();
-                repo.Text = "github.com/asystech-chen/Vantage-Lite";
-                repo.LinkColor = palette.Accent;
-                repo.ActiveLinkColor = palette.Accent;
-                repo.VisitedLinkColor = palette.Accent;
-                repo.SetBounds(28, 180, 414, 20);
-                repo.LinkClicked += delegate
-                {
-                    try
-                    {
-                        Process.Start("https://github.com/asystech-chen/Vantage-Lite");
-                    }
-                    catch
-                    {
-                    }
-                };
-
-                Label license = new Label();
-                license.Text = "Mozilla Public License 2.0";
-                license.ForeColor = palette.TextSecondary;
-                license.SetBounds(28, 206, 414, 20);
-
-                Label copyright = new Label();
-                copyright.Text = "© 2026 asystech-chen";
-                copyright.ForeColor = palette.TextSecondary;
-                copyright.SetBounds(28, 284, 200, 20);
-
-                Button diagnostics = CreateButton("诊断信息", palette);
-                diagnostics.SetBounds(250, 282, 100, 30);
-                diagnostics.Click += delegate
-                {
-                    diagnosticsRequested = true;
-                    form.Close();
-                };
-
-                Button ok = CreateButton("确定", palette);
-                ok.SetBounds(358, 282, 84, 30);
-                ok.Click += delegate { form.Close(); };
-
-                form.Controls.Add(icon);
-                form.Controls.Add(title);
-                form.Controls.Add(versionLabel);
-                form.Controls.Add(description);
-                form.Controls.Add(repo);
-                form.Controls.Add(license);
-                form.Controls.Add(copyright);
-                form.Controls.Add(diagnostics);
-                form.Controls.Add(ok);
-
-                form.Shown += delegate
-                {
-                    ThemeManager.ApplyWindowTheme(form);
-                    ok.Focus();
-                };
-
-                form.FormClosed += delegate
-                {
-                    Image image = icon.Image;
-                    icon.Image = null;
-
-                    if (image != null)
-                    {
-                        image.Dispose();
-                    }
-                };
-
-                form.ShowDialog(owner);
-                return diagnosticsRequested;
-            }
-        }
-
-        private static Image LoadIcon(int size)
-        {
-            try
-            {
-                using (Icon icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath))
-                {
-                    if (icon == null)
-                    {
-                        return null;
-                    }
-
-                    Bitmap bitmap = new Bitmap(size, size);
-
-                    using (Graphics graphics = Graphics.FromImage(bitmap))
-                    {
-                        graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
-                        graphics.DrawIcon(icon, new Rectangle(0, 0, size, size));
-                    }
-
-                    return bitmap;
-                }
-            }
-            catch
-            {
-                return null;
-            }
-        }
-
-        private static Button CreateButton(string text, ThemePalette palette)
-        {
-            Button button = new FlatButton();
-            button.Text = text;
-            button.FlatStyle = FlatStyle.Flat;
-            button.UseVisualStyleBackColor = false;
-            button.BackColor = palette.ChromeBackground;
-            button.ForeColor = palette.TextPrimary;
-            button.FlatAppearance.BorderSize = 1;
-            button.FlatAppearance.BorderColor = palette.AddressBorder;
-            button.FlatAppearance.MouseOverBackColor = palette.ButtonHover;
-            button.FlatAppearance.MouseDownBackColor = palette.ButtonPressed;
-            return button;
-        }
-    }
-
-    /// <summary>
     /// 诊断信息弹出窗口：只读文本 + 复制/打开目录。
     /// 依赖：ThemeManager。改动注意：窗口是模态的，调用方在 UI 线程。
     /// </summary>
@@ -397,6 +240,8 @@ namespace VantageLite.UI
                 ThemePalette palette = ThemeManager.Current;
 
                 form.Text = "Vantage Lite 诊断信息";
+                form.AutoScaleMode = AutoScaleMode.Dpi;
+                form.AutoScaleDimensions = new SizeF(96F, 96F);
                 form.StartPosition = FormStartPosition.CenterParent;
                 form.ClientSize = new Size(740, 580);
                 form.MinimumSize = new Size(560, 420);
@@ -532,6 +377,8 @@ namespace VantageLite.UI
                 ThemePalette palette = ThemeManager.Current;
 
                 form.Text = string.IsNullOrEmpty(caption) ? "Vantage Lite" : caption;
+                form.AutoScaleMode = AutoScaleMode.Dpi;
+                form.AutoScaleDimensions = new SizeF(96F, 96F);
                 form.StartPosition = FormStartPosition.CenterParent;
                 form.FormBorderStyle = FormBorderStyle.FixedDialog;
                 form.MinimizeBox = false;
@@ -613,6 +460,230 @@ namespace VantageLite.UI
             button.DialogResult = result;
             button.Width = 84;
             button.Height = 28;
+            button.FlatStyle = FlatStyle.Flat;
+            button.UseVisualStyleBackColor = false;
+            button.BackColor = palette.ChromeBackground;
+            button.ForeColor = palette.TextPrimary;
+            button.FlatAppearance.BorderSize = 1;
+            button.FlatAppearance.BorderColor = palette.AddressBorder;
+            button.FlatAppearance.MouseOverBackColor = palette.ButtonHover;
+            button.FlatAppearance.MouseDownBackColor = palette.ButtonPressed;
+            return button;
+        }
+    }
+
+    /// <summary>
+    /// 关于窗口：图标 + 名称 + 版本 + 说明 + 链接。
+    /// 依赖：ThemeManager / 嵌入的 logo（由 SVG 预渲染）。
+    /// 改动注意：所有尺寸按宿主 DPI 缩放；标签用 AutoSize，禁止固定高度，避免缩放后遮挡文字。
+    /// </summary>
+    internal static class AboutDialog
+    {
+        public static bool Show(IWin32Window owner, string version)
+        {
+            bool diagnosticsRequested = false;
+
+            int dpi = WindowChrome.GlobalDpi;
+            Control ownerControl = owner as Control;
+
+            if (ownerControl != null && ownerControl.DeviceDpi > 0)
+            {
+                dpi = ownerControl.DeviceDpi;
+            }
+
+            Func<int, int> px = delegate(int value)
+            {
+                return (int)Math.Round(value * dpi / 96.0);
+            };
+
+            using (Form form = new Form())
+            {
+                ThemePalette palette = ThemeManager.Current;
+
+                form.Text = "关于 Vantage Lite";
+                form.StartPosition = FormStartPosition.CenterParent;
+                form.FormBorderStyle = FormBorderStyle.FixedDialog;
+                form.ClientSize = new Size(px(470), px(350));
+                form.MinimizeBox = false;
+                form.MaximizeBox = false;
+                form.ShowInTaskbar = false;
+                form.Font = ThemeFonts.Ui(9.5F);
+                form.BackColor = palette.WindowBackground;
+                form.ForeColor = palette.TextPrimary;
+
+                PictureBox icon = new PictureBox();
+                icon.SizeMode = PictureBoxSizeMode.Zoom;
+                icon.Image = LoadLogo(px(64));
+
+                Label title = new Label();
+                title.AutoSize = true;
+                title.Text = "Vantage Lite";
+                title.Font = ThemeFonts.Ui(15F);
+                title.ForeColor = palette.TextPrimary;
+
+                Label versionLabel = new Label();
+                versionLabel.AutoSize = true;
+                versionLabel.Text = "版本 " + (string.IsNullOrWhiteSpace(version) ? "unknown" : version);
+                versionLabel.ForeColor = palette.TextSecondary;
+
+                Label description = new Label();
+                description.AutoSize = true;
+                description.MaximumSize = new Size(px(414), 0);
+                description.Text = "轻量、可控的 Windows 浏览器\n基于 WebView2，本地数据，无账号、无遥测。";
+                description.ForeColor = palette.TextPrimary;
+
+                LinkLabel repo = new LinkLabel();
+                repo.AutoSize = true;
+                repo.Text = "GitHub";
+                repo.LinkColor = palette.Accent;
+                repo.ActiveLinkColor = palette.Accent;
+                repo.VisitedLinkColor = palette.Accent;
+                repo.LinkClicked += delegate
+                {
+                    try
+                    {
+                        Process.Start("https://github.com/asystech-chen/Vantage-Lite");
+                    }
+                    catch
+                    {
+                    }
+                };
+
+                Label license = new Label();
+                license.AutoSize = true;
+                license.Text = "Mozilla Public License 2.0";
+                license.ForeColor = palette.TextSecondary;
+
+                Label copyright = new Label();
+                copyright.AutoSize = true;
+                copyright.Text = "2026© ASYS Technology";
+                copyright.ForeColor = palette.TextSecondary;
+
+                Button diagnostics = CreateButton("诊断信息", palette);
+                diagnostics.Click += delegate
+                {
+                    diagnosticsRequested = true;
+                    form.Close();
+                };
+
+                Button ok = CreateButton("确定", palette);
+                ok.Click += delegate { form.Close(); };
+
+                form.Controls.Add(icon);
+                form.Controls.Add(title);
+                form.Controls.Add(versionLabel);
+                form.Controls.Add(description);
+                form.Controls.Add(repo);
+                form.Controls.Add(license);
+                form.Controls.Add(copyright);
+                form.Controls.Add(diagnostics);
+                form.Controls.Add(ok);
+
+                form.Load += delegate
+                {
+                    int left = px(28);
+                    int top = px(26);
+                    int iconSize = px(64);
+
+                    icon.SetBounds(left, top, iconSize, iconSize);
+
+                    int textLeft = px(108);
+                    title.Location = new Point(textLeft, top);
+                    versionLabel.Location = new Point(textLeft, title.Bottom + px(2));
+
+                    int contentTop = Math.Max(top + iconSize, versionLabel.Bottom) + px(16);
+                    description.Location = new Point(left, contentTop);
+
+                    int y = description.Bottom + px(12);
+                    repo.Location = new Point(left, y);
+
+                    y = repo.Bottom + px(8);
+                    license.Location = new Point(left, y);
+
+                    y = license.Bottom + px(10);
+                    copyright.Location = new Point(left, y);
+
+                    int buttonY = form.ClientSize.Height - px(28) - px(30);
+                    int okWidth = px(84);
+                    int diagnosticsWidth = px(100);
+
+                    ok.SetBounds(
+                        form.ClientSize.Width - px(28) - okWidth,
+                        buttonY,
+                        okWidth,
+                        px(30));
+
+                    diagnostics.SetBounds(
+                        ok.Left - px(8) - diagnosticsWidth,
+                        buttonY,
+                        diagnosticsWidth,
+                        px(30));
+                };
+
+                form.Shown += delegate
+                {
+                    ThemeManager.ApplyWindowTheme(form);
+                    ok.Focus();
+                };
+
+                form.FormClosed += delegate
+                {
+                    Image image = icon.Image;
+                    icon.Image = null;
+
+                    if (image != null)
+                    {
+                        image.Dispose();
+                    }
+                };
+
+                form.ShowDialog(owner);
+                return diagnosticsRequested;
+            }
+        }
+
+        /// <summary>
+        /// 从嵌入资源读取由 SVG 预渲染的透明 PNG，按目标尺寸高质量缩放。
+        /// 依赖：Resources/vantage-logo.png（与 vantage-logo.svg 同源）。
+        /// </summary>
+        private static Image LoadLogo(int size)
+        {
+            try
+            {
+                using (Stream stream = typeof(AboutDialog).Assembly
+                    .GetManifestResourceStream("VantageLite.Logo.png"))
+                {
+                    if (stream == null)
+                    {
+                        return null;
+                    }
+
+                    using (Image source = Image.FromStream(stream))
+                    {
+                        Bitmap bitmap = new Bitmap(size, size, PixelFormat.Format32bppArgb);
+
+                        using (Graphics graphics = Graphics.FromImage(bitmap))
+                        {
+                            graphics.Clear(Color.Transparent);
+                            graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+                            graphics.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.HighQuality;
+                            graphics.DrawImage(source, new Rectangle(0, 0, size, size));
+                        }
+
+                        return bitmap;
+                    }
+                }
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static Button CreateButton(string text, ThemePalette palette)
+        {
+            Button button = new FlatButton();
+            button.Text = text;
             button.FlatStyle = FlatStyle.Flat;
             button.UseVisualStyleBackColor = false;
             button.BackColor = palette.ChromeBackground;

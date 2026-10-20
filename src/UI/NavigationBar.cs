@@ -31,6 +31,8 @@ namespace VantageLite.UI
         private GlyphButton _menuButton;
         private Panel _addressHost;
         private TextBox _addressBox;
+        private FlowLayoutPanel _buttonsPanel;
+        private FlowLayoutPanel _rightButtonsPanel;
         private bool _isLoading;
 
         public NavigationBar()
@@ -138,6 +140,7 @@ namespace VantageLite.UI
             buttons.FlowDirection = FlowDirection.LeftToRight;
             buttons.Margin = Padding.Empty;
             buttons.Padding = Padding.Empty;
+            _buttonsPanel = buttons;
 
             _backButton = CreateButton(IconFont.Back, "后退 (Alt+←)");
             _forwardButton = CreateButton(IconFont.Forward, "前进 (Alt+→)");
@@ -177,6 +180,7 @@ namespace VantageLite.UI
             rightButtons.FlowDirection = FlowDirection.RightToLeft;
             rightButtons.Margin = Padding.Empty;
             rightButtons.Padding = Padding.Empty;
+            _rightButtonsPanel = rightButtons;
             rightButtons.Controls.Add(_menuButton);
             rightButtons.Controls.Add(_downloadButton);
             rightButtons.Controls.Add(_bookmarkButton);
@@ -202,6 +206,62 @@ namespace VantageLite.UI
             SetNavigationState(false, false);
         }
 
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            ApplyMetrics();
+        }
+
+        protected override void OnDpiChangedAfterParent(EventArgs e)
+        {
+            base.OnDpiChangedAfterParent(e);
+            ApplyMetrics();
+        }
+
+        private void ApplyMetrics()
+        {
+            Height = WindowChrome.Scale(this, 44);
+            Padding = new Padding(
+                WindowChrome.Scale(this, 8),
+                WindowChrome.Scale(this, 6),
+                WindowChrome.Scale(this, 8),
+                WindowChrome.Scale(this, 6));
+
+            if (_buttonsPanel != null)
+            {
+                _buttonsPanel.Width = WindowChrome.Scale(this, 144);
+            }
+
+            if (_rightButtonsPanel != null)
+            {
+                _rightButtonsPanel.Width = WindowChrome.Scale(this, 108);
+            }
+
+            if (_addressHost != null)
+            {
+                _addressHost.Padding = new Padding(
+                    WindowChrome.Scale(this, 10),
+                    WindowChrome.Scale(this, 4),
+                    WindowChrome.Scale(this, 10),
+                    WindowChrome.Scale(this, 4));
+            }
+
+            Button[] navButtons = { _backButton, _forwardButton, _reloadButton, _homeButton, _bookmarkButton, _downloadButton, _menuButton };
+            for (int i = 0; i < navButtons.Length; i++)
+            {
+                if (navButtons[i] == null)
+                {
+                    continue;
+                }
+
+                navButtons[i].Width = WindowChrome.Scale(this, 34);
+                navButtons[i].Height = WindowChrome.Scale(this, 32);
+                navButtons[i].Margin = new Padding(0, 0, WindowChrome.Scale(this, 2), 0);
+            }
+
+            Invalidate();
+        }
+
         private GlyphButton CreateButton(string glyph, string toolTip)
         {
             GlyphButton button = new GlyphButton(glyph);
@@ -209,7 +269,7 @@ namespace VantageLite.UI
             button.Height = 32;
             button.FlatStyle = FlatStyle.Flat;
             button.FlatAppearance.BorderSize = 0;
-            button.Font = IconFont.Create(12F);
+            button.Font = IconFont.CreatePx(16f);
             button.TabStop = false;
             button.Margin = new Padding(0, 0, 2, 0);
             button.Cursor = Cursors.Default;

@@ -25,6 +25,9 @@ namespace VantageLite.UI
         // 记住最近一次 Sync 的数据，窗口宽度变化时据此重排标签。
         private IList<BrowserTab> _lastTabs;
 
+        // 中键关闭标签后，同一次点击的 MouseUp 可能落到标签栏空白处，短暂屏蔽。
+        private DateTime _suppressEmptyClickUntil = DateTime.MinValue;
+
         public TabStrip()
         {
             _items = new Dictionary<int, TabViewItem>();
@@ -131,6 +134,7 @@ namespace VantageLite.UI
                     item = new TabViewItem(tab.Id);
                     item.SelectRequested += OnItemSelectRequested;
                     item.CloseRequested += OnItemCloseRequested;
+                    item.MiddleCloseRequested += OnItemMiddleCloseRequested;
                     _items[tab.Id] = item;
                     _panel.Controls.Add(item);
                 }
@@ -187,10 +191,17 @@ namespace VantageLite.UI
         /// </summary>
         private void TabStrip_MouseUp(object sender, MouseEventArgs e)
         {
-            if (e.Button == MouseButtons.Middle)
+            if (e.Button != MouseButtons.Middle)
             {
-                Raise(NewTabRequested);
+                return;
             }
+
+            if (DateTime.UtcNow < _suppressEmptyClickUntil)
+            {
+                return;
+            }
+
+            Raise(NewTabRequested);
         }
 
         private void OnItemSelectRequested(object sender, EventArgs e)
@@ -215,6 +226,24 @@ namespace VantageLite.UI
             {
                 return;
             }
+
+            EventHandler<int> handler = TabCloseRequested;
+            if (handler != null)
+            {
+                handler(this, item.TabId);
+            }
+        }
+
+        private void OnItemMiddleCloseRequested(object sender, EventArgs e)
+        {
+            TabViewItem item = sender as TabViewItem;
+            if (item == null)
+            {
+                return;
+            }
+
+            // 标签被移除后，同一次中键点击的 MouseUp 可能命中标签栏背景。
+            _suppressEmptyClickUntil = DateTime.UtcNow.AddMilliseconds(350);
 
             EventHandler<int> handler = TabCloseRequested;
             if (handler != null)

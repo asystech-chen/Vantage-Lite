@@ -70,6 +70,7 @@ namespace VantageLite.UI
 
         public event EventHandler SelectRequested;
         public event EventHandler CloseRequested;
+        public event EventHandler MiddleCloseRequested;
 
         public void Update(BrowserTab tab, bool active)
         {
@@ -178,7 +179,7 @@ namespace VantageLite.UI
         {
             if (e.Button == MouseButtons.Middle)
             {
-                Raise(CloseRequested);
+                Raise(MiddleCloseRequested);
             }
         }
 

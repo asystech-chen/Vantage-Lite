@@ -10,7 +10,8 @@ namespace VantageLite.Storage
     public sealed class HistoryStore
     {
         private const int MaxEntries = 2000;
-        private const int SaveEvery = 20;
+        // 每次访问都落盘：应用被强制结束（关控制台窗口）时也不会丢最近记录。
+        private const int SaveEvery = 1;
 
         private readonly string _path;
         private readonly List<HistoryEntry> _items;

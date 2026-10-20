@@ -49,12 +49,15 @@ namespace VantageLite.Storage
 
                 if (File.Exists(path))
                 {
-                    File.Replace(temp, path, null);
+                    File.Copy(temp, path, true);
+                    File.Delete(temp);
                 }
                 else
                 {
                     File.Move(temp, path);
                 }
+
+                Log.Debug("已保存 " + path);
             }
             catch (Exception ex)
             {

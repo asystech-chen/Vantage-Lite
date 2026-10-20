@@ -78,7 +78,7 @@ namespace VantageLite.UI
             string border = dark ? "#33363b" : "#eeeeee";
             string link = dark ? "#6cb6ff" : "#1a66c9";
 
-            return "<!doctype html><html><head><meta charset=\"utf-8\">"
+            return "<!doctype html><html><head><meta charset=\"utf-8\"><base target=\"_blank\">"
                 + "<title>" + Escape(title) + "</title><style>"
                 + ":root{color-scheme:" + (dark ? "dark" : "light") + "}"
                 + "body{margin:0;padding:28px 36px;background:" + background + ";color:" + foreground + ";"

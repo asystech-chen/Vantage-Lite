@@ -223,20 +223,28 @@ namespace VantageLite.Browser
         /// </summary>
         public void SetContentVisibility(bool visible)
         {
-            Visible = visible;
-
             WebView2 view = _webView;
-            if (view == null || view.IsDisposed || view.Visible == visible)
-            {
-                return;
-            }
 
-            try
+            // 顺序很重要：WinForms 的 Visible getter 在父容器隐藏后恒为 false，
+            // 那时再给子控件赋 false 是空操作，不会触发 VisibleChanged，
+            // WebView2 controller 就会一直以为自己可见。
+            if (visible)
             {
-                view.Visible = visible;
+                Visible = true;
+
+                if (view != null && !view.IsDisposed && !view.Visible)
+                {
+                    try { view.Visible = true; } catch { }
+                }
             }
-            catch
+            else
             {
+                if (view != null && !view.IsDisposed && view.Visible)
+                {
+                    try { view.Visible = false; } catch { }
+                }
+
+                Visible = false;
             }
         }
 

@@ -133,8 +133,18 @@ namespace VantageLite.Browser
                     }
 
                     // 对象仍可用：当作挂起被拒绝，用低内存目标兜底。
+                    bool wasThrottled = _isThrottled;
                     SetMemoryTarget(true);
-                    Log.Info("[tab " + _id + "] suspend failed but core alive; memory target low");
+
+                    if (wasThrottled)
+                    {
+                        Log.Debug("[tab " + _id + "] suspend still refused");
+                    }
+                    else
+                    {
+                        Log.Info("[tab " + _id + "] suspend failed but core alive; memory target low");
+                    }
+
                     return false;
                 }
 

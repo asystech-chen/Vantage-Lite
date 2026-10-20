@@ -32,6 +32,7 @@ namespace VantageLite.Browser
         public event EventHandler ActiveTabChanged;
         public event EventHandler<string> NewWindowRequested;
         public event EventHandler<NavigatedEventArgs> Navigated;
+        public event EventHandler<string> WebMessage;
 
         public TabManager(
             Control host,
@@ -74,6 +75,7 @@ namespace VantageLite.Browser
             tab.TitleChanged += TabTitleChanged;
             tab.NewWindowRequested += TabNewWindowRequested;
             tab.Navigated += TabNavigated;
+            tab.WebMessage += TabWebMessage;
             _tabs.Add(tab);
             _host.Controls.Add(tab);
             tab.Dock = DockStyle.Fill;

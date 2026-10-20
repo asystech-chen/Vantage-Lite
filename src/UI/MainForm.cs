@@ -46,7 +46,7 @@ namespace VantageLite.UI
             WireNavigationEvents();
             InitializeTheme();
 
-            _bookmarksBar.Refresh(_bookmarks.ToolbarFolder);
+            _bookmarksBar.Refresh(_bookmarks);
 
             _resizeSettleTimer = new Timer();
             _resizeSettleTimer.Interval = 250;
@@ -107,6 +107,7 @@ namespace VantageLite.UI
                 _tabManager.ActiveTabChanged += TabManager_ActiveTabChanged;
                 _tabManager.NewWindowRequested += TabManager_NewWindowRequested;
                 _tabManager.Navigated += TabManager_Navigated;
+                _tabManager.WebMessage += TabManager_WebMessage;
 
                 _tabStrip.TabSelected += TabStrip_TabSelected;
                 _tabStrip.TabCloseRequested += TabStrip_TabCloseRequested;

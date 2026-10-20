@@ -76,6 +76,9 @@ namespace VantageLite.Browser
 
                 // 页面内表单改动标记，用于丢弃前的脏数据保护。
                 await core.AddScriptToExecuteOnDocumentCreatedAsync(DirtyFormScript.Source);
+
+                // 快捷键兜底：页面聚焦时 WinForms 收不到按键。
+                await core.AddScriptToExecuteOnDocumentCreatedAsync(ShortcutScript.Source);
             }
             catch (Exception)
             {

@@ -26,6 +26,19 @@ namespace VantageLite.Storage
 
         public BookmarkNode Root { get; private set; }
 
+        public string ClipboardId { get; set; }
+
+        public bool ClipboardCut { get; set; }
+
+        public string ClipboardTitle
+        {
+            get
+            {
+                BookmarkNode node = Find(ClipboardId);
+                return node == null ? null : node.Title;
+            }
+        }
+
         public BookmarkNode ToolbarFolder
         {
             get { return Find(ToolbarId); }
@@ -136,6 +149,163 @@ namespace VantageLite.Storage
             node.Title = title.Trim();
             Save();
             return true;
+        }
+
+        public bool Cut(string id)
+        {
+            if (string.IsNullOrEmpty(id) || IsSystemFolder(id) || Find(id) == null)
+            {
+                return false;
+            }
+
+            ClipboardId = id;
+            ClipboardCut = true;
+            return true;
+        }
+
+        public bool CopyToClipboard(string id)
+        {
+            if (string.IsNullOrEmpty(id) || IsSystemFolder(id) || Find(id) == null)
+            {
+                return false;
+            }
+
+            ClipboardId = id;
+            ClipboardCut = false;
+            return true;
+        }
+
+        public bool Paste(string parentId)
+        {
+            BookmarkNode target = Find(parentId);
+            if (target == null || !target.IsFolder || string.IsNullOrEmpty(ClipboardId))
+            {
+                return false;
+            }
+
+            if (ClipboardCut)
+            {
+                bool moved = Move(ClipboardId, parentId);
+                if (moved)
+                {
+                    ClipboardId = null;
+                    ClipboardCut = false;
+                }
+
+                return moved;
+            }
+
+            return Copy(ClipboardId, parentId) != null;
+        }
+
+        public bool Move(string id, string newParentId)
+        {
+            if (IsSystemFolder(id))
+            {
+                return false;
+            }
+
+            BookmarkNode node = Find(id);
+            BookmarkNode target = Find(newParentId);
+
+            if (node == null || target == null || !target.IsFolder)
+            {
+                return false;
+            }
+
+            // 文件夹不能移动到自身或自己的子级。
+            if (node.IsFolder && IsDescendantOrSelf(id, newParentId))
+            {
+                return false;
+            }
+
+            BookmarkNode parent = ParentOf(id);
+            if (parent == null)
+            {
+                return false;
+            }
+
+            parent.GetChildren().Remove(node);
+            target.GetChildren().Add(node);
+            Save();
+            return true;
+        }
+
+        public BookmarkNode Copy(string id, string newParentId)
+        {
+            BookmarkNode node = Find(id);
+            BookmarkNode target = Find(newParentId);
+
+            if (node == null || target == null || !target.IsFolder)
+            {
+                return null;
+            }
+
+            if (node.IsFolder && IsDescendantOrSelf(id, newParentId))
+            {
+                return null;
+            }
+
+            BookmarkNode clone = CloneNode(node);
+            target.GetChildren().Add(clone);
+            Save();
+            return clone;
+        }
+
+        public bool IsDescendantOrSelf(string ancestorId, string nodeId)
+        {
+            BookmarkNode ancestor = Find(ancestorId);
+            return ancestor != null && ContainsNode(ancestor, nodeId);
+        }
+
+        private static BookmarkNode CloneNode(BookmarkNode node)
+        {
+            BookmarkNode clone = new BookmarkNode
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                Type = node.Type,
+                Title = node.Title,
+                Url = node.Url,
+                CreatedUtc = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+            };
+
+            if (node.IsFolder && node.Children != null)
+            {
+                for (int i = 0; i < node.Children.Count; i++)
+                {
+                    clone.GetChildren().Add(CloneNode(node.Children[i]));
+                }
+            }
+
+            return clone;
+        }
+
+        private static bool ContainsNode(BookmarkNode root, string id)
+        {
+            if (root == null)
+            {
+                return false;
+            }
+
+            if (string.Equals(root.Id, id, StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            if (root.Children == null)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < root.Children.Count; i++)
+            {
+                if (ContainsNode(root.Children[i], id))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         public bool Remove(string id)

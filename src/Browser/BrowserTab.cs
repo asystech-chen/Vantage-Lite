@@ -147,6 +147,7 @@ namespace VantageLite.Browser
         public event EventHandler<string> NewWindowRequested;
         public event EventHandler<string> ProcessFailed;
         public event EventHandler<NavigatedEventArgs> Navigated;
+        public event EventHandler<string> WebMessage;
 
         public BrowserTab(
             int id,

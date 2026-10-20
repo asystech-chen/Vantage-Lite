@@ -86,6 +86,12 @@ namespace VantageLite.UI
                 return true;
             }
 
+            if (keyData == (Keys.Control | Keys.Shift | Keys.B))
+            {
+                ToggleBookmarksBar();
+                return true;
+            }
+
             if (keyData == (Keys.Control | Keys.Shift | Keys.Delete))
             {
                 ClearHistory();

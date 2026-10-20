@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Runtime.Serialization.Json;
+using System.Text;
 using VantageLite.App;
 using VantageLite.Diagnostics;
 
@@ -31,6 +32,22 @@ namespace VantageLite.Storage
             {
                 Log.Warn("读取 " + path + " 失败：" + ex.Message);
                 return fallback;
+            }
+        }
+
+        public static T Parse<T>(string json) where T : class
+        {
+            try
+            {
+                using (MemoryStream stream = new MemoryStream(Encoding.UTF8.GetBytes(json)))
+                {
+                    DataContractJsonSerializer serializer = new DataContractJsonSerializer(typeof(T));
+                    return serializer.ReadObject(stream) as T;
+                }
+            }
+            catch
+            {
+                return null;
             }
         }
 

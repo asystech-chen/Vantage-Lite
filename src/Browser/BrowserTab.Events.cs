@@ -28,6 +28,7 @@ namespace VantageLite.Browser
             core.NavigationCompleted += Core_NavigationCompleted;
             core.NewWindowRequested += Core_NewWindowRequested;
             core.ProcessFailed += Core_ProcessFailed;
+            core.WebMessageReceived += Core_WebMessageReceived;
         }
 
         /// <summary>
@@ -202,6 +203,36 @@ namespace VantageLite.Browser
             if (handler != null)
             {
                 handler(this, uri);
+            }
+        }
+
+        private void Core_WebMessageReceived(object sender, CoreWebView2WebMessageReceivedEventArgs e)
+        {
+            if (!ReferenceEquals(sender, _core))
+            {
+                return;
+            }
+
+            string message;
+
+            try
+            {
+                message = e.TryGetWebMessageAsString();
+            }
+            catch
+            {
+                return;
+            }
+
+            if (string.IsNullOrEmpty(message))
+            {
+                return;
+            }
+
+            EventHandler<string> handler = WebMessage;
+            if (handler != null)
+            {
+                handler(this, message);
             }
         }
 

@@ -78,6 +78,15 @@ namespace VantageLite.Browser
             }
         }
 
+        private void TabWebMessage(object sender, string message)
+        {
+            EventHandler<string> handler = WebMessage;
+            if (handler != null)
+            {
+                handler(this, message);
+            }
+        }
+
         private void TabNewWindowRequested(object sender, string url)
         {
             EventHandler<string> handler = NewWindowRequested;

@@ -2,6 +2,7 @@ using System;
 using System.Windows.Forms;
 using VantageLite.Browser;
 using VantageLite.Diagnostics;
+using VantageLite.Storage;
 
 namespace VantageLite.UI
 {
@@ -14,8 +15,20 @@ namespace VantageLite.UI
         private const string HistoryAddress = "about:history";
         private const string BookmarksAddress = "about:bookmarks";
 
+        // 消息过滤器和页面脚本可能同时触发同一个快捷键，做一次短去抖。
+        private DateTime _lastBookmarkToggleUtc;
+        private DateTime _lastBarToggleUtc;
+
         private void ToggleBookmark()
         {
+            DateTime now = DateTime.UtcNow;
+            if ((now - _lastBookmarkToggleUtc).TotalMilliseconds < 300)
+            {
+                return;
+            }
+
+            _lastBookmarkToggleUtc = now;
+
             BrowserTab tab = ActiveTab;
             if (tab == null)
             {
@@ -31,7 +44,7 @@ namespace VantageLite.UI
 
             bool added = _bookmarks.Toggle(tab.DisplayTitle, url);
             Log.Info((added ? "Bookmark added: " : "Bookmark removed: ") + url);
-            _bookmarksBar.Refresh(_bookmarks.ToolbarFolder);
+            _bookmarksBar.Refresh(_bookmarks);
             UpdateBookmarkState();
         }
 
@@ -51,7 +64,7 @@ namespace VantageLite.UI
 
             string html = string.Equals(address, HistoryAddress, StringComparison.OrdinalIgnoreCase)
                 ? InternalPages.History(_history.Items)
-                : InternalPages.Bookmarks(_bookmarks.Root);
+                : InternalPages.Bookmarks(_bookmarks);
 
             tab.ShowInternalPage(address, html);
             _navigationBar.SetAddress(address);
@@ -60,21 +73,97 @@ namespace VantageLite.UI
 
         private void ShowBookmarkManager()
         {
-            string openUrl = null;
+            ShowInternalPage(BookmarksAddress);
+        }
 
-            using (BookmarkManagerForm form = new BookmarkManagerForm(_bookmarks))
+        private void ToggleBookmarksBar()
+        {
+            DateTime now = DateTime.UtcNow;
+            if ((now - _lastBarToggleUtc).TotalMilliseconds < 300)
             {
-                form.OpenRequested += delegate (object sender, string url) { openUrl = url; };
-                form.ShowDialog(this);
+                return;
             }
 
-            _bookmarksBar.Refresh(_bookmarks.ToolbarFolder);
+            _lastBarToggleUtc = now;
+            _bookmarksBar.Visible = !_bookmarksBar.Visible;
+        }
+
+        /// <summary>
+        /// 书签页操作完成后原位重绘，保持地址栏仍是 about:bookmarks。
+        /// </summary>
+        private void RenderBookmarksPage()
+        {
+            BrowserTab tab = ActiveTab;
+            if (tab != null && string.Equals(tab.Url, BookmarksAddress, StringComparison.OrdinalIgnoreCase))
+            {
+                ShowInternalPage(BookmarksAddress);
+            }
+        }
+
+        private void TabManager_WebMessage(object sender, string message)
+        {
+            BookmarkCommand command = JsonFile.Parse<BookmarkCommand>(message);
+            if (command == null || string.IsNullOrEmpty(command.Cmd))
+            {
+                return;
+            }
+
+            if (string.Equals(command.Cmd, "shortcut", StringComparison.OrdinalIgnoreCase))
+            {
+                if (string.Equals(command.Name, "bookmark", StringComparison.OrdinalIgnoreCase))
+                {
+                    ToggleBookmark();
+                }
+                else if (string.Equals(command.Name, "bookmarksbar", StringComparison.OrdinalIgnoreCase))
+                {
+                    ToggleBookmarksBar();
+                }
+                else if (string.Equals(command.Name, "bookmarks", StringComparison.OrdinalIgnoreCase))
+                {
+                    ShowBookmarkManager();
+                }
+
+                return;
+            }
+
+            bool changed;
+
+            switch (command.Cmd)
+            {
+                case "newFolder":
+                    changed = _bookmarks.AddFolder(command.ParentId, command.Name) != null;
+                    break;
+                case "rename":
+                    changed = _bookmarks.Rename(command.Id, command.Name);
+                    break;
+                case "delete":
+                    changed = _bookmarks.Remove(command.Id);
+                    break;
+                case "cut":
+                    changed = _bookmarks.Cut(command.Id);
+                    break;
+                case "copy":
+                    changed = _bookmarks.CopyToClipboard(command.Id);
+                    break;
+                case "paste":
+                    changed = _bookmarks.Paste(command.ParentId);
+                    break;
+                case "move":
+                    changed = _bookmarks.Move(command.Id, command.ParentId);
+                    break;
+                default:
+                    changed = false;
+                    break;
+            }
+
+            if (!changed)
+            {
+                return;
+            }
+
+            _bookmarksBar.Refresh(_bookmarks);
             UpdateBookmarkState();
-
-            if (!string.IsNullOrEmpty(openUrl))
-            {
-                NavigateTo(openUrl);
-            }
+            RenderBookmarksPage();
         }
 
         private static string NormalizeInternalPage(string address)

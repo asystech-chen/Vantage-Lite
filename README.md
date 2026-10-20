@@ -2,10 +2,12 @@
 
 Windows 极简浏览器外壳，基于 **WebView2 (Edge Chromium)**。
 
+[![License: MPL 2.0](https://img.shields.io/badge/License-MPL_2.0-brightgreen.svg)](LICENSE)
+
 - 目标：启动即用、无账号、无同步、无推荐、无后台服务
 - 非目标：扩展、密码管理、与 Vantage (Firefox) 配置兼容
-- 当前版本：0.10.2（深浅色主题完善）
-- 已实现：多标签、后台挂起、脏表单保护、单文件 exe、明暗主题跟随系统
+- 当前版本：0.10.3（拖拽插入线与书签展开状态）
+- 已实现：多标签、后台挂起/丢弃、书签与历史、书签栏拖拽、单文件 exe、明暗主题、内置页
 
 ## 构建
 
@@ -90,28 +92,24 @@ VantageLite.exe --user-data-dir=D:\tmp\vl-profile --url=https://asystech.cn
 | `Ctrl+9` | 切换到最后一个标签 |
 | `F12` | 开发者工具 |
 
-## M2 测试清单
+## 功能
 
-1. `build.cmd` 输出 `Build OK`
-2. `bin\Release\net48\` 里只有 `VantageLite.exe`（没有 DLL）
-3. 双击 exe 能打开 ASYS 起始页
-4. 新建标签并切换，功能正常
-5. 填一个表单（不提交），切到别的标签等 30 秒以上
-6. 切回原标签，表单内容仍在（说明是挂起不是销毁）
-7. 日志出现 `suspend: ok`，`[tabs]` 行包含 `suspended=`
-8. 把 `--suspend-after-seconds=0` 启动，后台标签不应挂起
-9. 把 `--max-live-tabs=2` 开 3 个标签，超限时优先销毁无表单标签
-10. 有未提交表单的标签不会被销毁（日志出现 `discard skipped`）
-11. 日志里的 `ours=` 只统计本程序新增的 WebView2 进程
-12. 退出后重开，确认 `UserData` 和 `Logs` 都在 exe 目录
+- 多标签：新建、切换、中键关闭、拖动排序
+- 内存：后台 30 秒挂起、挂起被拒降级、存活标签上限 + LRU 丢弃、最小化节流
+- 书签：树形文件夹、书签工具栏、`about:bookmarks` 管理页、拖拽排序/移入文件夹
+- 历史：`about:history`，即时落盘，最多 2000 条
+- 设置：`about:preferences`（启动页、最大存活标签、书签栏开关）
+- 外观：跟随系统明暗主题，内置页与原生菜单同步切换
+- 图标：页面 favicon、书签栏图标、Windows 系统文件夹图标（`SHGetFileInfo`）
+- 快捷键：见上方表格
 
-## 已知限制（M2）
+## 已知限制
 
 - 无会话恢复：关闭窗口后标签不保留
-- 无书签、历史、下载管理
-- 无自动更新
+- 无下载管理、无自动更新、无扩展
 - 未签名，首次运行可能触发 SmartScreen
 - 脏表单检测只覆盖顶层文档的 `input/change`，跨域 iframe 和复杂 SPA 可能漏判
+- “轻量”指安装包体积、零运行时安装和启动速度；WebView2 的内存占用与 Edge 同量级
 
 ## 目录
 
@@ -125,3 +123,15 @@ docs/            架构、构建、日志说明
 ```
 
 详细模块地图见 `docs/architecture.md`。
+
+## 许可
+
+本项目代码采用 **Mozilla Public License 2.0**，全文见 [LICENSE](LICENSE)。
+
+- 第三方组件与商标说明：[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)
+- 隐私说明：[PRIVACY.md](PRIVACY.md)
+- 安全策略：[SECURITY.md](SECURITY.md)
+- 参与贡献：[CONTRIBUTING.md](CONTRIBUTING.md)
+- 更新日志：[CHANGELOG.md](CHANGELOG.md)
+
+Vantage Lite 与 Mozilla、Firefox、Microsoft、Edge 均无隶属或背书关系。

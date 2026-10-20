@@ -108,7 +108,7 @@ namespace VantageLite.UI
                 .Append("</span><span class=\"v\">").Append(Escape(value)).Append("</span></div>");
         }
 
-        public static string Bookmarks(BookmarkStore store)
+        public static string Bookmarks(BookmarkStore store, ICollection<string> expanded)
         {
             BookmarkNode root = store == null ? null : store.Root;
             int total = CountBookmarks(root, 0);
@@ -128,7 +128,7 @@ namespace VantageLite.UI
 
             // 即使没有书签，也要渲染文件夹树，否则空文件夹无法管理。
             body.Append("<ul class=\"tree\">");
-            AppendChildren(root, body, new int[1]);
+            AppendChildren(root, body, new int[1], expanded);
             body.Append("</ul>");
 
             body.Append("<div id=\"menu\" class=\"menu\">");
@@ -165,7 +165,7 @@ namespace VantageLite.UI
             return Page("书签", "共 " + total + " 个书签 · 点行尾 ⋯ 管理", body.ToString());
         }
 
-        private static void AppendChildren(BookmarkNode node, StringBuilder sb, int[] rendered)
+        private static void AppendChildren(BookmarkNode node, StringBuilder sb, int[] rendered, ICollection<string> expanded)
         {
             if (node == null || node.Children == null)
             {
@@ -178,21 +178,23 @@ namespace VantageLite.UI
 
                 if (child.IsFolder)
                 {
+                    bool open = expanded != null && expanded.Contains(child.Id);
+
                     sb.Append("<li class=\"folder\" id=\"li_").Append(child.Id)
                         .Append("\" data-id=\"").Append(child.Id).Append("\">")
                         .Append("<div class=\"folder-head\" id=\"row_").Append(child.Id)
                         .Append("\" draggable=\"true\" ").Append(DragAttributes(child.Id))
                         .Append(" onclick=\"toggleFolder('").Append(child.Id)
                         .Append("',event)\"><span class=\"tri\" id=\"tri_")
-                        .Append(child.Id).Append("\">▸</span>")
+                        .Append(child.Id).Append("\">").Append(open ? "▾" : "▸").Append("</span>")
                         .Append(Icon(null, true, false))
                         .Append("<span class=\"name\">")
                         .Append(Escape(child.Title)).Append("</span>")
                         .Append(MoreButton(child.Id))
                         .Append("</div><ul class=\"tree\" id=\"ul_").Append(child.Id)
-                        .Append("\" style=\"display:none\">");
+                        .Append("\" style=\"display:").Append(open ? "block" : "none").Append("\">");
 
-                    AppendChildren(child, sb, rendered);
+                    AppendChildren(child, sb, rendered, expanded);
                     sb.Append("</ul></li>");
                 }
                 else
@@ -298,6 +300,7 @@ function toggleFolder(id,ev){
   var open=ul.style.display!=='none';
   ul.style.display=open?'none':'block';
   if(tri){tri.textContent=open?'▸':'▾';}
+  post({cmd:'expanded',id:id,open:!open});
 }
 function move(id){moving=id;document.getElementById('moveBox').style.display='flex';}
 function hideMove(){document.getElementById('moveBox').style.display='none';}

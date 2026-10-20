@@ -87,7 +87,7 @@ namespace VantageLite.UI
             }
             else
             {
-                html = InternalPages.Bookmarks(_bookmarks);
+                html = InternalPages.Bookmarks(_bookmarks, _expandedBookmarks);
             }
 
             tab.ShowInternalPage(address, html);
@@ -202,7 +202,7 @@ namespace VantageLite.UI
                 return;
             }
 
-            string html = InternalPages.Bookmarks(_bookmarks);
+            string html = InternalPages.Bookmarks(_bookmarks, _expandedBookmarks);
 
             for (int i = 0; i < _tabManager.Tabs.Count; i++)
             {
@@ -264,6 +264,24 @@ namespace VantageLite.UI
                 return;
             }
 
+            // 记录书签页文件夹的展开状态，重绘后原样恢复。
+            if (string.Equals(command.Cmd, "expanded", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!string.IsNullOrEmpty(command.Id))
+                {
+                    if (command.Open)
+                    {
+                        _expandedBookmarks.Add(command.Id);
+                    }
+                    else
+                    {
+                        _expandedBookmarks.Remove(command.Id);
+                    }
+                }
+
+                return;
+            }
+
             bool changed;
 
             switch (command.Cmd)
@@ -287,7 +305,7 @@ namespace VantageLite.UI
                     changed = _bookmarks.Paste(command.ParentId);
                     break;
                 case "move":
-                    changed = _bookmarks.Move(command.Id, command.ParentId);
+                    changed = _bookmarks.Move(command.Id, command.ParentId, command.Before);
                     break;
                 default:
                     changed = false;
@@ -305,6 +323,11 @@ namespace VantageLite.UI
                 }
 
                 return;
+            }
+
+            if (string.Equals(command.Cmd, "delete", StringComparison.OrdinalIgnoreCase))
+            {
+                _expandedBookmarks.Remove(command.Id);
             }
 
             _bookmarksBar.Refresh(_bookmarks);

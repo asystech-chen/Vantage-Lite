@@ -5,5 +5,7 @@ obj/
 *.suo
 *.log
 logs/
+Logs/
+UserData/
 data/
 *.zip

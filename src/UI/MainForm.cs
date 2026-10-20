@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Windows.Forms;
@@ -27,6 +28,7 @@ namespace VantageLite.UI
         private TabManager _tabManager;
         private BrowserTab _attachedTab;
         private BookmarkStore _bookmarks;
+        private readonly HashSet<string> _expandedBookmarks = new HashSet<string>(StringComparer.Ordinal);
         private HistoryStore _history;
         private AppSettings _settings;
         private bool _minimized;

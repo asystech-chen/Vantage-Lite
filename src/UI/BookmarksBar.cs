@@ -351,7 +351,7 @@ namespace VantageLite.UI
 
         private void ShowFolderMenu(Button button, BookmarkNode folder)
         {
-            ContextMenuStrip menu = NewMenu();
+            ContextMenuStrip menu = NewMenu(true);
             IList<BookmarkNode> children = folder.GetChildren();
 
             if (children.Count == 0)
@@ -364,14 +364,14 @@ namespace VantageLite.UI
             {
                 for (int i = 0; i < children.Count; i++)
                 {
-                    menu.Items.Add(CreateMenuItem(children[i]));
+                    menu.Items.Add(CreateMenuItem(children[i], true, menu));
                 }
             }
 
             ShowMenuAtButton(button, menu);
         }
 
-        private ToolStripMenuItem CreateMenuItem(BookmarkNode node)
+        private ToolStripMenuItem CreateMenuItem(BookmarkNode node, bool showIcon, ContextMenuStrip ownerMenu)
         {
             ToolStripMenuItem item = new ToolStripMenuItem(node.Title);
             item.ToolTipText = node.IsFolder ? null : node.Url;
@@ -382,18 +382,66 @@ namespace VantageLite.UI
                 IList<BookmarkNode> children = node.GetChildren();
                 for (int i = 0; i < children.Count; i++)
                 {
-                    item.DropDownItems.Add(CreateMenuItem(children[i]));
+                    item.DropDownItems.Add(CreateMenuItem(children[i], showIcon, ownerMenu));
                 }
 
                 item.Enabled = item.DropDownItems.Count > 0;
+
+                if (showIcon)
+                {
+                    item.Image = FolderIcon();
+                }
             }
             else
             {
                 string url = node.Url;
                 item.Click += delegate { RaiseOpen(url); };
+
+                if (showIcon)
+                {
+                    ApplyFavicon(item, url, ownerMenu);
+                }
             }
 
             return item;
+        }
+
+        /// <summary>
+        /// 菜单项图标异步加载：加载完成时菜单可能已经关闭，需要判 IsDisposed。
+        /// </summary>
+        private static void ApplyFavicon(ToolStripMenuItem item, string url, ContextMenuStrip ownerMenu)
+        {
+            Image cached = FaviconCache.GetOrLoad(url, delegate (Image image)
+            {
+                if (image == null)
+                {
+                    return;
+                }
+
+                try
+                {
+                    if (ownerMenu == null || ownerMenu.IsDisposed || !ownerMenu.IsHandleCreated)
+                    {
+                        return;
+                    }
+
+                    ownerMenu.BeginInvoke(new Action(delegate
+                    {
+                        if (!item.IsDisposed && !ownerMenu.IsDisposed)
+                        {
+                            item.Image = image;
+                        }
+                    }));
+                }
+                catch
+                {
+                }
+            });
+
+            if (cached != null)
+            {
+                item.Image = cached;
+            }
         }
 
         private void ShowItemMenu(Button button, BookmarkNode node)
@@ -553,8 +601,15 @@ namespace VantageLite.UI
 
         private ContextMenuStrip NewMenu()
         {
+            return NewMenu(false);
+        }
+
+        private ContextMenuStrip NewMenu(bool showIcons)
+        {
             ContextMenuStrip menu = new ContextMenuStrip();
-            menu.ShowImageMargin = false;
+            menu.ShowImageMargin = showIcons;
+            menu.ShowCheckMargin = false;
+            menu.ImageScalingSize = new Size(16, 16);
             menu.Font = ThemeFonts.Ui(9.5F);
             ThemeManager.ApplyMenuTheme(menu);
             return menu;
@@ -669,8 +724,9 @@ namespace VantageLite.UI
 
             e.Effect = DragDropEffects.Move;
 
+            // 书签栏是横向排列，左右位置才表示插入前后。
             Point point = button.PointToClient(new Point(e.X, e.Y));
-            double ratio = button.Height <= 0 ? 0.5 : (double)point.Y / button.Height;
+            double ratio = button.Width <= 0 ? 0.5 : (double)point.X / button.Width;
             string mode = node.IsFolder && ratio > 0.3 && ratio < 0.7
                 ? "into"
                 : (ratio < 0.5 ? "before" : "after");
@@ -738,12 +794,12 @@ namespace VantageLite.UI
 
         private void ShowDropLine(Button button, bool before)
         {
-            Point screen = _panel.PointToScreen(new Point(
-                button.Left,
-                before ? button.Top : button.Bottom - 2));
+            int x = before ? button.Left : button.Right - 2;
+
+            Point screen = _panel.PointToScreen(new Point(x, button.Top));
             Point local = PointToClient(screen);
 
-            _dropLine.SetBounds(local.X, local.Y, button.Width, 2);
+            _dropLine.SetBounds(local.X, local.Y, 2, button.Height);
             _dropLine.BackColor = ThemeManager.Current.Accent;
             _dropLine.Visible = true;
             _dropLine.BringToFront();

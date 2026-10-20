@@ -32,5 +32,8 @@ namespace VantageLite.Storage
 
         [DataMember(Name = "bookmarksBar", Order = 7, EmitDefaultValue = false)]
         public bool BookmarksBar { get; set; }
+
+        [DataMember(Name = "open", Order = 8, EmitDefaultValue = false)]
+        public bool Open { get; set; }
     }
 }

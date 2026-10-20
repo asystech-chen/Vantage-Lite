@@ -33,6 +33,7 @@ namespace VantageLite.Browser
         private int _stateVersion;
         private bool _isThrottled;
         private bool _statusBarSuppressed;
+        private bool _isLoading;
         private string _internalAddress;
         private Image _favicon;
 
@@ -64,6 +65,11 @@ namespace VantageLite.Browser
         public bool HasUnsavedInput
         {
             get { return _hasUnsavedInput; }
+        }
+
+        public bool IsLoading
+        {
+            get { return _isLoading; }
         }
 
         public bool IsThrottled

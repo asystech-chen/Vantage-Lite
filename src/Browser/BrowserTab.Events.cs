@@ -352,6 +352,8 @@ namespace VantageLite.Browser
 
         private void RaiseLoading(bool loading)
         {
+            _isLoading = loading;
+
             EventHandler<bool> handler = LoadingChanged;
             if (handler != null)
             {

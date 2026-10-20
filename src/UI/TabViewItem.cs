@@ -15,10 +15,13 @@ namespace VantageLite.UI
     {
         private readonly Button _closeButton;
         private readonly Panel _indicator;
+        private readonly Timer _spinner;
 
         private BrowserTab _tab;
         private bool _active;
         private bool _hovered;
+        private bool _loading;
+        private int _spinAngle;
         private string _titleText;
         private Color _titleColor;
 
@@ -37,6 +40,18 @@ namespace VantageLite.UI
             Margin = new Padding(0, 0, 2, 0);
             Font = ThemeFonts.Ui(9F);
             Cursor = Cursors.Default;
+
+            _spinner = new Timer();
+            _spinner.Interval = 90;
+            _spinner.Tick += delegate
+            {
+                _spinAngle = (_spinAngle + 30) % 360;
+
+                if (_loading)
+                {
+                    Invalidate();
+                }
+            };
 
             _indicator = new Panel();
             _indicator.Dock = DockStyle.Top;
@@ -86,19 +101,27 @@ namespace VantageLite.UI
                 if (_tab != null)
                 {
                     _tab.FaviconChanged += Tab_FaviconChanged;
+                    _tab.LoadingChanged += Tab_LoadingChanged;
                 }
             }
 
             _active = active;
+            SetLoading(tab != null && tab.IsLoading);
             UpdateVisual();
         }
 
         protected override void Dispose(bool disposing)
         {
-            if (disposing && _tab != null)
+            if (disposing)
             {
-                _tab.FaviconChanged -= Tab_FaviconChanged;
-                _tab = null;
+                if (_tab != null)
+                {
+                    _tab.FaviconChanged -= Tab_FaviconChanged;
+                    _tab.LoadingChanged -= Tab_LoadingChanged;
+                    _tab = null;
+                }
+
+                _spinner.Dispose();
             }
 
             base.Dispose(disposing);
@@ -106,6 +129,32 @@ namespace VantageLite.UI
 
         private void Tab_FaviconChanged(object sender, EventArgs e)
         {
+            Invalidate();
+        }
+
+        private void Tab_LoadingChanged(object sender, bool loading)
+        {
+            SetLoading(loading);
+        }
+
+        private void SetLoading(bool loading)
+        {
+            if (_loading == loading)
+            {
+                return;
+            }
+
+            _loading = loading;
+
+            if (loading)
+            {
+                _spinner.Start();
+            }
+            else
+            {
+                _spinner.Stop();
+            }
+
             Invalidate();
         }
 
@@ -138,7 +187,19 @@ namespace VantageLite.UI
             int left = 8;
             Image icon = _tab == null ? null : _tab.Favicon;
 
-            if (icon != null)
+            if (_loading)
+            {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+
+                using (Pen pen = new Pen(ThemeManager.Current.Accent, 2F))
+                {
+                    pen.StartCap = System.Drawing.Drawing2D.LineCap.Round;
+                    pen.EndCap = System.Drawing.Drawing2D.LineCap.Round;
+                    e.Graphics.DrawArc(pen, left + 1, (Height - iconSize) / 2 + 1,
+                        iconSize - 2, iconSize - 2, _spinAngle, 260);
+                }
+            }
+            else if (icon != null)
             {
                 e.Graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
                 e.Graphics.DrawImage(icon, new Rectangle(left, (Height - iconSize) / 2, iconSize, iconSize));

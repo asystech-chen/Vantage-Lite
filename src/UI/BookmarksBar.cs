@@ -606,18 +606,18 @@ namespace VantageLite.UI
                 Pending[key] = callbacks;
             }
 
-            ThreadPool.QueueUserWorkItem(delegate { Load(key); });
+            ThreadPool.QueueUserWorkItem(delegate { Load(key, url); });
             return null;
         }
 
-        private static void Load(string key)
+        private static void Load(string key, string pageUrl)
         {
             Image image = Download("https://" + key + "/favicon.ico");
 
             // 很多站点 favicon 不在根目录，回退到页面里的 <link rel="icon">。
             if (image == null)
             {
-                string iconUrl = FindIconUrl(key);
+                string iconUrl = FindIconUrl(pageUrl);
                 if (iconUrl != null)
                 {
                     image = Download(iconUrl);
@@ -690,10 +690,9 @@ namespace VantageLite.UI
             return bitmap;
         }
 
-        private static string FindIconUrl(string key)
+        private static string FindIconUrl(string pageUrl)
         {
-            string baseUrl = "https://" + key + "/";
-            string html = DownloadHtml(baseUrl);
+            string html = DownloadHtml(pageUrl);
 
             if (string.IsNullOrEmpty(html))
             {
@@ -718,7 +717,7 @@ namespace VantageLite.UI
                     Uri resolved;
 
                     if (!string.IsNullOrEmpty(href) &&
-                        Uri.TryCreate(new Uri(baseUrl), href, out resolved))
+                        Uri.TryCreate(new Uri(pageUrl), href, out resolved))
                     {
                         return resolved.ToString();
                     }

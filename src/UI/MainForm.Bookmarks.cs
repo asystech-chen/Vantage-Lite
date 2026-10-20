@@ -14,6 +14,7 @@ namespace VantageLite.UI
     {
         private const string HistoryAddress = "about:history";
         private const string BookmarksAddress = "about:bookmarks";
+        private const string AboutAddress = "about:about";
 
         // 消息过滤器和页面脚本可能同时触发同一个快捷键，做一次短去抖。
         private DateTime _lastBookmarkToggleUtc;
@@ -67,9 +68,20 @@ namespace VantageLite.UI
                 return;
             }
 
-            string html = string.Equals(address, HistoryAddress, StringComparison.OrdinalIgnoreCase)
-                ? InternalPages.History(_history.Items)
-                : InternalPages.Bookmarks(_bookmarks);
+            string html;
+
+            if (string.Equals(address, HistoryAddress, StringComparison.OrdinalIgnoreCase))
+            {
+                html = InternalPages.History(_history.Items);
+            }
+            else if (string.Equals(address, AboutAddress, StringComparison.OrdinalIgnoreCase))
+            {
+                html = InternalPages.About(Application.ProductVersion, WebViewEnvironment.RuntimeVersion);
+            }
+            else
+            {
+                html = InternalPages.Bookmarks(_bookmarks);
+            }
 
             tab.ShowInternalPage(address, html);
             _navigationBar.SetAddress(address);
@@ -294,6 +306,11 @@ namespace VantageLite.UI
             if (value == BookmarksAddress || value == "vantage:bookmarks")
             {
                 return BookmarksAddress;
+            }
+
+            if (value == AboutAddress || value == "vantage:about")
+            {
+                return AboutAddress;
             }
 
             return null;

@@ -20,6 +20,7 @@ namespace VantageLite.Theming
         public const string StarFilled = "\uE735";
         public const string More = "\uE712";
         public const string Folder = "\uE8B7";
+        public const string Menu = "\uE700";
 
         private static readonly string Family = DetectFamily();
 

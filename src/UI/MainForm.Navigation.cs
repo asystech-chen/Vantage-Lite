@@ -98,7 +98,8 @@ namespace VantageLite.UI
             // 内置页是 HTML 快照，F5 重新生成，而不是重载旧的 data: 地址。
             string url = tab.Url;
             if (string.Equals(url, HistoryAddress, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(url, BookmarksAddress, StringComparison.OrdinalIgnoreCase))
+                string.Equals(url, BookmarksAddress, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(url, AboutAddress, StringComparison.OrdinalIgnoreCase))
             {
                 ShowInternalPage(url);
                 return;

@@ -18,6 +18,7 @@ namespace VantageLite.UI
         public event EventHandler StopRequested;
         public event EventHandler HomeRequested;
         public event EventHandler BookmarkRequested;
+        public event EventHandler MenuRequested;
 
         private readonly ToolTip _toolTip;
         private Button _backButton;
@@ -25,6 +26,7 @@ namespace VantageLite.UI
         private Button _reloadButton;
         private Button _homeButton;
         private Button _bookmarkButton;
+        private Button _menuButton;
         private Panel _addressHost;
         private TextBox _addressBox;
         private bool _isLoading;
@@ -63,7 +65,7 @@ namespace VantageLite.UI
             _addressBox.BackColor = palette.AddressBackground;
             _addressBox.ForeColor = palette.TextPrimary;
 
-            Button[] buttons = { _backButton, _forwardButton, _reloadButton, _homeButton, _bookmarkButton };
+            Button[] buttons = { _backButton, _forwardButton, _reloadButton, _homeButton, _bookmarkButton, _menuButton };
             for (int i = 0; i < buttons.Length; i++)
             {
                 buttons[i].BackColor = palette.ChromeBackground;
@@ -126,11 +128,13 @@ namespace VantageLite.UI
             _reloadButton = CreateButton(IconFont.Refresh, "刷新 (F5)");
             _homeButton = CreateButton(IconFont.Home, "主页");
             _bookmarkButton = CreateButton(IconFont.Star, "收藏当前页面 (Ctrl+D)");
+            _menuButton = CreateButton(IconFont.Menu, "菜单");
 
             _backButton.Click += delegate { Raise(BackRequested); };
             _forwardButton.Click += delegate { Raise(ForwardRequested); };
             _homeButton.Click += delegate { Raise(HomeRequested); };
             _bookmarkButton.Click += delegate { Raise(BookmarkRequested); };
+            _menuButton.Click += delegate { Raise(MenuRequested); };
             _reloadButton.Click += delegate
             {
                 if (_isLoading)
@@ -150,11 +154,12 @@ namespace VantageLite.UI
 
             FlowLayoutPanel rightButtons = new FlowLayoutPanel();
             rightButtons.Dock = DockStyle.Right;
-            rightButtons.Width = 36;
+            rightButtons.Width = 72;
             rightButtons.WrapContents = false;
             rightButtons.FlowDirection = FlowDirection.RightToLeft;
             rightButtons.Margin = Padding.Empty;
             rightButtons.Padding = Padding.Empty;
+            rightButtons.Controls.Add(_menuButton);
             rightButtons.Controls.Add(_bookmarkButton);
 
             _addressBox = new TextBox();

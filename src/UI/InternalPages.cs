@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using VantageLite.App;
 using VantageLite.Storage;
 using VantageLite.Theming;
 
@@ -41,6 +42,25 @@ namespace VantageLite.UI
             }
 
             return Page("历史", "共 " + (items == null ? 0 : items.Count) + " 条", body.ToString());
+        }
+
+        public static string About(string version, string runtime)
+        {
+            StringBuilder body = new StringBuilder();
+            body.Append("<div class=\"about\">");
+            AppendLine(body, "版本", string.IsNullOrEmpty(version) ? "unknown" : version);
+            AppendLine(body, "WebView2 Runtime", string.IsNullOrEmpty(runtime) ? "未检测到" : runtime);
+            AppendLine(body, "数据目录", AppPaths.DataDirectory);
+            AppendLine(body, "定位", "轻量、可控的 Windows 浏览器");
+            body.Append("</div>");
+
+            return Page("关于 Vantage Lite", "Vantage Lite", body.ToString());
+        }
+
+        private static void AppendLine(StringBuilder sb, string name, string value)
+        {
+            sb.Append("<div class=\"line\"><span class=\"k\">").Append(Escape(name))
+                .Append("</span><span class=\"v\">").Append(Escape(value)).Append("</span></div>");
         }
 
         public static string Bookmarks(BookmarkStore store)
@@ -113,8 +133,12 @@ namespace VantageLite.UI
 
                 if (child.IsFolder)
                 {
-                    sb.Append("<li class=\"folder\"><div class=\"folder-head\" onclick=\"toggleFolder('")
-                        .Append(child.Id).Append("',event)\"><span class=\"tri\" id=\"tri_")
+                    sb.Append("<li class=\"folder\" id=\"li_").Append(child.Id)
+                        .Append("\" data-id=\"").Append(child.Id).Append("\">")
+                        .Append("<div class=\"folder-head\" id=\"row_").Append(child.Id)
+                        .Append("\" draggable=\"true\" ").Append(DragAttributes(child.Id))
+                        .Append(" onclick=\"toggleFolder('").Append(child.Id)
+                        .Append("',event)\"><span class=\"tri\" id=\"tri_")
                         .Append(child.Id).Append("\">▸</span>")
                         .Append(Icon(null, true, false))
                         .Append("<span class=\"name\">")
@@ -134,15 +158,26 @@ namespace VantageLite.UI
                     }
 
                     rendered[0]++;
-                    sb.Append("<li><div class=\"row\">").Append(Icon(child.Url, false, rendered[0] < 40))
+                    sb.Append("<li id=\"li_").Append(child.Id).Append("\" data-id=\"")
+                        .Append(child.Id).Append("\"><div class=\"row\" id=\"row_").Append(child.Id)
+                        .Append("\" draggable=\"true\" ").Append(DragAttributes(child.Id)).Append(">")
+                        .Append(Icon(child.Url, false, rendered[0] < 40))
                         .Append("<a href=\"").Append(Escape(child.Url))
-                        .Append("\" target=\"_blank\">")
+                        .Append("\" target=\"_blank\" draggable=\"false\">")
                         .Append(Escape(DisplayTitle(child.Title, child.Url))).Append("</a>")
                         .Append(MoreButton(child.Id)).Append("</div>")
                         .Append("<div class=\"url\">").Append(Escape(child.Url))
                         .Append(" · ").Append(FormatTime(child.CreatedUtc)).Append("</div></li>");
                 }
             }
+        }
+
+        private static string DragAttributes(string id)
+        {
+            return "ondragstart=\"onDragStart(event,'" + id + "')\" "
+                + "ondragend=\"onDragEnd()\" "
+                + "ondragover=\"onDragOver(event,'" + id + "')\" "
+                + "ondrop=\"onDrop(event,'" + id + "')\"";
         }
 
         private static string MoreButton(string id)
@@ -223,6 +258,48 @@ function move(id){moving=id;document.getElementById('moveBox').style.display='fl
 function hideMove(){document.getElementById('moveBox').style.display='none';}
 function confirmMove(){if(moving){post({cmd:'move',id:moving,parent:document.getElementById('moveSelect').value});}hideMove();}
 ");
+            sb.Append(@"
+var draggedId=null,dropTarget=null,dropMode=null,dropEl=null;
+function onDragStart(ev,id){
+  draggedId=id;
+  try{ev.dataTransfer.effectAllowed='move';ev.dataTransfer.setData('text/plain',id);}catch(e){}
+}
+function onDragOver(ev,id){
+  if(!draggedId||draggedId===id){return;}
+  ev.preventDefault();ev.stopPropagation();
+  try{ev.dataTransfer.dropEffect='move';}catch(e){}
+  var el=document.getElementById('row_'+id);if(!el){return;}
+  var r=el.getBoundingClientRect();var y=(ev.clientY-r.top)/r.height;
+  var f=!!(nodes[id]&&nodes[id].folder);
+  var mode=(f&&y>0.3&&y<0.7)?'into':(y<0.5?'before':'after');
+  setDrop(el,mode);dropTarget=id;dropMode=mode;
+}
+function onDrop(ev,id){
+  ev.preventDefault();ev.stopPropagation();
+  var mode=dropMode,target=dropTarget,dragged=draggedId;clearDrop();
+  if(!dragged||!target){return;}
+  if(mode==='into'){post({cmd:'move',id:dragged,parent:target});return;}
+  var parent=(nodes[target]||{}).parent;
+  if(!parent||parent==='root'){return;}
+  var before=null;
+  if(mode==='before'){before=target;}
+  else{
+    var li=document.getElementById('li_'+target);
+    var next=li?li.nextElementSibling:null;
+    while(next&&!next.getAttribute('data-id')){next=next.nextElementSibling;}
+    before=next?next.getAttribute('data-id'):null;
+  }
+  post({cmd:'move',id:dragged,parent:parent,before:before});
+}
+function onDragEnd(){clearDrop();draggedId=null;}
+function setDrop(el,mode){
+  clearDrop();dropEl=el;el.classList.add('drop-'+mode);
+}
+function clearDrop(){
+  if(dropEl){dropEl.classList.remove('drop-into','drop-before','drop-after');dropEl=null;}
+  dropTarget=null;dropMode=null;
+}
+");
             sb.Append("</script>");
             return sb.ToString();
         }
@@ -299,11 +376,11 @@ function confirmMove(){if(moving){post({cmd:'move',id:moving,parent:document.get
         {
             StringBuilder sb = new StringBuilder("{");
             bool[] first = new bool[1] { true };
-            AppendNodesJson(node, sb, first);
+            AppendNodesJson(node, "root", sb, first);
             return sb.Append('}').ToString();
         }
 
-        private static void AppendNodesJson(BookmarkNode node, StringBuilder sb, bool[] first)
+        private static void AppendNodesJson(BookmarkNode node, string parentId, StringBuilder sb, bool[] first)
         {
             if (node == null || node.Children == null)
             {
@@ -326,11 +403,12 @@ function confirmMove(){if(moving){post({cmd:'move',id:moving,parent:document.get
 
                 sb.Append(Json(child.Id)).Append(":{title:").Append(Json(child.Title))
                     .Append(",folder:").Append(child.IsFolder ? "true" : "false")
-                    .Append(",system:").Append(system ? "true" : "false").Append('}');
+                    .Append(",system:").Append(system ? "true" : "false")
+                    .Append(",parent:").Append(Json(parentId)).Append('}');
 
                 if (child.IsFolder)
                 {
-                    AppendNodesJson(child, sb, first);
+                    AppendNodesJson(child, child.Id, sb, first);
                 }
             }
         }
@@ -465,6 +543,12 @@ function confirmMove(){if(moving){post({cmd:'move',id:moving,parent:document.get
                 + ".menu div{padding:6px 10px;border-radius:4px;cursor:pointer;font-size:13px}"
                 + ".menu div:hover{background:" + buttonBg + "}"
                 + ".menu .danger{color:#d9534f}"
+                + ".about .line{display:flex;gap:16px;padding:10px 0;border-bottom:1px solid " + border + "}"
+                + ".about .k{width:150px;color:" + muted + "}"
+                + ".about .v{word-break:break-all}"
+                + ".drop-into{background:rgba(76,154,255,.16);border-radius:4px}"
+                + ".drop-before{box-shadow:inset 0 2px 0 " + link + "}"
+                + ".drop-after{box-shadow:inset 0 -2px 0 " + link + "}"
                 + ".modal{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;align-items:center;justify-content:center}"
                 + ".panel{background:" + background + ";padding:20px;border-radius:8px;min-width:320px;box-shadow:0 10px 30px rgba(0,0,0,.3)}"
                 + ".panel-title{font-weight:600;margin-bottom:10px}"

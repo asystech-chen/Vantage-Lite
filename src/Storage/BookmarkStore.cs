@@ -200,6 +200,11 @@ namespace VantageLite.Storage
 
         public bool Move(string id, string newParentId)
         {
+            return Move(id, newParentId, null);
+        }
+
+        public bool Move(string id, string newParentId, string beforeId)
+        {
             if (IsSystemFolder(id))
             {
                 return false;
@@ -225,8 +230,42 @@ namespace VantageLite.Storage
                 return false;
             }
 
+            if (!string.IsNullOrEmpty(beforeId) &&
+                string.Equals(beforeId, id, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
             parent.GetChildren().Remove(node);
-            target.GetChildren().Add(node);
+
+            if (!string.IsNullOrEmpty(beforeId))
+            {
+                IList<BookmarkNode> children = target.GetChildren();
+                int index = -1;
+
+                for (int i = 0; i < children.Count; i++)
+                {
+                    if (string.Equals(children[i].Id, beforeId, StringComparison.Ordinal))
+                    {
+                        index = i;
+                        break;
+                    }
+                }
+
+                if (index >= 0)
+                {
+                    children.Insert(index, node);
+                }
+                else
+                {
+                    children.Add(node);
+                }
+            }
+            else
+            {
+                target.GetChildren().Add(node);
+            }
+
             Save();
             return true;
         }

@@ -17,8 +17,8 @@ namespace VantageLite.Browser
         private readonly CoreWebView2Environment _environment;
         private readonly bool _enableDevTools;
         private int _maxLiveTabs;
-        private readonly int _suspendAfterSeconds;
-        private readonly int _discardAfterMinutes;
+        private int _suspendAfterSeconds;
+        private int _discardAfterMinutes;
         private readonly List<BrowserTab> _tabs;
         private readonly Timer _maintenanceTimer;
 
@@ -33,6 +33,7 @@ namespace VantageLite.Browser
         public event EventHandler<string> NewWindowRequested;
         public event EventHandler<NavigatedEventArgs> Navigated;
         public event EventHandler<string> WebMessage;
+        public event EventHandler LastTabClosed;
 
         public TabManager(
             Control host,
@@ -74,9 +75,41 @@ namespace VantageLite.Browser
             _maxLiveTabs = Math.Max(1, maxLiveTabs);
         }
 
-        public async Task<BrowserTab> CreateTabAsync(string url)
+        public void SetSuspendAfterSeconds(int seconds)
         {
-            BrowserTab tab = new BrowserTab(_nextId++, _environment, _enableDevTools, url);
+            _suspendAfterSeconds = Math.Max(0, seconds);
+        }
+
+        public void SetDiscardAfterMinutes(int minutes)
+        {
+            _discardAfterMinutes = Math.Max(0, minutes);
+        }
+
+        /// <summary>
+        /// 任取一个存活标签的 Profile；全部挂起/丢弃时返回 null。
+        /// </summary>
+        public CoreWebView2Profile GetProfile()
+        {
+            for (int i = 0; i < _tabs.Count; i++)
+            {
+                CoreWebView2Profile profile = _tabs[i].Profile;
+                if (profile != null)
+                {
+                    return profile;
+                }
+            }
+
+            return null;
+        }
+
+        public Task<BrowserTab> CreateTabAsync(string url)
+        {
+            return CreateTabAsync(url, null, null);
+        }
+
+        public async Task<BrowserTab> CreateTabAsync(string url, string internalAddress, string internalHtml)
+        {
+            BrowserTab tab = new BrowserTab(_nextId++, _environment, _enableDevTools, url, internalAddress, internalHtml);
             tab.TitleChanged += TabTitleChanged;
             tab.NewWindowRequested += TabNewWindowRequested;
             tab.Navigated += TabNavigated;
@@ -245,10 +278,19 @@ namespace VantageLite.Browser
                     RaiseTabsChanged();
                     LogTabState("close");
 
-                    // 保留一个空白标签，不直接退出浏览器。
+                    // 保留一个标签，不直接退出浏览器；由主窗口按设置创建。
                     if (keepAlive && !_disposed)
                     {
-                        await CreateTabAsync("about:blank");
+                        EventHandler handler = LastTabClosed;
+
+                        if (handler != null)
+                        {
+                            handler(this, EventArgs.Empty);
+                        }
+                        else
+                        {
+                            await CreateTabAsync("about:blank");
+                        }
                     }
 
                     return;

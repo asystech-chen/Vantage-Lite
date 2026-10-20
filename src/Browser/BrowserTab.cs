@@ -35,6 +35,8 @@ namespace VantageLite.Browser
         private bool _statusBarSuppressed;
         private bool _isLoading;
         private string _internalAddress;
+        private string _pendingInternalAddress;
+        private string _pendingInternalHtml;
         private Image _favicon;
         private Image _overrideFavicon;
 
@@ -198,12 +200,26 @@ namespace VantageLite.Browser
             CoreWebView2Environment environment,
             bool enableDevTools,
             string initialUrl)
+            : this(id, environment, enableDevTools, initialUrl, null, null)
+        {
+        }
+
+        public BrowserTab(
+            int id,
+            CoreWebView2Environment environment,
+            bool enableDevTools,
+            string initialUrl,
+            string internalAddress,
+            string internalHtml)
         {
             _id = id;
             _environment = environment;
             _enableDevTools = enableDevTools;
-            _pendingUrl = initialUrl;
-            _url = initialUrl;
+            _pendingUrl = internalAddress == null ? initialUrl : null;
+            _url = internalAddress ?? initialUrl;
+            _internalAddress = internalAddress;
+            _pendingInternalAddress = internalAddress;
+            _pendingInternalHtml = internalHtml;
             LastActivatedUtc = DateTime.UtcNow;
             LastDeactivatedUtc = DateTime.MinValue;
 
@@ -260,6 +276,31 @@ namespace VantageLite.Browser
             }
             catch
             {
+            }
+        }
+
+        /// <summary>
+        /// 当前 WebView2 的 Profile（Cookie / 浏览数据）。未就绪时返回 null。
+        /// </summary>
+        public CoreWebView2Profile Profile
+        {
+            get
+            {
+                CoreWebView2 core = _core;
+
+                if (core == null || _disposed)
+                {
+                    return null;
+                }
+
+                try
+                {
+                    return core.Profile;
+                }
+                catch
+                {
+                    return null;
+                }
             }
         }
 

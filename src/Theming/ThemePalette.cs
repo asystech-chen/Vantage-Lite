@@ -35,7 +35,7 @@ namespace VantageLite.Theming
             TabHover = Color.FromArgb(36, 41, 51),
             TextPrimary = Color.FromArgb(242, 245, 250),
             TextSecondary = Color.FromArgb(168, 176, 191),
-            TextDisabled = Color.FromArgb(110, 118, 132),
+            TextDisabled = Color.FromArgb(150, 158, 172),
             AddressBackground = Color.FromArgb(40, 45, 56),
             AddressBorder = Color.FromArgb(58, 65, 80),
             ButtonHover = Color.FromArgb(47, 54, 67),

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Runtime.Serialization;
 
 namespace VantageLite.Storage
@@ -35,5 +36,38 @@ namespace VantageLite.Storage
 
         [DataMember(Name = "open", Order = 8, EmitDefaultValue = false)]
         public bool Open { get; set; }
+
+        [DataMember(Name = "suspendSeconds", Order = 9, EmitDefaultValue = false)]
+        public int? SuspendSeconds { get; set; }
+
+        [DataMember(Name = "discardMinutes", Order = 10, EmitDefaultValue = false)]
+        public int? DiscardMinutes { get; set; }
+
+        [DataMember(Name = "search", Order = 11, EmitDefaultValue = false)]
+        public string SearchEngine { get; set; }
+
+        [DataMember(Name = "newTabMode", Order = 12, EmitDefaultValue = false)]
+        public string NewTabMode { get; set; }
+
+        [DataMember(Name = "newTabUrl", Order = 13, EmitDefaultValue = false)]
+        public string NewTabUrl { get; set; }
+
+        [DataMember(Name = "newTabShortcuts", Order = 14, EmitDefaultValue = false)]
+        public bool? NewTabShortcuts { get; set; }
+
+        [DataMember(Name = "address", Order = 15, EmitDefaultValue = false)]
+        public string Address { get; set; }
+
+        [DataMember(Name = "theme", Order = 16, EmitDefaultValue = false)]
+        public string ThemeMode { get; set; }
+
+        [DataMember(Name = "clearOnExit", Order = 17, EmitDefaultValue = false)]
+        public bool? ClearOnExit { get; set; }
+
+        [DataMember(Name = "homeMode", Order = 18, EmitDefaultValue = false)]
+        public string HomeMode { get; set; }
+
+        [DataMember(Name = "customEngines", Order = 20, EmitDefaultValue = false)]
+        public List<CustomSearchEngine> CustomSearchEngines { get; set; }
     }
 }

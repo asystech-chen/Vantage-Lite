@@ -60,8 +60,52 @@ namespace VantageLite.UI
                 _settings.MaxLiveTabs = AppSettings.DefaultMaxLiveTabs;
             }
 
+            if (_settings.SuspendAfterSeconds < 0 || _settings.SuspendAfterSeconds > 3600)
+            {
+                _settings.SuspendAfterSeconds = AppSettings.DefaultSuspendSeconds;
+            }
+
+            if (_settings.DiscardAfterMinutes < 0 || _settings.DiscardAfterMinutes > 1440)
+            {
+                _settings.DiscardAfterMinutes = AppSettings.DefaultDiscardMinutes;
+            }
+
+            if (string.IsNullOrWhiteSpace(_settings.SearchEngine))
+            {
+                _settings.SearchEngine = AppSettings.DefaultSearchEngine;
+            }
+
+            if (string.IsNullOrWhiteSpace(_settings.NewTabMode))
+            {
+                _settings.NewTabMode = AppSettings.DefaultNewTabMode;
+            }
+
+            if (_settings.NewTabUrl == null)
+            {
+                _settings.NewTabUrl = string.Empty;
+            }
+
+            if (string.IsNullOrWhiteSpace(_settings.ThemeMode))
+            {
+                _settings.ThemeMode = AppSettings.DefaultThemeMode;
+            }
+
+            if (string.IsNullOrWhiteSpace(_settings.HomeMode))
+            {
+                _settings.HomeMode = string.Equals(
+                    _settings.HomeUrl, AppSettings.DefaultHomeUrl, StringComparison.OrdinalIgnoreCase)
+                    ? AppSettings.DefaultHomeMode
+                    : "custom";
+            }
+
+            if (_settings.CustomSearchEngines == null)
+            {
+                _settings.CustomSearchEngines = new List<CustomSearchEngine>();
+            }
+
             // 先确定明暗主题，再建控件，避免书签栏等控件在浅色配色下初始化。
             VantageLite.Theming.ThemeManager.Initialize();
+            VantageLite.Theming.ThemeManager.SetMode(_settings.ThemeMode);
 
             BuildLayout();
             WireNavigationEvents();
@@ -81,6 +125,7 @@ namespace VantageLite.UI
             Application.AddMessageFilter(this);
 
             Load += MainForm_Load;
+            FormClosing += MainForm_FormClosing;
             FormClosed += MainForm_FormClosed;
             Resize += MainForm_Resize;
         }
@@ -130,30 +175,37 @@ namespace VantageLite.UI
                 Log.Info("Creating WebView2 environment...");
                 CoreWebView2Environment environment = await WebViewEnvironment.CreateAsync(_options);
 
-                int maxLiveTabs = _options.MaxLiveTabs != AppSettings.DefaultMaxLiveTabs
+                int maxLiveTabs = _options.MaxLiveTabsSpecified
                     ? _options.MaxLiveTabs
                     : _settings.MaxLiveTabs;
+                int suspendAfterSeconds = _options.SuspendSpecified
+                    ? _options.SuspendAfterSeconds
+                    : _settings.SuspendAfterSeconds;
+                int discardAfterMinutes = _options.DiscardSpecified
+                    ? _options.DiscardAfterMinutes
+                    : _settings.DiscardAfterMinutes;
 
                 _tabManager = new TabManager(
                     _contentHost,
                     environment,
                     _options.EnableDevTools,
                     maxLiveTabs,
-                    _options.SuspendAfterSeconds,
-                    _options.DiscardAfterMinutes);
+                    suspendAfterSeconds,
+                    discardAfterMinutes);
 
                 _tabManager.TabsChanged += TabManager_TabsChanged;
                 _tabManager.ActiveTabChanged += TabManager_ActiveTabChanged;
                 _tabManager.NewWindowRequested += TabManager_NewWindowRequested;
                 _tabManager.Navigated += TabManager_Navigated;
                 _tabManager.WebMessage += TabManager_WebMessage;
+                _tabManager.LastTabClosed += delegate { CreateNewTab(); };
 
                 _tabStrip.TabSelected += TabStrip_TabSelected;
                 _tabStrip.TabCloseRequested += TabStrip_TabCloseRequested;
                 _tabStrip.NewTabRequested += TabStrip_NewTabRequested;
 
                 Log.Info("WebView2 environment ready. max live tabs = " + maxLiveTabs);
-                await _tabManager.CreateTabAsync(HomeUrl);
+                await CreateTabForTargetAsync(ResolveHomeTarget());
             }
             catch (Exception ex)
             {
@@ -165,6 +217,33 @@ namespace VantageLite.UI
                     MessageBoxButtons.OK);
                 Close();
             }
+        }
+
+        private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            if (_settings == null || !_settings.ClearOnExit)
+            {
+                return;
+            }
+
+            try
+            {
+                Microsoft.Web.WebView2.Core.CoreWebView2Profile profile =
+                    _tabManager == null ? null : _tabManager.GetProfile();
+
+                if (profile != null)
+                {
+                    profile.CookieManager.DeleteAllCookies();
+                    Log.Info("Cookies cleared on exit");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Warn("Clear cookies on exit failed: " + ex.Message);
+            }
+
+            _history.Clear();
+            Log.Info("History cleared on exit");
         }
 
         private void MainForm_FormClosed(object sender, FormClosedEventArgs e)

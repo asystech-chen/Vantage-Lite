@@ -100,6 +100,17 @@ namespace VantageLite.Browser
                 return;
             }
 
+            // 内置页作为首个页面：直接 NavigateToString，避免先加载 about:blank 再跳转。
+            if (!string.IsNullOrEmpty(_pendingInternalHtml))
+            {
+                string address = _pendingInternalAddress ?? _url;
+                string html = _pendingInternalHtml;
+                _pendingInternalAddress = null;
+                _pendingInternalHtml = null;
+                ShowInternalPage(address, html);
+                return;
+            }
+
             string url = _restorePending ? _url : _pendingUrl;
             _restorePending = false;
             _pendingUrl = null;

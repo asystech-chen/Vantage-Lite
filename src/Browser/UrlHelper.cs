@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using VantageLite.Storage;
 
 namespace VantageLite.Browser
 {
@@ -8,9 +10,19 @@ namespace VantageLite.Browser
     /// </summary>
     public static class UrlHelper
     {
-        private const string SearchUrl = "https://www.bing.com/search?q=";
+        private const string DefaultSearchUrl = "https://www.bing.com/search?q=";
 
         public static string Normalize(string input)
+        {
+            return Normalize(input, null);
+        }
+
+        public static string Normalize(string input, string searchEngine)
+        {
+            return Normalize(input, searchEngine, null);
+        }
+
+        public static string Normalize(string input, string searchEngine, IList<CustomSearchEngine> customEngines)
         {
             if (string.IsNullOrWhiteSpace(input))
             {
@@ -49,7 +61,94 @@ namespace VantageLite.Browser
                 return "https://" + input;
             }
 
-            return SearchUrl + Uri.EscapeDataString(input);
+            return BuildSearchUrl(input, searchEngine, customEngines);
+        }
+
+        public static string BuildSearchUrl(string query, string searchEngine, IList<CustomSearchEngine> customEngines)
+        {
+            string escaped = Uri.EscapeDataString(query ?? string.Empty);
+            string template = SearchTemplate(searchEngine, customEngines);
+
+            if (string.IsNullOrEmpty(template))
+            {
+                return SearchUrlFor(null) + escaped;
+            }
+
+            int index = template.IndexOf("{query}", StringComparison.OrdinalIgnoreCase);
+
+            if (index >= 0)
+            {
+                return template.Substring(0, index) + escaped + template.Substring(index + 7);
+            }
+
+            return template + escaped;
+        }
+
+        /// <summary>
+        /// 返回带 {query} 占位符的搜索模板；自定义引擎按 custom:名称 查找。
+        /// </summary>
+        public static string SearchTemplate(string searchEngine, IList<CustomSearchEngine> customEngines)
+        {
+            string key = searchEngine ?? string.Empty;
+
+            if (key.StartsWith("custom:", StringComparison.OrdinalIgnoreCase))
+            {
+                string name = key.Substring(7).Trim();
+
+                if (customEngines != null)
+                {
+                    for (int i = 0; i < customEngines.Count; i++)
+                    {
+                        CustomSearchEngine engine = customEngines[i];
+
+                        if (engine != null &&
+                            string.Equals(engine.Name, name, StringComparison.OrdinalIgnoreCase) &&
+                            !string.IsNullOrWhiteSpace(engine.Url))
+                        {
+                            return engine.Url;
+                        }
+                    }
+                }
+
+                return null;
+            }
+
+            switch (key.ToLowerInvariant())
+            {
+                case "baidu":
+                    return "https://www.baidu.com/s?wd={query}";
+                case "google":
+                    return "https://www.google.com/search?q={query}";
+                case "duckduckgo":
+                    return "https://duckduckgo.com/?q={query}";
+                default:
+                    return "https://www.bing.com/search?q={query}";
+            }
+        }
+
+        public static string EngineKey(CustomSearchEngine engine)
+        {
+            return engine == null ? string.Empty : "custom:" + (engine.Name ?? string.Empty).Trim();
+        }
+
+        public static string SearchUrlPrefix(string searchEngine)
+        {
+            return SearchUrlFor(searchEngine);
+        }
+
+        private static string SearchUrlFor(string searchEngine)
+        {
+            switch ((searchEngine ?? string.Empty).ToLowerInvariant())
+            {
+                case "google":
+                    return "https://www.google.com/search?q=";
+                case "baidu":
+                    return "https://www.baidu.com/s?wd=";
+                case "duckduckgo":
+                    return "https://duckduckgo.com/?q=";
+                default:
+                    return DefaultSearchUrl;
+            }
         }
     }
 }

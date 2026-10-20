@@ -1,6 +1,10 @@
 using System;
+using System.Collections.Generic;
+using System.Text;
 using System.IO;
+using System.Threading.Tasks;
 using System.Windows.Forms;
+using Microsoft.Web.WebView2.Core;
 using VantageLite.App;
 using VantageLite.Browser;
 using VantageLite.Diagnostics;
@@ -14,6 +18,7 @@ namespace VantageLite.UI
     /// </summary>
     public sealed partial class MainForm
     {
+        private const string NewTabAddress = "about:newtab";
         private const string HistoryAddress = "about:history";
         private const string BookmarksAddress = "about:bookmarks";
         private const string AboutAddress = "about:about";
@@ -73,7 +78,11 @@ namespace VantageLite.UI
 
             string html;
 
-            if (string.Equals(address, HistoryAddress, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(address, NewTabAddress, StringComparison.OrdinalIgnoreCase))
+            {
+                html = InternalPages.NewTab(_settings, _bookmarks);
+            }
+            else if (string.Equals(address, HistoryAddress, StringComparison.OrdinalIgnoreCase))
             {
                 html = InternalPages.History(_history.Items);
             }
@@ -216,7 +225,31 @@ namespace VantageLite.UI
             }
         }
 
-        private void TabManager_WebMessage(object sender, string message)
+        /// <summary>
+        /// 历史页重绘：清空历史或过滤状态变化后保持地址与内容一致。
+        /// </summary>
+        private void RenderHistoryPage()
+        {
+            if (_tabManager == null)
+            {
+                return;
+            }
+
+            string html = InternalPages.History(_history.Items);
+
+            for (int i = 0; i < _tabManager.Tabs.Count; i++)
+            {
+                BrowserTab tab = _tabManager.Tabs[i];
+
+                if (tab.IsLive &&
+                    string.Equals(tab.Url, HistoryAddress, StringComparison.OrdinalIgnoreCase))
+                {
+                    tab.ShowInternalPage(HistoryAddress, html);
+                }
+            }
+        }
+
+        private async void TabManager_WebMessage(object sender, string message)
         {
             Log.Info("[bookmarks] message: " + message);
 
@@ -261,6 +294,60 @@ namespace VantageLite.UI
             if (string.Equals(command.Cmd, "settings", StringComparison.OrdinalIgnoreCase))
             {
                 ApplySettings(command);
+                return;
+            }
+
+            if (string.Equals(command.Cmd, "theme", StringComparison.OrdinalIgnoreCase))
+            {
+                ApplyThemeMode(command.ThemeMode);
+                return;
+            }
+
+            if (string.Equals(command.Cmd, "searchEngine", StringComparison.OrdinalIgnoreCase))
+            {
+                ApplySearchEngine(command.SearchEngine);
+                return;
+            }
+
+            if (string.Equals(command.Cmd, "clearCookies", StringComparison.OrdinalIgnoreCase))
+            {
+                ClearCookies();
+                return;
+            }
+
+            if (string.Equals(command.Cmd, "clearAllData", StringComparison.OrdinalIgnoreCase))
+            {
+                await ClearAllUsageDataAsync();
+                return;
+            }
+
+            if (string.Equals(command.Cmd, "navigate", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!string.IsNullOrWhiteSpace(command.Address))
+                {
+                    NavigateTo(command.Address);
+                }
+
+                return;
+            }
+
+            if (string.Equals(command.Cmd, "openInternal", StringComparison.OrdinalIgnoreCase))
+            {
+                string address = NormalizeInternalPage(command.Address);
+                if (address != null)
+                {
+                    OpenInternalPage(address);
+                }
+
+                return;
+            }
+
+            if (string.Equals(command.Cmd, "clearHistory", StringComparison.OrdinalIgnoreCase))
+            {
+                _history.Clear();
+                Log.Info("History cleared from about:history");
+                RenderHistoryPage();
+                PostStatus("已清空浏览记录");
                 return;
             }
 
@@ -341,6 +428,114 @@ namespace VantageLite.UI
                 ? AppSettings.DefaultHomeUrl
                 : command.Home.Trim();
             _settings.MaxLiveTabs = Math.Max(1, Math.Min(50, command.MaxTabs));
+
+            if (command.SuspendSeconds.HasValue)
+            {
+                _settings.SuspendAfterSeconds = Math.Max(0, Math.Min(3600, command.SuspendSeconds.Value));
+            }
+
+            if (command.DiscardMinutes.HasValue)
+            {
+                _settings.DiscardAfterMinutes = Math.Max(0, Math.Min(1440, command.DiscardMinutes.Value));
+            }
+
+            if (!string.IsNullOrWhiteSpace(command.SearchEngine))
+            {
+                string engine = command.SearchEngine.Trim();
+
+                _settings.SearchEngine = engine.StartsWith("custom:", StringComparison.OrdinalIgnoreCase)
+                    ? "custom:" + engine.Substring(7).Trim()
+                    : engine.ToLowerInvariant();
+            }
+
+            if (!string.IsNullOrWhiteSpace(command.NewTabMode))
+            {
+                _settings.NewTabMode = command.NewTabMode.Trim().ToLowerInvariant();
+            }
+
+            if (command.NewTabUrl != null)
+            {
+                _settings.NewTabUrl = command.NewTabUrl.Trim();
+            }
+
+            if (command.NewTabShortcuts.HasValue)
+            {
+                _settings.NewTabShortcuts = command.NewTabShortcuts.Value;
+            }
+
+            if (!string.IsNullOrWhiteSpace(command.ThemeMode))
+            {
+                _settings.ThemeMode = command.ThemeMode.Trim().ToLowerInvariant();
+            }
+
+            if (command.ClearOnExit.HasValue)
+            {
+                _settings.ClearOnExit = command.ClearOnExit.Value;
+            }
+
+            if (!string.IsNullOrWhiteSpace(command.HomeMode))
+            {
+                _settings.HomeMode = command.HomeMode.Trim().ToLowerInvariant();
+            }
+
+            if (command.CustomSearchEngines != null)
+            {
+                List<CustomSearchEngine> engines = new List<CustomSearchEngine>();
+
+                for (int i = 0; i < command.CustomSearchEngines.Count; i++)
+                {
+                    CustomSearchEngine engine = command.CustomSearchEngines[i];
+
+                    if (engine == null ||
+                        string.IsNullOrWhiteSpace(engine.Name) ||
+                        string.IsNullOrWhiteSpace(engine.Url))
+                    {
+                        continue;
+                    }
+
+                    string url = engine.Url.Trim();
+
+                    if (url.IndexOf("://", StringComparison.Ordinal) < 0)
+                    {
+                        continue;
+                    }
+
+                    engines.Add(new CustomSearchEngine
+                    {
+                        Name = engine.Name.Trim(),
+                        Url = url
+                    });
+                }
+
+                _settings.CustomSearchEngines = engines;
+            }
+
+            if (_settings.SearchEngine != null &&
+                _settings.SearchEngine.StartsWith("custom:", StringComparison.OrdinalIgnoreCase))
+            {
+                bool found = false;
+
+                if (_settings.CustomSearchEngines != null)
+                {
+                    for (int i = 0; i < _settings.CustomSearchEngines.Count; i++)
+                    {
+                        CustomSearchEngine item = _settings.CustomSearchEngines[i];
+
+                        if (item != null &&
+                            string.Equals("custom:" + item.Name, _settings.SearchEngine, StringComparison.OrdinalIgnoreCase))
+                        {
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (!found)
+                {
+                    _settings.SearchEngine = AppSettings.DefaultSearchEngine;
+                }
+            }
+
             _settings.ShowBookmarksBar = command.BookmarksBar;
 
             JsonFile.Save(Path.Combine(AppPaths.DataDirectory, "settings.json"), _settings);
@@ -348,7 +543,13 @@ namespace VantageLite.UI
             if (_tabManager != null)
             {
                 _tabManager.SetMaxLiveTabs(_settings.MaxLiveTabs);
+                _tabManager.SetSuspendAfterSeconds(_settings.SuspendAfterSeconds);
+                _tabManager.SetDiscardAfterMinutes(_settings.DiscardAfterMinutes);
             }
+
+            VantageLite.Theming.ThemeManager.SetMode(_settings.ThemeMode);
+            SyncSearchEngineToPages(_settings.SearchEngine);
+            RefreshNewTabPages();
 
             _bookmarksBar.Visible = _settings.ShowBookmarksBar;
 
@@ -359,6 +560,273 @@ namespace VantageLite.UI
             }
         }
 
+        private void ApplyThemeMode(string mode)
+        {
+            if (string.IsNullOrWhiteSpace(mode))
+            {
+                return;
+            }
+
+            string value = mode.Trim().ToLowerInvariant();
+
+            if (value != "system" && value != "light" && value != "dark")
+            {
+                return;
+            }
+
+            _settings.ThemeMode = value;
+            JsonFile.Save(Path.Combine(AppPaths.DataDirectory, "settings.json"), _settings);
+            VantageLite.Theming.ThemeManager.SetMode(value);
+            PostStatus("主题已切换");
+        }
+
+        private void ApplySearchEngine(string engine)
+        {
+            if (string.IsNullOrWhiteSpace(engine))
+            {
+                return;
+            }
+
+            string value = engine.Trim();
+            string lower = value.ToLowerInvariant();
+
+            if (lower.StartsWith("custom:", StringComparison.Ordinal))
+            {
+                string name = value.Substring(7).Trim();
+                CustomSearchEngine match = null;
+
+                if (_settings.CustomSearchEngines != null)
+                {
+                    for (int i = 0; i < _settings.CustomSearchEngines.Count; i++)
+                    {
+                        CustomSearchEngine item = _settings.CustomSearchEngines[i];
+
+                        if (item != null && string.Equals(item.Name, name, StringComparison.OrdinalIgnoreCase))
+                        {
+                            match = item;
+                            break;
+                        }
+                    }
+                }
+
+                if (match == null)
+                {
+                    return;
+                }
+
+                value = "custom:" + match.Name;
+            }
+            else
+            {
+                if (lower != "bing" && lower != "google" && lower != "baidu" && lower != "duckduckgo")
+                {
+                    return;
+                }
+
+                value = lower;
+            }
+
+            _settings.SearchEngine = value;
+            JsonFile.Save(Path.Combine(AppPaths.DataDirectory, "settings.json"), _settings);
+            SyncSearchEngineToPages(value);
+        }
+
+        /// <summary>
+        /// 设置变化后重绘已打开的新标签页，让自定义搜索引擎立即出现。
+        /// </summary>
+        private void RefreshNewTabPages()
+        {
+            if (_tabManager == null)
+            {
+                return;
+            }
+
+            string html = InternalPages.NewTab(_settings, _bookmarks);
+
+            for (int i = 0; i < _tabManager.Tabs.Count; i++)
+            {
+                BrowserTab tab = _tabManager.Tabs[i];
+
+                if (tab.IsLive &&
+                    string.Equals(tab.Url, NewTabAddress, StringComparison.OrdinalIgnoreCase))
+                {
+                    tab.ShowInternalPage(NewTabAddress, html);
+                }
+            }
+        }
+
+        /// <summary>
+        /// 搜索引擎变化后，同步已打开的新标签页与设置页里的下拉框。
+        /// </summary>
+        private void SyncSearchEngineToPages(string engine)
+        {
+            if (_tabManager == null || string.IsNullOrEmpty(engine))
+            {
+                return;
+            }
+
+            string safe = engine.Replace("\\", "\\\\").Replace("'", "\\'");
+            string script = "var e=document.getElementById('ntEngine')||document.getElementById('search');"
+                + "if(e){e.value='" + safe + "';}";
+
+            for (int i = 0; i < _tabManager.Tabs.Count; i++)
+            {
+                BrowserTab tab = _tabManager.Tabs[i];
+                if (!tab.IsLive)
+                {
+                    continue;
+                }
+
+                string url = tab.Url;
+                if (string.Equals(url, NewTabAddress, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(url, PreferencesAddress, StringComparison.OrdinalIgnoreCase))
+                {
+                    tab.ExecuteScript(script);
+                }
+            }
+        }
+
+        private void ClearCookies()
+        {
+            CoreWebView2Profile profile = _tabManager == null ? null : _tabManager.GetProfile();
+
+            if (profile == null)
+            {
+                PostStatus("当前没有可用标签，Cookie 未清理");
+                return;
+            }
+
+            try
+            {
+                profile.CookieManager.DeleteAllCookies();
+                Log.Info("All cookies cleared");
+                PostStatus("已清理所有 Cookie");
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Clear cookies failed", ex);
+                PostStatus("清理 Cookie 失败");
+            }
+        }
+
+        private async Task ClearAllUsageDataAsync()
+        {
+            _history.Clear();
+            RenderHistoryPage();
+
+            CoreWebView2Profile profile = _tabManager == null ? null : _tabManager.GetProfile();
+
+            if (profile != null)
+            {
+                try
+                {
+                    await profile.ClearBrowsingDataAsync(CoreWebView2BrowsingDataKinds.AllProfile);
+                    Log.Info("All browsing data cleared");
+                }
+                catch (Exception ex)
+                {
+                    Log.Error("Clear browsing data failed", ex);
+                }
+            }
+
+            PostStatus("已清空所有使用痕迹");
+        }
+
+        private void PostStatus(string text)
+        {
+            BrowserTab page = ActiveTab;
+
+            if (page != null)
+            {
+                page.PostWebMessage(text);
+            }
+        }
+
+        private void ShowAboutDialog()
+        {
+            if (AboutDialog.Show(this, Application.ProductVersion))
+            {
+                ShowDiagnostics();
+            }
+        }
+
+        private void ShowDiagnostics()
+        {
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine("Vantage Lite " + Application.ProductVersion);
+            sb.AppendLine("Time: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss zzz"));
+            sb.AppendLine("OS: " + Environment.OSVersion.VersionString
+                + " (" + (Environment.Is64BitOperatingSystem ? "x64" : "x86") + ")");
+            sb.AppendLine("CLR: " + Environment.Version);
+            sb.AppendLine("Process: " + (Environment.Is64BitProcess ? "x64" : "x86"));
+            sb.AppendLine("Exe: " + Application.ExecutablePath);
+            sb.AppendLine("WebView2: " + (WebViewEnvironment.RuntimeVersion ?? "未检测到"));
+
+            string userData = AppPaths.ResolveUserDataDir(_options.UserDataDir);
+            string logDir = string.IsNullOrWhiteSpace(_options.LogFile)
+                ? AppPaths.DefaultLogDir
+                : Path.GetDirectoryName(Path.GetFullPath(_options.LogFile)) ?? AppPaths.DefaultLogDir;
+
+            sb.AppendLine("Data: " + AppPaths.DataDirectory);
+            sb.AppendLine("UserData: " + userData);
+            sb.AppendLine("Logs: " + logDir);
+            sb.AppendLine();
+            sb.AppendLine("Memory: " + DiagnosticsInfo.GetMemorySummary());
+            sb.AppendLine();
+
+            int total = 0;
+            int live = 0;
+            int suspended = 0;
+            int discarded = 0;
+
+            if (_tabManager != null)
+            {
+                for (int i = 0; i < _tabManager.Tabs.Count; i++)
+                {
+                    BrowserTab tab = _tabManager.Tabs[i];
+                    total++;
+
+                    if (tab.IsLive)
+                    {
+                        live++;
+                    }
+
+                    if (tab.IsSuspended)
+                    {
+                        suspended++;
+                    }
+
+                    if (tab.IsDiscarded)
+                    {
+                        discarded++;
+                    }
+                }
+            }
+
+            sb.AppendLine("Tabs: total=" + total + ", live=" + live
+                + ", suspended=" + suspended + ", discarded=" + discarded);
+            sb.AppendLine("Active: " + (ActiveTab == null ? "none" : ActiveTab.Url));
+            sb.AppendLine();
+
+            if (_settings != null)
+            {
+                sb.AppendLine("Settings:");
+                sb.AppendLine("  theme=" + _settings.ThemeMode
+                    + ", search=" + _settings.SearchEngine
+                    + ", newTab=" + _settings.NewTabMode
+                    + ", home=" + _settings.HomeMode);
+                sb.AppendLine("  maxTabs=" + _settings.MaxLiveTabs
+                    + ", suspend=" + _settings.SuspendAfterSeconds
+                    + ", discard=" + _settings.DiscardAfterMinutes
+                    + ", clearOnExit=" + _settings.ClearOnExit);
+                sb.AppendLine();
+            }
+
+            sb.AppendLine("Args: " + string.Join(" ", Environment.GetCommandLineArgs()));
+
+            DiagnosticsForm.Show(this, sb.ToString(), AppPaths.DataDirectory, logDir);
+        }
+
         private static string NormalizeInternalPage(string address)
         {
             if (string.IsNullOrWhiteSpace(address))
@@ -367,6 +835,11 @@ namespace VantageLite.UI
             }
 
             string value = address.Trim().ToLowerInvariant();
+
+            if (value == NewTabAddress || value == "vantage:newtab")
+            {
+                return NewTabAddress;
+            }
 
             if (value == HistoryAddress || value == "vantage:history")
             {
@@ -406,12 +879,7 @@ namespace VantageLite.UI
 
             _history.Clear();
             Log.Info("History cleared");
-
-            BrowserTab tab = ActiveTab;
-            if (tab != null && string.Equals(tab.Url, HistoryAddress, StringComparison.OrdinalIgnoreCase))
-            {
-                ShowInternalPage(HistoryAddress);
-            }
+            RenderHistoryPage();
         }
     
         private void ShowMainMenu()
@@ -430,7 +898,8 @@ namespace VantageLite.UI
 
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add(AddMenuItem("设置", delegate { OpenInternalPage(PreferencesAddress); }));
-            menu.Items.Add(AddMenuItem("关于 Vantage Lite", delegate { OpenInternalPage(AboutAddress); }));
+            menu.Items.Add(AddMenuItem("诊断信息", delegate { ShowDiagnostics(); }));
+            menu.Items.Add(AddMenuItem("关于 Vantage Lite", delegate { ShowAboutDialog(); }));
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add(AddMenuItem("退出", delegate { Close(); }));
 
@@ -451,7 +920,7 @@ namespace VantageLite.UI
                 menu.Dispose();
             };
 
-            menu.Show(Cursor.Position);
+            MenuPositioner.Show(menu, this, Cursor.Position);
         }
 
         private static ToolStripMenuItem AddMenuItem(string text, Action action)

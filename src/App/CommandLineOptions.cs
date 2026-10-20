@@ -20,6 +20,9 @@ namespace VantageLite.App
         public int MaxLiveTabs { get; set; }
         public int SuspendAfterSeconds { get; set; }
         public int DiscardAfterMinutes { get; set; }
+        public bool MaxLiveTabsSpecified { get; set; }
+        public bool SuspendSpecified { get; set; }
+        public bool DiscardSpecified { get; set; }
         public bool ShowHelp { get; set; }
         public bool ShowVersion { get; set; }
         public List<string> Warnings { get; private set; }
@@ -107,6 +110,7 @@ namespace VantageLite.App
                     if (int.TryParse(value, out maxLiveTabs) && maxLiveTabs >= 1 && maxLiveTabs <= 50)
                     {
                         options.MaxLiveTabs = maxLiveTabs;
+                        options.MaxLiveTabsSpecified = true;
                     }
                     else
                     {
@@ -121,6 +125,7 @@ namespace VantageLite.App
                     if (int.TryParse(value, out seconds) && seconds >= 0 && seconds <= 3600)
                     {
                         options.SuspendAfterSeconds = seconds;
+                        options.SuspendSpecified = true;
                     }
                     else
                     {
@@ -135,6 +140,7 @@ namespace VantageLite.App
                     if (int.TryParse(value, out minutes) && minutes >= 0 && minutes <= 1440)
                     {
                         options.DiscardAfterMinutes = minutes;
+                        options.DiscardSpecified = true;
                     }
                     else
                     {

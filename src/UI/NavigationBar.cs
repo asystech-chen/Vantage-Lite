@@ -21,12 +21,12 @@ namespace VantageLite.UI
         public event EventHandler MenuRequested;
 
         private readonly ToolTip _toolTip;
-        private Button _backButton;
-        private Button _forwardButton;
-        private Button _reloadButton;
-        private Button _homeButton;
-        private Button _bookmarkButton;
-        private Button _menuButton;
+        private GlyphButton _backButton;
+        private GlyphButton _forwardButton;
+        private GlyphButton _reloadButton;
+        private GlyphButton _homeButton;
+        private GlyphButton _bookmarkButton;
+        private GlyphButton _menuButton;
         private Panel _addressHost;
         private TextBox _addressBox;
         private bool _isLoading;
@@ -71,9 +71,11 @@ namespace VantageLite.UI
             {
                 buttons[i].UseVisualStyleBackColor = false;
                 buttons[i].BackColor = palette.ChromeBackground;
-                buttons[i].ForeColor = palette.TextPrimary;
-                buttons[i].FlatAppearance.MouseOverBackColor = palette.ButtonHover;
-                buttons[i].FlatAppearance.MouseDownBackColor = palette.ButtonPressed;
+                buttons[i].ForeColor = buttons[i].Enabled ? palette.TextPrimary : palette.TextDisabled;
+                buttons[i].FlatAppearance.MouseOverBackColor =
+                    buttons[i].Enabled ? palette.ButtonHover : palette.ChromeBackground;
+                buttons[i].FlatAppearance.MouseDownBackColor =
+                    buttons[i].Enabled ? palette.ButtonPressed : palette.ChromeBackground;
             }
 
             _addressHost.Invalidate();
@@ -97,18 +99,19 @@ namespace VantageLite.UI
         {
             _backButton.Enabled = canGoBack;
             _forwardButton.Enabled = canGoForward;
+            ApplyTheme();
         }
 
         public void SetBookmarked(bool bookmarked)
         {
-            _bookmarkButton.Text = bookmarked ? IconFont.StarFilled : IconFont.Star;
+            _bookmarkButton.Glyph = bookmarked ? IconFont.StarFilled : IconFont.Star;
             _toolTip.SetToolTip(_bookmarkButton, bookmarked ? "取消收藏 (Ctrl+D)" : "收藏当前页面 (Ctrl+D)");
         }
 
         public void SetLoading(bool loading)
         {
             _isLoading = loading;
-            _reloadButton.Text = loading ? IconFont.Cancel : IconFont.Refresh;
+            _reloadButton.Glyph = loading ? IconFont.Cancel : IconFont.Refresh;
         }
 
         private void BuildControls()
@@ -185,10 +188,9 @@ namespace VantageLite.UI
             SetNavigationState(false, false);
         }
 
-        private Button CreateButton(string glyph, string toolTip)
+        private GlyphButton CreateButton(string glyph, string toolTip)
         {
-            Button button = new Button();
-            button.Text = glyph;
+            GlyphButton button = new GlyphButton(glyph);
             button.Width = 34;
             button.Height = 32;
             button.FlatStyle = FlatStyle.Flat;
@@ -259,6 +261,59 @@ namespace VantageLite.UI
                     ControlStyles.AllPaintingInWmPaint,
                     true);
             }
+        }
+    }
+
+
+    /// <summary>
+    /// 用字体图标绘制的按钮：禁用态使用主题的 TextDisabled，避免系统默认的深灰。
+    /// 依赖：ThemeManager / IconFont。改动注意：Glyph 变化后需要重新绘制。
+    /// </summary>
+    internal sealed class GlyphButton : Button
+    {
+        private string _glyph;
+
+        public GlyphButton(string glyph)
+        {
+            _glyph = glyph;
+            Text = string.Empty;
+            FlatStyle = FlatStyle.Flat;
+            UseVisualStyleBackColor = false;
+            FlatAppearance.BorderSize = 0;
+            SetStyle(
+                ControlStyles.UserPaint |
+                ControlStyles.OptimizedDoubleBuffer |
+                ControlStyles.AllPaintingInWmPaint,
+                true);
+        }
+
+        public string Glyph
+        {
+            get { return _glyph; }
+            set
+            {
+                _glyph = value;
+                Invalidate();
+            }
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            // 让基类绘制背景/边框/悬停状态，图标由这里按主题绘制。
+            base.OnPaint(e);
+
+            Color color = Enabled ? ForeColor : ThemeManager.Current.TextDisabled;
+
+            TextRenderer.DrawText(
+                e.Graphics,
+                _glyph ?? string.Empty,
+                Font,
+                ClientRectangle,
+                color,
+                TextFormatFlags.HorizontalCenter |
+                TextFormatFlags.VerticalCenter |
+                TextFormatFlags.NoPrefix |
+                TextFormatFlags.SingleLine);
         }
     }
 }

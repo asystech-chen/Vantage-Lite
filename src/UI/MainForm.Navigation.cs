@@ -1,6 +1,8 @@
 using System;
+using System.Threading.Tasks;
 using VantageLite.Browser;
 using VantageLite.Diagnostics;
+using VantageLite.Storage;
 
 namespace VantageLite.UI
 {
@@ -24,7 +26,7 @@ namespace VantageLite.UI
         {
             try
             {
-                await _tabManager.CreateTabAsync("about:blank");
+                await CreateNewTabCoreAsync();
                 _navigationBar.FocusAddressBar();
             }
             catch (Exception ex)
@@ -33,7 +35,170 @@ namespace VantageLite.UI
             }
         }
 
-        private async void CloseActiveTab()
+        /// <summary>
+        /// 直接创建目标标签页，不经过 about:blank：内置页作为首个页面、网址直接加载。
+        /// </summary>
+        private async Task CreateNewTabCoreAsync()
+        {
+            if (_tabManager == null || _settings == null)
+            {
+                return;
+            }
+
+            string mode = NormalizeNewTabMode(_settings.NewTabMode);
+            string target;
+
+            if (mode == "blank")
+            {
+                target = "about:blank";
+            }
+            else if (mode == "home")
+            {
+                target = ResolveHomeTarget();
+            }
+            else if (mode == "custom")
+            {
+                target = NormalizeCustomUrl(_settings.NewTabUrl);
+
+                if (target.Length == 0)
+                {
+                    target = NewTabAddress;
+                }
+            }
+            else
+            {
+                target = NewTabAddress;
+            }
+
+            await CreateTabForTargetAsync(target);
+        }
+
+        private async Task CreateTabForTargetAsync(string target)
+        {
+            if (string.Equals(target, NewTabAddress, StringComparison.OrdinalIgnoreCase))
+            {
+                await _tabManager.CreateTabAsync(
+                    "about:blank",
+                    NewTabAddress,
+                    InternalPages.NewTab(_settings, _bookmarks));
+                return;
+            }
+
+            await _tabManager.CreateTabAsync(target);
+        }
+
+        /// <summary>
+        /// 启动页目标：ASYS 起始页 / 空白页 / 新标签页 / 自定义页面。
+        /// </summary>
+        private string ResolveHomeTarget()
+        {
+            string mode = NormalizeHomeMode(_settings == null ? null : _settings.HomeMode);
+
+            if (mode == "blank")
+            {
+                return "about:blank";
+            }
+
+            if (mode == "newtab")
+            {
+                return NewTabAddress;
+            }
+
+            if (mode == "custom")
+            {
+                string url = NormalizeCustomUrl(_settings.HomeUrl);
+
+                if (url.Length > 0)
+                {
+                    return url;
+                }
+            }
+
+            return AppSettings.DefaultHomeUrl;
+        }
+
+        private static string NormalizeHomeMode(string mode)
+        {
+            if (string.Equals(mode, "blank", StringComparison.OrdinalIgnoreCase))
+            {
+                return "blank";
+            }
+
+            if (string.Equals(mode, "newtab", StringComparison.OrdinalIgnoreCase))
+            {
+                return "newtab";
+            }
+
+            if (string.Equals(mode, "custom", StringComparison.OrdinalIgnoreCase))
+            {
+                return "custom";
+            }
+
+            return "asys";
+        }
+
+        private static bool IsAboutAddress(string address)
+        {
+            if (string.IsNullOrWhiteSpace(address))
+            {
+                return false;
+            }
+
+            string value = address.Trim().ToLowerInvariant();
+            return value == "about:about" || value == "vantage:about";
+        }
+
+        private static bool IsDiagnosticsAddress(string address)
+        {
+            if (string.IsNullOrWhiteSpace(address))
+            {
+                return false;
+            }
+
+            string value = address.Trim().ToLowerInvariant();
+            return value == "about:diag" || value == "about:diagnostics" || value == "vantage:diag";
+        }
+
+        private static string NormalizeNewTabMode(string mode)
+        {
+            if (string.Equals(mode, "blank", StringComparison.OrdinalIgnoreCase))
+            {
+                return "blank";
+            }
+
+            if (string.Equals(mode, "custom", StringComparison.OrdinalIgnoreCase))
+            {
+                return "custom";
+            }
+
+            if (string.Equals(mode, "home", StringComparison.OrdinalIgnoreCase))
+            {
+                return "home";
+            }
+
+            return "builtin";
+        }
+
+        private static string NormalizeCustomUrl(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url))
+            {
+                return string.Empty;
+            }
+
+            url = url.Trim();
+
+            if (url.StartsWith("about:", StringComparison.OrdinalIgnoreCase) ||
+                url.StartsWith("file:", StringComparison.OrdinalIgnoreCase) ||
+                url.IndexOf("://", StringComparison.Ordinal) >= 0)
+            {
+                return url;
+            }
+
+            return "https://" + url;
+        }
+
+        private void CloseActiveTab()
         {
             BrowserTab tab = ActiveTab;
             if (tab == null)
@@ -41,7 +206,7 @@ namespace VantageLite.UI
                 return;
             }
 
-            await _tabManager.CloseTabAsync(tab.Id);
+            CloseTabById(tab.Id);
         }
 
         private void NavigateTo(string address)
@@ -52,6 +217,18 @@ namespace VantageLite.UI
                 return;
             }
 
+            if (IsDiagnosticsAddress(address))
+            {
+                ShowDiagnostics();
+                return;
+            }
+
+            if (IsAboutAddress(address))
+            {
+                ShowAboutDialog();
+                return;
+            }
+
             string internalPage = NormalizeInternalPage(address);
             if (internalPage != null)
             {
@@ -59,7 +236,7 @@ namespace VantageLite.UI
                 return;
             }
 
-            string url = UrlHelper.Normalize(address);
+            string url = UrlHelper.Normalize(address, _settings.SearchEngine, _settings.CustomSearchEngines);
             if (url == null)
             {
                 return;

@@ -25,8 +25,9 @@ namespace VantageLite.UI
         // 记住最近一次 Sync 的数据，窗口宽度变化时据此重排标签。
         private IList<BrowserTab> _lastTabs;
 
-        // 中键关闭标签后，同一次点击的 MouseUp 可能落到标签栏空白处，短暂屏蔽。
-        private DateTime _suppressEmptyClickUntil = DateTime.MinValue;
+        // 中键在标签上按下后，这次点击的 MouseUp 不应再触发“空白处新建标签”。
+        // 用状态位而不是超时，慢速松开也不会误开新标签。
+        private bool _middleDownOnTab;
 
         public TabStrip()
         {
@@ -47,7 +48,9 @@ namespace VantageLite.UI
             _panel.Margin = Padding.Empty;
             _panel.SizeChanged += delegate { ApplyWidths(); };
             _panel.MouseUp += TabStrip_MouseUp;
+            _panel.MouseDown += TabStrip_MouseDown;
             MouseUp += TabStrip_MouseUp;
+            MouseDown += TabStrip_MouseDown;
 
             _newTabButton = new Button();
             _newTabButton.Text = IconFont.Add;
@@ -191,6 +194,15 @@ namespace VantageLite.UI
         /// <summary>
         /// 中键点击标签栏空白处新建标签页。点击标签本身不会冒泡到这里。
         /// </summary>
+        private void TabStrip_MouseDown(object sender, MouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Middle)
+            {
+                // 空白处按下：这是一次全新的中键点击，解除上一条标签的抑制状态。
+                _middleDownOnTab = false;
+            }
+        }
+
         private void TabStrip_MouseUp(object sender, MouseEventArgs e)
         {
             if (e.Button != MouseButtons.Middle)
@@ -198,8 +210,9 @@ namespace VantageLite.UI
                 return;
             }
 
-            if (DateTime.UtcNow < _suppressEmptyClickUntil)
+            if (_middleDownOnTab)
             {
+                _middleDownOnTab = false;
                 return;
             }
 
@@ -244,8 +257,8 @@ namespace VantageLite.UI
                 return;
             }
 
-            // 标签被移除后，同一次中键点击的 MouseUp 可能命中标签栏背景。
-            _suppressEmptyClickUntil = DateTime.UtcNow.AddMilliseconds(350);
+            // 标记这次中键按下来自标签；松手时无论间隔多久都不新建标签。
+            _middleDownOnTab = true;
 
             EventHandler<int> handler = TabCloseRequested;
             if (handler != null)

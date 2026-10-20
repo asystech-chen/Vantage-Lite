@@ -48,6 +48,15 @@ namespace VantageLite.UI
         /// </summary>
         public bool PreFilterMessage(ref Message m)
         {
+            // 点击菜单以外的区域（包括 WebView2）时关闭已打开的菜单/子菜单。
+            if ((m.Msg == 0x0201 || m.Msg == 0x0204 || m.Msg == 0x0207) &&
+                MenuPositioner.HasOpenMenu &&
+                !MenuPositioner.ContainsScreenPoint(Cursor.Position))
+            {
+                MenuPositioner.CloseOpenMenus();
+                return false;
+            }
+
             // WM_KEYDOWN / WM_SYSKEYDOWN
             if (m.Msg != 0x0100 && m.Msg != 0x0104)
             {

@@ -20,12 +20,34 @@ namespace VantageLite.Theming
 
         private static bool _initialized;
         private static bool _isDark;
+        private static string _mode = "system";
 
         public static event EventHandler ThemeChanged;
 
         public static bool IsDark
         {
             get { return _isDark; }
+        }
+
+        public static string Mode
+        {
+            get { return _mode; }
+        }
+
+        /// <summary>
+        /// 设置主题来源：system / light / dark。手动模式下忽略系统主题变化。
+        /// </summary>
+        public static void SetMode(string mode)
+        {
+            string next = NormalizeMode(mode);
+
+            if (string.Equals(next, _mode, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _mode = next;
+            ApplyResolvedTheme();
         }
 
         public static ThemePalette Current
@@ -167,19 +189,65 @@ namespace VantageLite.Theming
 
         private static void OnUserPreferenceChanged(object sender, UserPreferenceChangedEventArgs e)
         {
-            bool dark = ReadSystemDark();
+            if (!string.Equals(_mode, "system", StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            ApplyResolvedTheme();
+        }
+
+        private static void RaiseThemeChanged()
+        {
+            EventHandler handler = ThemeChanged;
+
+            if (handler != null)
+            {
+                handler(null, EventArgs.Empty);
+            }
+        }
+
+        private static void ApplyResolvedTheme()
+        {
+            bool dark = ResolveDark();
+
             if (dark == _isDark)
             {
                 return;
             }
 
             _isDark = dark;
+            RaiseThemeChanged();
+        }
 
-            EventHandler handler = ThemeChanged;
-            if (handler != null)
+        private static bool ResolveDark()
+        {
+            if (string.Equals(_mode, "dark", StringComparison.OrdinalIgnoreCase))
             {
-                handler(null, EventArgs.Empty);
+                return true;
             }
+
+            if (string.Equals(_mode, "light", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            return ReadSystemDark();
+        }
+
+        private static string NormalizeMode(string mode)
+        {
+            if (string.Equals(mode, "dark", StringComparison.OrdinalIgnoreCase))
+            {
+                return "dark";
+            }
+
+            if (string.Equals(mode, "light", StringComparison.OrdinalIgnoreCase))
+            {
+                return "light";
+            }
+
+            return "system";
         }
 
         private static bool ReadSystemDark()

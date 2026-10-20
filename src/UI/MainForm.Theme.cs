@@ -82,7 +82,8 @@ namespace VantageLite.UI
 
         private static bool IsInternalAddress(string url)
         {
-            return string.Equals(url, HistoryAddress, StringComparison.OrdinalIgnoreCase)
+            return string.Equals(url, NewTabAddress, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(url, HistoryAddress, StringComparison.OrdinalIgnoreCase)
                 || string.Equals(url, BookmarksAddress, StringComparison.OrdinalIgnoreCase)
                 || string.Equals(url, AboutAddress, StringComparison.OrdinalIgnoreCase)
                 || string.Equals(url, PreferencesAddress, StringComparison.OrdinalIgnoreCase);

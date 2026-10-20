@@ -6,8 +6,8 @@ Windows 极简浏览器外壳，基于 **WebView2 (Edge Chromium)**。
 
 - 目标：启动即用、无账号、无同步、无推荐、无后台服务
 - 非目标：扩展、密码管理、与 Vantage (Firefox) 配置兼容
-- 当前版本：0.10.3（拖拽插入线与书签展开状态）
-- 已实现：多标签、后台挂起/丢弃、书签与历史、书签栏拖拽、单文件 exe、明暗主题、内置页
+- 当前版本：0.11.0（设置项补全与历史过滤）
+- 已实现：多标签、后台挂起/丢弃、书签与历史、书签栏拖拽、单文件 exe、明暗主题、内置页、可配置新标签页
 
 ## 构建
 
@@ -46,8 +46,8 @@ bin\Release\net48\VantageLite.exe
 | `--console` | 日志同时输出到控制台 |
 | `--user-data-dir=PATH` | 指定用户数据目录（独立 profile） |
 | `--max-live-tabs=N` | 最多保留的 WebView2 实例数，默认 10（1-50） |
-| `--suspend-after-seconds=N` | 后台标签静默多少秒后挂起，默认 30（0=不挂起） |
-| `--discard-after-minutes=N` | 挂起多少分钟后销毁，默认 60（0=不销毁） |
+| `--suspend-after-seconds=N` | 后台标签静默多少秒后挂起，默认 30（0=不挂起），会覆盖设置页 |
+| `--discard-after-minutes=N` | 挂起多少分钟后销毁，默认 60（0=不销毁），会覆盖设置页 |
 | `--url=URL` | 指定启动页，也可直接传 URL |
 | `--no-devtools` | 禁用 F12 开发者工具 |
 | `--version` | 显示版本 |
@@ -97,8 +97,9 @@ VantageLite.exe --user-data-dir=D:\tmp\vl-profile --url=https://asystech.cn
 - 多标签：新建、切换、中键关闭、拖动排序
 - 内存：后台 30 秒挂起、挂起被拒降级、存活标签上限 + LRU 丢弃、最小化节流
 - 书签：树形文件夹、书签工具栏、`about:bookmarks` 管理页、拖拽排序/移入文件夹
-- 历史：`about:history`，即时落盘，最多 2000 条
-- 设置：`about:preferences`（启动页、最大存活标签、书签栏开关）
+- 历史：`about:history`，即时落盘，最多 2000 条；支持今天/7 天/30 天/半年/一年/全部过滤与一键清空
+- 新标签页：`about:newtab`（时钟 + 搜索框，可选书签快捷入口），可切换内置页/空白页/当前主页/自定义网址
+- 设置：`about:preferences`（启动页、新标签页、主题、最大存活标签、挂起/销毁等待、搜索引擎、书签栏、隐私清理）
 - 外观：跟随系统明暗主题，内置页与原生菜单同步切换
 - 图标：页面 favicon、书签栏图标、Windows 系统文件夹图标（`SHGetFileInfo`）
 - 快捷键：见上方表格

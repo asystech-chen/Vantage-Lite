@@ -618,13 +618,13 @@ namespace VantageLite.UI
         private void ShowMenu(Control owner, ContextMenuStrip menu)
         {
             PrepareMenu(menu);
-            menu.Show(Cursor.Position);
+            MenuPositioner.Show(menu, this, Cursor.Position);
         }
 
         private void ShowMenuAtButton(Control button, ContextMenuStrip menu)
         {
             PrepareMenu(menu);
-            menu.Show(button, new Point(0, button.Height));
+            MenuPositioner.Show(menu, this, button.PointToScreen(new Point(0, button.Height)));
         }
 
         private void PrepareMenu(ContextMenuStrip menu)
@@ -876,6 +876,160 @@ namespace VantageLite.UI
             if (handler != null)
             {
                 handler(this, EventArgs.Empty);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 右键菜单定位：所有菜单都限制在主窗口客户区内，避免跑到窗口外。
+    /// 依赖：WinForms。改动注意：子菜单在 Opened 后修正位置，可能有一次位置跳动。
+    /// </summary>
+    internal static class MenuPositioner
+    {
+        private static readonly List<ToolStripDropDown> OpenMenus = new List<ToolStripDropDown>();
+
+        public static bool HasOpenMenu
+        {
+            get
+            {
+                for (int i = 0; i < OpenMenus.Count; i++)
+                {
+                    if (!OpenMenus[i].IsDisposed && OpenMenus[i].Visible)
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+        }
+
+        public static bool ContainsScreenPoint(Point point)
+        {
+            for (int i = 0; i < OpenMenus.Count; i++)
+            {
+                ToolStripDropDown menu = OpenMenus[i];
+
+                if (!menu.IsDisposed && menu.Visible && menu.Bounds.Contains(point))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        public static void CloseOpenMenus()
+        {
+            ToolStripDropDown[] menus = OpenMenus.ToArray();
+
+            for (int i = 0; i < menus.Length; i++)
+            {
+                try
+                {
+                    menus[i].Close();
+                }
+                catch
+                {
+                }
+            }
+
+            OpenMenus.Clear();
+        }
+
+        public static void Show(ContextMenuStrip menu, Control owner, Point screenPoint)
+        {
+            if (menu == null || owner == null)
+            {
+                return;
+            }
+
+            Control boundsOwner = owner.TopLevelControl ?? owner;
+            ConstrainSubMenus(menu, boundsOwner);
+
+            Rectangle bounds = boundsOwner.RectangleToScreen(boundsOwner.ClientRectangle);
+            Size size = menu.GetPreferredSize(Size.Empty);
+
+            int x = screenPoint.X;
+            int y = screenPoint.Y;
+
+            if (x + size.Width > bounds.Right)
+            {
+                x = bounds.Right - size.Width;
+            }
+
+            if (y + size.Height > bounds.Bottom)
+            {
+                // 底部放不下时贴着窗口底部向上撑，而不是翻到锚点上方盖住工具栏。
+                y = bounds.Bottom - size.Height;
+            }
+
+            x = Math.Max(bounds.Left, x);
+            y = Math.Max(bounds.Top, Math.Min(y, Math.Max(bounds.Top, bounds.Bottom - size.Height)));
+
+            Track(menu);
+            menu.Closed += delegate { Untrack(menu); };
+            menu.Show(new Point(x, y));
+        }
+
+        private static void Track(ToolStripDropDown menu)
+        {
+            if (menu != null && !OpenMenus.Contains(menu))
+            {
+                OpenMenus.Add(menu);
+            }
+        }
+
+        private static void Untrack(ToolStripDropDown menu)
+        {
+            OpenMenus.Remove(menu);
+        }
+
+        private static void ConstrainSubMenus(ContextMenuStrip menu, Control owner)
+        {
+            Attach(menu.Items, menu, owner);
+        }
+
+        private static void Attach(ToolStripItemCollection items, ContextMenuStrip menu, Control owner)
+        {
+            for (int i = 0; i < items.Count; i++)
+            {
+                ToolStripMenuItem item = items[i] as ToolStripMenuItem;
+                if (item == null || item.DropDownItems.Count == 0)
+                {
+                    continue;
+                }
+
+                ToolStripDropDown dropDown = item.DropDown;
+                dropDown.Renderer = menu.Renderer;
+                dropDown.BackColor = ThemeManager.Current.ChromeBackground;
+                dropDown.ForeColor = ThemeManager.Current.TextPrimary;
+                dropDown.Opened += delegate
+                {
+                    Track(dropDown);
+                    ClampDropDown(dropDown, owner);
+                };
+                dropDown.Closed += delegate { Untrack(dropDown); };
+
+                Attach(item.DropDownItems, menu, owner);
+            }
+        }
+
+        private static void ClampDropDown(ToolStripDropDown dropDown, Control owner)
+        {
+            Rectangle bounds = owner.RectangleToScreen(owner.ClientRectangle);
+            Point location = dropDown.Location;
+            Size size = dropDown.Size;
+
+            int maxX = Math.Max(bounds.Left, bounds.Right - size.Width);
+            int maxY = Math.Max(bounds.Top, bounds.Bottom - size.Height);
+
+            int x = Math.Max(bounds.Left, Math.Min(location.X, maxX));
+            int y = Math.Max(bounds.Top, Math.Min(location.Y, maxY));
+
+            if (x != location.X || y != location.Y)
+            {
+                dropDown.Location = new Point(x, y);
             }
         }
     }

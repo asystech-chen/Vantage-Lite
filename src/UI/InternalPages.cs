@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using VantageLite.App;
+using VantageLite.Browser;
 using VantageLite.Storage;
 using VantageLite.Theming;
 
@@ -18,30 +19,263 @@ namespace VantageLite.UI
         public static string History(IList<HistoryEntry> items)
         {
             StringBuilder body = new StringBuilder();
+            int total = items == null ? 0 : items.Count;
 
-            if (items == null || items.Count == 0)
+            body.Append("<div class=\"filters\">");
+            AppendHistoryFilter(body, "today", "今天");
+            AppendHistoryFilter(body, "d7", "最近 7 天");
+            AppendHistoryFilter(body, "d30", "最近 30 天");
+            AppendHistoryFilter(body, "d180", "最近半年");
+            AppendHistoryFilter(body, "d365", "最近一年");
+            AppendHistoryFilter(body, "all", "全部");
+            body.Append("<span id=\"shown\" class=\"status\"></span>");
+            body.Append("<button class=\"danger\" onclick=\"askClear()\">清空历史</button>");
+            body.Append("</div>");
+
+            body.Append("<ul id=\"histList\">");
+
+            for (int i = 0; i < total; i++)
             {
-                body.Append("<p class=\"empty\">还没有浏览记录。</p>");
+                HistoryEntry item = items[i];
+                body.Append("<li data-ts=\"").Append(item.VisitedUtc).Append("\">")
+                    .Append("<div class=\"row\">").Append(Icon(item.Url, false, i < 40))
+                    .Append("<a href=\"").Append(Escape(item.Url)).Append("\">")
+                    .Append(Escape(DisplayTitle(item.Title, item.Url))).Append("</a></div>")
+                    .Append("<div class=\"url\">").Append(Escape(item.Url))
+                    .Append(" · ").Append(FormatTime(item.VisitedUtc)).Append("</div></li>");
             }
-            else
-            {
-                body.Append("<ul>");
-                int count = Math.Min(items.Count, MaxRows);
 
-                for (int i = 0; i < count; i++)
+            body.Append("</ul>");
+            body.Append("<p id=\"histEmpty\" class=\"empty\" style=\"display:none\">该时间段没有记录。</p>");
+
+            body.Append("<div id=\"clearBox\" class=\"modal\"><div class=\"panel\">");
+            body.Append("<div class=\"panel-title\">清空全部浏览历史？</div>");
+            body.Append("<div class=\"panel-buttons\"><button class=\"danger\" onclick=\"clearOk()\">清空</button>");
+            body.Append("<button onclick=\"hideClear()\">取消</button></div></div></div>");
+
+            body.Append("<script>");
+            body.Append("function post(o){try{window.chrome.webview.postMessage(JSON.stringify(o));}catch(e){}}");
+            body.Append("var RANGE_DAYS={today:0,d7:7,d30:30,d180:180,d365:365,all:-1};");
+            body.Append("function setRange(key){"
+                + "var now=Date.now();var from=0;"
+                + "if(key==='today'){var d=new Date();d.setHours(0,0,0,0);from=d.getTime();}"
+                + "else if(key!=='all'){from=now-RANGE_DAYS[key]*86400000;}"
+                + "var items=document.querySelectorAll('#histList li');var n=0;"
+                + "for(var i=0;i<items.length;i++){"
+                + "var ts=parseInt(items[i].getAttribute('data-ts'),10)*1000;"
+                + "var show=(key==='all'||ts>=from);"
+                + "items[i].style.display=show?'':'none';if(show){n++;}}"
+                + "var bs=document.querySelectorAll('.filter');"
+                + "for(var j=0;j<bs.length;j++){bs[j].className='filter'+(bs[j].getAttribute('data-range')===key?' active':'');}"
+                + "document.getElementById('shown').textContent='显示 '+n+' 条';"
+                + "document.getElementById('histEmpty').style.display=n===0?'block':'none';}");
+            body.Append("function askClear(){document.getElementById('clearBox').style.display='flex';}");
+            body.Append("function hideClear(){document.getElementById('clearBox').style.display='none';}");
+            body.Append("function clearOk(){hideClear();post({cmd:'clearHistory'});}");
+            body.Append("setRange('all');");
+            body.Append("</script>");
+
+            return Page("历史", "共 " + total + " 条", body.ToString());
+        }
+
+        private static void AppendHistoryFilter(StringBuilder sb, string key, string label)
+        {
+            sb.Append("<button class=\"filter\" data-range=\"").Append(key)
+                .Append("\" onclick=\"setRange('").Append(key).Append("')\">")
+                .Append(Escape(label)).Append("</button>");
+        }
+
+        public static string NewTab(AppSettings settings, BookmarkStore store)
+        {
+            if (settings == null)
+            {
+                settings = AppSettings.CreateDefault();
+            }
+
+            StringBuilder body = new StringBuilder();
+            body.Append("<div class=\"newtab\">");
+            body.Append("<div class=\"nt-clock\" id=\"ntClock\">--:--</div>");
+            body.Append("<div class=\"nt-date\" id=\"ntDate\"></div>");
+            body.Append("<form class=\"nt-search\" onsubmit=\"return ntSearch(event)\">");
+            body.Append("<select id=\"ntEngine\" class=\"nt-engine\" onchange=\"ntEngineChanged()\" title=\"搜索引擎\">");
+            AppendSearchOption(body, settings.SearchEngine, "bing", "必应");
+            AppendSearchOption(body, settings.SearchEngine, "baidu", "百度");
+            AppendSearchOption(body, settings.SearchEngine, "google", "Google");
+            AppendSearchOption(body, settings.SearchEngine, "duckduckgo", "DuckDuckGo");
+            AppendCustomEngineOptions(body, settings);
+            body.Append("</select>");
+            body.Append("<input id=\"ntQuery\" type=\"text\" placeholder=\"搜索或输入网址\" autocomplete=\"off\" autofocus>");
+            body.Append("<button class=\"nt-go\" type=\"submit\" title=\"搜索\">")
+                .Append("<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" ")
+                .Append("stroke-linecap=\"round\"><circle cx=\"11\" cy=\"11\" r=\"7\"/>")
+                .Append("<line x1=\"16.5\" y1=\"16.5\" x2=\"21\" y2=\"21\"/></svg></button>");
+            body.Append("</form>");
+
+            if (settings.NewTabShortcuts)
+            {
+                AppendShortcuts(body, store);
+            }
+
+            body.Append("</div>");
+
+            body.Append("<script>");
+            body.Append("function post(o){try{window.chrome.webview.postMessage(JSON.stringify(o));}catch(e){}}");
+            body.Append("var NT_ENGINES={");
+            bool firstEngine = true;
+            AppendEngineJs(body, ref firstEngine, "bing", "https://www.bing.com/search?q={query}");
+            AppendEngineJs(body, ref firstEngine, "baidu", "https://www.baidu.com/s?wd={query}");
+            AppendEngineJs(body, ref firstEngine, "google", "https://www.google.com/search?q={query}");
+            AppendEngineJs(body, ref firstEngine, "duckduckgo", "https://duckduckgo.com/?q={query}");
+
+            if (settings.CustomSearchEngines != null)
+            {
+                for (int i = 0; i < settings.CustomSearchEngines.Count; i++)
                 {
-                    HistoryEntry item = items[i];
-                    body.Append("<li><div class=\"row\">").Append(Icon(item.Url, false, i < 40))
-                        .Append("<a href=\"").Append(Escape(item.Url)).Append("\">")
-                        .Append(Escape(DisplayTitle(item.Title, item.Url))).Append("</a></div>")
-                        .Append("<div class=\"url\">").Append(Escape(item.Url))
-                        .Append(" · ").Append(FormatTime(item.VisitedUtc)).Append("</div></li>");
+                    CustomSearchEngine engine = settings.CustomSearchEngines[i];
+                    if (engine != null && !string.IsNullOrWhiteSpace(engine.Name) && !string.IsNullOrWhiteSpace(engine.Url))
+                    {
+                        AppendEngineJs(body, ref firstEngine, UrlHelper.EngineKey(engine), engine.Url);
+                    }
                 }
-
-                body.Append("</ul>");
             }
 
-            return Page("历史", "共 " + (items == null ? 0 : items.Count) + " 条", body.ToString());
+            body.Append("};");
+            body.Append("function ntEngineChanged(){post({cmd:'searchEngine',search:document.getElementById('ntEngine').value});}");
+            body.Append("function ntTarget(q){"
+                + "if(/^(https?:\\/\\/|about:|file:)/i.test(q)){return q;}"
+                + "if(/^[^\\s]+\\.[^\\s]+$/.test(q)){return 'https://'+q;}"
+                + "var t=NT_ENGINES[document.getElementById('ntEngine').value]||NT_ENGINES['bing'];"
+                + "return t.replace('{query}',encodeURIComponent(q));}");
+            body.Append("function ntSearch(ev){ev.preventDefault();"
+                + "var q=document.getElementById('ntQuery').value.trim();"
+                + "if(!q){return false;}post({cmd:'navigate',address:ntTarget(q)});return false;}");
+            body.Append("function ntTick(){var d=new Date();"
+                + "var hh=('0'+d.getHours()).slice(-2);var mm=('0'+d.getMinutes()).slice(-2);"
+                + "document.getElementById('ntClock').textContent=hh+':'+mm;"
+                + "var w=['星期日','星期一','星期二','星期三','星期四','星期五','星期六'];"
+                + "document.getElementById('ntDate').textContent=d.getFullYear()+'年'+(d.getMonth()+1)+'月'+d.getDate()+'日 '+w[d.getDay()];}");
+            body.Append("ntTick();setInterval(ntTick,1000);");
+            body.Append("</script>");
+
+            return Page("新标签页", string.Empty, body.ToString(), true);
+        }
+
+        private static void AppendShortcuts(StringBuilder sb, BookmarkStore store)
+        {
+            BookmarkNode toolbar = store == null ? null : store.ToolbarFolder;
+            IList<BookmarkNode> children = toolbar == null ? null : toolbar.GetChildren();
+            const int max = 8;
+
+            sb.Append("<div class=\"shortcuts\">");
+
+            int count = 0;
+            if (children != null)
+            {
+                for (int i = 0; i < children.Count && count < max; i++)
+                {
+                    BookmarkNode child = children[i];
+                    if (child.IsFolder || string.IsNullOrWhiteSpace(child.Url))
+                    {
+                        continue;
+                    }
+
+                    string title = string.IsNullOrWhiteSpace(child.Title) ? child.Url : child.Title;
+                    string data = FaviconCache.GetDataUri(child.Url);
+
+                    sb.Append("<a class=\"shortcut\" href=\"").Append(Escape(child.Url))
+                        .Append("\" target=\"_self\" title=\"").Append(Escape(title)).Append("\">");
+
+                    if (!string.IsNullOrEmpty(data))
+                    {
+                        sb.Append("<img class=\"sc-icon\" src=\"").Append(data).Append("\" alt=\"\">");
+                    }
+                    else
+                    {
+                        sb.Append("<span class=\"sc-icon\">").Append(Escape(FirstLetter(title))).Append("</span>");
+                    }
+
+                    sb.Append("<span class=\"sc-title\">").Append(Escape(title)).Append("</span></a>");
+                    count++;
+                }
+            }
+
+            if (count == 0)
+            {
+                sb.Append("<span class=\"hint\">书签工具栏为空，按 Ctrl+D 添加书签后会显示在这里。</span>");
+            }
+
+            sb.Append("</div>");
+        }
+
+        private static string FirstLetter(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return "?";
+            }
+
+            return text.Substring(0, 1).ToUpperInvariant();
+        }
+
+        private static void AppendNewTabOption(StringBuilder sb, string current, string value, string label)
+        {
+            sb.Append("<option value=\"").Append(value).Append("\"");
+            if (string.Equals(current, value, StringComparison.OrdinalIgnoreCase))
+            {
+                sb.Append(" selected");
+            }
+
+            sb.Append(">").Append(Escape(label)).Append("</option>");
+        }
+
+        private static void AppendCustomEngineRow(StringBuilder sb, CustomSearchEngine engine)
+        {
+            sb.Append("<div class=\"engine-row\"><input class=\"ce-name\" type=\"text\" placeholder=\"名称\" value=\"")
+                .Append(Escape(engine == null ? string.Empty : engine.Name))
+                .Append("\" oninput=\"refreshEngineSelect();scheduleSave()\">")
+                .Append("<input class=\"ce-url\" type=\"text\" placeholder=\"https://example.com/search?q={query}\" value=\"")
+                .Append(Escape(engine == null ? string.Empty : engine.Url))
+                .Append("\" oninput=\"scheduleSave()\"><button class=\"danger\" onclick=\"removeEngineRow(this)\">删除</button></div>");
+        }
+
+        private static void AppendCustomEngineOptions(StringBuilder sb, AppSettings settings)
+        {
+            if (settings.CustomSearchEngines == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < settings.CustomSearchEngines.Count; i++)
+            {
+                CustomSearchEngine engine = settings.CustomSearchEngines[i];
+
+                if (engine != null && !string.IsNullOrWhiteSpace(engine.Name))
+                {
+                    AppendSearchOption(sb, settings.SearchEngine, UrlHelper.EngineKey(engine), engine.Name);
+                }
+            }
+        }
+
+        private static void AppendEngineJs(StringBuilder sb, ref bool first, string key, string template)
+        {
+            if (!first)
+            {
+                sb.Append(',');
+            }
+
+            first = false;
+            sb.Append(Json(key)).Append(':').Append(Json(template));
+        }
+
+        private static void AppendSearchOption(StringBuilder sb, string current, string value, string label)
+        {
+            sb.Append("<option value=\"").Append(value).Append("\"");
+            if (string.Equals(current, value, StringComparison.OrdinalIgnoreCase))
+            {
+                sb.Append(" selected");
+            }
+
+            sb.Append(">").Append(Escape(label)).Append("</option>");
         }
 
         public static string Preferences(AppSettings settings)
@@ -52,27 +286,183 @@ namespace VantageLite.UI
             }
 
             StringBuilder body = new StringBuilder();
-            body.Append("<div class=\"form\">");
+            body.Append("<div class=\"settings\">");
 
-            AppendField(body, "home", "启动页", settings.HomeUrl);
-            body.Append("<label class=\"field\"><span>最大存活标签页</span>")
-                .Append("<input id=\"maxTabs\" type=\"number\" min=\"1\" max=\"50\" value=\"")
-                .Append(settings.MaxLiveTabs).Append("\"></label>");
+            body.Append("<section class=\"card\"><div class=\"card-head\"><h2>启动</h2>")
+                .Append("<p>浏览器启动时打开的页面</p></div><div class=\"card-body\">");
+            string homeMode = string.IsNullOrWhiteSpace(settings.HomeMode)
+                ? AppSettings.DefaultHomeMode
+                : settings.HomeMode;
+
+            body.Append("<div class=\"field-row\"><span class=\"label\">启动方式</span><span class=\"control\">")
+                .Append("<select id=\"homeMode\" onchange=\"syncHomeFields()\">");
+            AppendThemeOption(body, homeMode, "asys", "ASYS 搜索起始页");
+            AppendThemeOption(body, homeMode, "blank", "空白页");
+            AppendThemeOption(body, homeMode, "newtab", "Vantage Lite 新标签页");
+            AppendThemeOption(body, homeMode, "custom", "自定义页面");
+            body.Append("</select></span></div>");
+            body.Append("<div class=\"field-row\" id=\"homeUrlRow\"><span class=\"label\">自定义网址</span>")
+                .Append("<span class=\"control\"><input id=\"home\" type=\"text\" value=\"")
+                .Append(Escape(settings.HomeUrl)).Append("\">")
+                .Append("<span class=\"hint\">仅“自定义页面”时使用</span></span></div>");
+            body.Append("</div></section>");
+
+            body.Append("<section class=\"card\"><div class=\"card-head\"><h2>新标签页</h2>")
+                .Append("<p>Ctrl+T 和 + 按钮打开的内容</p></div><div class=\"card-body\">");
+            body.Append("<div class=\"field-row\"><span class=\"label\">打开方式</span><span class=\"control\">")
+                .Append("<select id=\"newTabMode\" onchange=\"syncNewTabFields()\">");
+            AppendNewTabOption(body, settings.NewTabMode, "builtin", "Vantage Lite 新标签页");
+            AppendNewTabOption(body, settings.NewTabMode, "blank", "空白页");
+            AppendNewTabOption(body, settings.NewTabMode, "home", "使用当前主页");
+            AppendNewTabOption(body, settings.NewTabMode, "custom", "自定义页面");
+            body.Append("</select></span></div>");
+            body.Append("<div class=\"field-row\" id=\"newTabUrlRow\"><span class=\"label\">自定义网址</span>")
+                .Append("<span class=\"control\"><input id=\"newTabUrl\" type=\"text\" value=\"")
+                .Append(Escape(settings.NewTabUrl)).Append("\">")
+                .Append("<span class=\"hint\">仅“自定义页面”时使用，留空则回退到内置页</span></span></div>");
+            body.Append("<div class=\"field-row\" id=\"newTabShortcutRow\"><span class=\"label\">快捷入口</span>")
+                .Append("<span class=\"control\"><label class=\"check\"><input id=\"ntShortcuts\" type=\"checkbox\"")
+                .Append(settings.NewTabShortcuts ? " checked" : string.Empty)
+                .Append("> 显示书签快捷入口</label>")
+                .Append("<span class=\"hint\">仅“Vantage Lite 新标签页”时生效</span></span></div>");
+            body.Append("</div></section>");
+
+            body.Append("<section class=\"card\"><div class=\"card-head\"><h2>性能</h2>")
+                .Append("<p>控制后台标签占用的内存</p></div><div class=\"card-body\">");
+            AppendNumberRow(body, "maxTabs", "最大存活标签页", settings.MaxLiveTabs, 1, 50,
+                "同时保留的 WebView2 实例上限");
+            AppendNumberRow(body, "suspend", "后台挂起等待（秒）", settings.SuspendAfterSeconds, 0, 3600,
+                "0 表示不自动挂起");
+            AppendNumberRow(body, "discard", "挂起后销毁等待（分钟）", settings.DiscardAfterMinutes, 0, 1440,
+                "0 表示不自动销毁");
+            body.Append("</div></section>");
+
+            body.Append("<section class=\"card\"><div class=\"card-head\"><h2>搜索</h2>")
+                .Append("<p>地址栏与新标签页使用的搜索引擎</p></div><div class=\"card-body\">");
+            body.Append("<div class=\"field-row\"><span class=\"label\">搜索引擎</span><span class=\"control\">")
+                .Append("<select id=\"search\">");
+            AppendSearchOption(body, settings.SearchEngine, "bing", "必应");
+            AppendSearchOption(body, settings.SearchEngine, "baidu", "百度");
+            AppendSearchOption(body, settings.SearchEngine, "google", "Google");
+            AppendSearchOption(body, settings.SearchEngine, "duckduckgo", "DuckDuckGo");
+            AppendCustomEngineOptions(body, settings);
+            body.Append("</select>");
+            body.Append("<span class=\"hint\">自定义引擎可在下方卡片中添加</span></span></div>");
+            body.Append("</div></section>");
+
+            body.Append("<section class=\"card\"><div class=\"card-head\"><h2>自定义搜索引擎</h2>")
+                .Append("<p>名称 + 搜索 URL，用 {query} 代表关键词</p></div><div class=\"card-body\">");
+            body.Append("<div id=\"customEngines\">");
+
+            if (settings.CustomSearchEngines != null)
+            {
+                for (int i = 0; i < settings.CustomSearchEngines.Count; i++)
+                {
+                    AppendCustomEngineRow(body, settings.CustomSearchEngines[i]);
+                }
+            }
+
+            body.Append("</div>");
+            body.Append("<div><button onclick=\"addCustomEngine()\">＋ 添加搜索引擎</button></div>");
+            body.Append("</div></section>");
+
+            body.Append("<section class=\"card\"><div class=\"card-head\"><h2>界面</h2>")
+                .Append("<p>主题与工具栏</p></div><div class=\"card-body\">");
+            body.Append("<div class=\"field-row\"><span class=\"label\">主题</span><span class=\"control\">")
+                .Append("<select id=\"themeMode\" onchange=\"applyThemeNow()\">");
+            AppendThemeOption(body, settings.ThemeMode, "system", "跟随系统");
+            AppendThemeOption(body, settings.ThemeMode, "light", "浅色");
+            AppendThemeOption(body, settings.ThemeMode, "dark", "深色");
+            body.Append("</select><span class=\"hint\">跟随系统会随 Windows 应用模式自动切换</span></span></div>");
             body.Append("<label class=\"check\"><input id=\"bar\" type=\"checkbox\"")
                 .Append(settings.ShowBookmarksBar ? " checked" : string.Empty)
                 .Append("> 显示书签栏</label>");
-            body.Append("<div class=\"actions\"><button onclick=\"saveSettings()\">保存</button>")
-                .Append("<span id=\"status\" class=\"status\"></span></div>");
+            body.Append("</div></section>");
+
+            body.Append("<section class=\"card\"><div class=\"card-head\"><h2>隐私</h2>")
+                .Append("<p>Cookie 与浏览痕迹</p></div><div class=\"card-body\">");
+            body.Append("<label class=\"check\"><input id=\"clearOnExit\" type=\"checkbox\"")
+                .Append(settings.ClearOnExit ? " checked" : string.Empty)
+                .Append("> 每次关闭时清空 Cookie 和浏览记录</label>");
+            body.Append("<div class=\"button-row\">")
+                .Append("<button onclick=\"askAction('清理所有 Cookie','清理后所有网站将退出登录。','clearCookies')\">清理所有 Cookie</button>")
+                .Append("<button onclick=\"askAction('清空浏览记录','将删除全部本地历史记录。','clearHistory')\">清空浏览记录</button>")
+                .Append("<button class=\"danger\" onclick=\"askAction('清空所有使用痕迹','将清除 Cookie、缓存、历史等数据；书签和设置会保留。','clearAllData')\">清空所有使用痕迹</button>")
+                .Append("</div>");
+            body.Append("</div></section>");
 
             body.Append("</div>");
 
+            body.Append("<div id=\"actionBox\" class=\"modal\"><div class=\"panel\">")
+                .Append("<div class=\"panel-title\" id=\"actionTitle\"></div>")
+                .Append("<p id=\"actionText\" class=\"hint\" style=\"margin:8px 0 0\"></p>")
+                .Append("<div class=\"panel-buttons\"><button class=\"danger\" onclick=\"actionConfirm()\">确定</button>")
+                .Append("<button onclick=\"hideAction()\">取消</button></div></div></div>");
+
+            body.Append("<div class=\"savebar\"><span class=\"hint\">更改会自动保存</span>")
+                .Append("<span id=\"status\" class=\"status\"></span></div>");
+
             body.Append("<script>");
+            body.Append("function post(o){try{window.chrome.webview.postMessage(JSON.stringify(o));}catch(e){}}");
+            body.Append("var pendingCmd='';");
+            body.Append("function askAction(title,text,cmd){pendingCmd=cmd;"
+                + "document.getElementById('actionTitle').textContent=title;"
+                + "document.getElementById('actionText').textContent=text;"
+                + "document.getElementById('actionBox').style.display='flex';}");
+            body.Append("function hideAction(){document.getElementById('actionBox').style.display='none';pendingCmd='';}");
+            body.Append("function actionConfirm(){var c=pendingCmd;hideAction();if(c){post({cmd:c});}}");
+            body.Append("var BUILTIN_ENGINES=[['bing','必应'],['baidu','百度'],['google','Google'],['duckduckgo','DuckDuckGo']];");
+            body.Append("function applyThemeNow(){post({cmd:'theme',theme:document.getElementById('themeMode').value});}");
+            body.Append("function addCustomEngine(){var box=document.getElementById('customEngines');"
+                + "var row=document.createElement('div');row.className='engine-row';"
+                + "row.innerHTML='<input class=\"ce-name\" type=\"text\" placeholder=\"名称\" oninput=\"refreshEngineSelect();scheduleSave()\">"
+                + "<input class=\"ce-url\" type=\"text\" placeholder=\"https://example.com/search?q={query}\" oninput=\"scheduleSave()\">"
+                + "<button class=\"danger\" onclick=\"removeEngineRow(this)\">删除</button>';"
+                + "box.appendChild(row);refreshEngineSelect();}");
+            body.Append("function removeEngineRow(btn){btn.parentNode.parentNode.removeChild(btn.parentNode);refreshEngineSelect();scheduleSave();}");
+            body.Append("function refreshEngineSelect(){var sel=document.getElementById('search');var cur=sel.value;sel.innerHTML='';"
+                + "for(var i=0;i<BUILTIN_ENGINES.length;i++){var o=document.createElement('option');o.value=BUILTIN_ENGINES[i][0];o.textContent=BUILTIN_ENGINES[i][1];sel.appendChild(o);}"
+                + "var rows=document.querySelectorAll('#customEngines .engine-row');"
+                + "for(var j=0;j<rows.length;j++){var n=rows[j].querySelector('.ce-name').value.trim();if(!n){continue;}"
+                + "var c=document.createElement('option');c.value='custom:'+n;c.textContent=n;sel.appendChild(c);}"
+                + "if(cur){sel.value=cur;}if(!sel.value&&sel.options.length){sel.selectedIndex=0;}}");
+            body.Append("refreshEngineSelect();");
+            body.Append("function syncHomeFields(){"
+                + "var m=document.getElementById('homeMode').value;"
+                + "document.getElementById('homeUrlRow').style.display=(m==='custom')?'flex':'none';}");
+            body.Append("syncHomeFields();");
+            body.Append("function syncNewTabFields(){"
+                + "var m=document.getElementById('newTabMode').value;"
+                + "document.getElementById('newTabUrlRow').style.display=(m==='custom')?'flex':'none';"
+                + "document.getElementById('newTabShortcutRow').style.display=(m==='builtin')?'flex':'none';}");
+            body.Append("syncNewTabFields();");
+            body.Append("var saveTimer=null;"
+                + "function scheduleSave(){if(saveTimer){clearTimeout(saveTimer);}saveTimer=setTimeout(saveSettings,300);}");
+            body.Append("(function(){var els=document.querySelectorAll('.settings input,.settings select');"
+                + "for(var i=0;i<els.length;i++){var el=els[i];"
+                + "if(el.id==='themeMode'){continue;}"
+                + "el.addEventListener('change',saveSettings);"
+                + "if(el.type==='text'||el.type==='number'){el.addEventListener('input',scheduleSave);}}})();");
             body.Append("function saveSettings(){"
+                + "var homeMode=document.getElementById('homeMode').value;"
                 + "var home=document.getElementById('home').value.trim();"
                 + "var maxTabs=parseInt(document.getElementById('maxTabs').value,10);"
                 + "if(!(maxTabs>=1&&maxTabs<=50)){document.getElementById('status').textContent='标签页数量需在 1-50 之间';return;}"
+                + "var suspend=parseInt(document.getElementById('suspend').value,10);"
+                + "if(!(suspend>=0&&suspend<=3600)){document.getElementById('status').textContent='挂起等待需在 0-3600 秒之间';return;}"
+                + "var discard=parseInt(document.getElementById('discard').value,10);"
+                + "if(!(discard>=0&&discard<=1440)){document.getElementById('status').textContent='销毁等待需在 0-1440 分钟之间';return;}"
+                + "var search=document.getElementById('search').value;"
+                + "var themeMode=document.getElementById('themeMode').value;"
+                + "var clearOnExit=document.getElementById('clearOnExit').checked;"
+                + "var newTabMode=document.getElementById('newTabMode').value;"
+                + "var newTabUrl=document.getElementById('newTabUrl').value.trim();"
+                + "var ntShortcuts=document.getElementById('ntShortcuts').checked;"
                 + "var bar=document.getElementById('bar').checked;"
-                + "try{window.chrome.webview.postMessage(JSON.stringify({cmd:'settings',home:home,maxTabs:maxTabs,bookmarksBar:bar}));}catch(e){}"
+                + "var engines=[];var rows=document.querySelectorAll('#customEngines .engine-row');"
+                + "for(var i=0;i<rows.length;i++){var n=rows[i].querySelector('.ce-name').value.trim();"
+                + "var u=rows[i].querySelector('.ce-url').value.trim();if(n&&u){engines.push({name:n,url:u});}}"
+                + "post({cmd:'settings',homeMode:homeMode,home:home,customEngines:engines,maxTabs:maxTabs,suspendSeconds:suspend,discardMinutes:discard,search:search,theme:themeMode,clearOnExit:clearOnExit,newTabMode:newTabMode,newTabUrl:newTabUrl,newTabShortcuts:ntShortcuts,bookmarksBar:bar});"
                 + "}");
             body.Append("if(window.chrome&&window.chrome.webview){"
                 + "window.chrome.webview.addEventListener('message',function(e){"
@@ -82,11 +472,33 @@ namespace VantageLite.UI
             return Page("设置", "Vantage Lite 基础选项", body.ToString());
         }
 
-        private static void AppendField(StringBuilder sb, string id, string label, string value)
+        private static void AppendTextRow(StringBuilder sb, string id, string label, string value, string hint)
         {
-            sb.Append("<label class=\"field\"><span>").Append(Escape(label))
-                .Append("</span><input id=\"").Append(id)
-                .Append("\" type=\"text\" value=\"").Append(Escape(value)).Append("\"></label>");
+            sb.Append("<div class=\"field-row\"><span class=\"label\">").Append(Escape(label)).Append("</span>")
+                .Append("<span class=\"control\"><input id=\"").Append(id)
+                .Append("\" type=\"text\" value=\"").Append(Escape(value)).Append("\">")
+                .Append("<span class=\"hint\">").Append(Escape(hint)).Append("</span></span></div>");
+        }
+
+        private static void AppendNumberRow(StringBuilder sb, string id, string label, int value, int min, int max, string hint)
+        {
+            sb.Append("<div class=\"field-row\"><span class=\"label\">").Append(Escape(label)).Append("</span>")
+                .Append("<span class=\"control\"><input id=\"").Append(id)
+                .Append("\" type=\"number\" min=\"").Append(min)
+                .Append("\" max=\"").Append(max)
+                .Append("\" value=\"").Append(value).Append("\">")
+                .Append("<span class=\"hint\">").Append(Escape(hint)).Append("</span></span></div>");
+        }
+
+        private static void AppendThemeOption(StringBuilder sb, string current, string value, string label)
+        {
+            sb.Append("<option value=\"").Append(value).Append("\"");
+            if (string.Equals(current, value, StringComparison.OrdinalIgnoreCase))
+            {
+                sb.Append(" selected");
+            }
+
+            sb.Append(">").Append(Escape(label)).Append("</option>");
         }
 
         public static string About(string version, string runtime)
@@ -97,6 +509,7 @@ namespace VantageLite.UI
             AppendLine(body, "WebView2 Runtime", string.IsNullOrEmpty(runtime) ? "未检测到" : runtime);
             AppendLine(body, "数据目录", AppPaths.DataDirectory);
             AppendLine(body, "定位", "轻量、可控的 Windows 浏览器");
+            AppendLine(body, "诊断信息", "菜单 → 诊断信息，或在地址栏输入 about:diag");
             body.Append("</div>");
 
             return Page("关于 Vantage Lite", "Vantage Lite", body.ToString());
@@ -479,7 +892,7 @@ function clearDrop(){
                 string shell = ShellIcons.FolderDataUri();
                 if (!string.IsNullOrEmpty(shell))
                 {
-                    return "<img class=\"fav\" src=\"" + shell + "\">";
+                    return "<img class=\"fav\" loading=\"lazy\" decoding=\"async\" src=\"" + shell + "\">";
                 }
 
                 return "<svg class=\"fav\" viewBox=\"0 0 16 16\">"
@@ -493,7 +906,7 @@ function clearDrop(){
             string data = FaviconCache.GetDataUri(url);
             if (!string.IsNullOrEmpty(data))
             {
-                return "<img class=\"fav\" src=\"" + data + "\">";
+                return "<img class=\"fav\" loading=\"lazy\" decoding=\"async\" src=\"" + data + "\">";
             }
 
             if (warm)
@@ -507,7 +920,7 @@ function clearDrop(){
                 return GlobeSvg();
             }
 
-            return "<img class=\"fav\" src=\"" + Escape(origin)
+            return "<img class=\"fav\" loading=\"lazy\" decoding=\"async\" src=\"" + Escape(origin)
                 + "/favicon.ico\" onerror=\"this.onerror=null;this.src=FAV_GLOBE\">";
         }
 
@@ -561,6 +974,11 @@ function clearDrop(){
 
         private static string Page(string title, string subtitle, string body)
         {
+            return Page(title, subtitle, body, false);
+        }
+
+        private static string Page(string title, string subtitle, string body, bool hideHeader)
+        {
             bool dark = ThemeManager.IsDark;
             ThemePalette palette = ThemeManager.Current;
 
@@ -572,7 +990,9 @@ function clearDrop(){
                 + ";--muted:" + Hex(palette.TextSecondary)
                 + ";--border:" + Hex(palette.AddressBorder)
                 + ";--link:" + Hex(palette.Accent)
-                + ";--btn:" + Hex(palette.ButtonHover) + "}"
+                + ";--btn:" + Hex(palette.ButtonHover)
+                + ";--card:" + Hex(palette.ChromeBackground)
+                + ";--input:" + Hex(palette.AddressBackground) + "}"
                 + "body{margin:0;padding:28px 36px;background:var(--bg);color:var(--fg);"
                 + "font:14px/1.6 \"Segoe UI\",\"Microsoft YaHei\",sans-serif}"
                 + "h1{font-size:18px;font-weight:600;margin:0 0 4px}"
@@ -621,13 +1041,62 @@ function clearDrop(){
                 + "background:var(--btn);color:var(--fg);border:1px solid var(--border);border-radius:4px}"
                 + ".warn{background:#c0392b;color:#fff;padding:8px 12px;border-radius:4px;margin-bottom:12px}"
                 + ".panel-buttons{margin-top:14px;display:flex;gap:8px;justify-content:flex-end}"
+                + ".newtab{max-width:760px;margin:12vh auto 0;padding:0 8px;text-align:center}"
+                + ".nt-clock{font-size:56px;font-weight:300;letter-spacing:3px}"
+                + ".nt-date{color:var(--muted);font-size:13px;margin-top:6px}"
+                + ".nt-search{display:flex;align-items:center;gap:6px;max-width:600px;margin:30px auto 0;"
+                + "padding:6px 8px 6px 12px;border:1px solid var(--border);border-radius:12px;background:var(--input)}"
+                + ".nt-search:focus-within{border-color:var(--link)}"
+                + ".nt-engine{border:none;background:transparent;color:var(--muted);font-size:13px;outline:none;max-width:112px}"
+                + ".nt-search input{flex:1;min-width:0;border:none;background:transparent;color:var(--fg);font-size:15px;"
+                + "outline:none;padding:6px 2px}"
+                + ".nt-go{width:34px;height:34px;flex:0 0 34px;border:none;background:transparent;color:var(--muted);"
+                + "display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:8px;padding:0}"
+                + ".nt-go:hover{background:var(--btn);color:var(--fg)}"
+                + ".nt-go svg{width:18px;height:18px}"
+                + ".shortcuts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;max-width:720px;margin:34px auto 0}"
+                + ".shortcut{display:flex;align-items:center;gap:9px;padding:10px 12px;border:1px solid var(--border);"
+                + "border-radius:10px;background:var(--card);color:var(--fg);text-decoration:none;font-size:13px;min-width:0}"
+                + ".shortcut:hover{border-color:var(--link);text-decoration:none}"
+                + ".shortcut .sc-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}"
+                + ".sc-icon{width:22px;height:22px;flex:0 0 22px;border-radius:5px;object-fit:contain;background:var(--btn)}"
+                + "span.sc-icon{display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--muted)}"
+                + "@media (max-width:640px){.shortcuts{grid-template-columns:repeat(2,minmax(0,1fr))}}"
+                + ".filters{display:flex;align-items:center;gap:6px;margin-bottom:14px;flex-wrap:wrap}"
+                + ".settings{max-width:780px}"
+                + ".card{border:1px solid var(--border);border-radius:10px;background:var(--card);margin-bottom:14px}"
+                + ".card-head{padding:14px 18px 0}"
+                + ".card-head h2{font-size:15px;font-weight:600;margin:0}"
+                + ".card-head p{margin:4px 0 0;color:var(--muted);font-size:12px}"
+                + ".card-body{padding:14px 18px 18px;display:flex;flex-direction:column;gap:14px}"
+                + ".field-row{display:flex;align-items:center;gap:16px}"
+                + ".field-row>.label{width:190px;flex:0 0 190px;font-size:13px}"
+                + ".field-row>.control{flex:1;min-width:0}"
+                + ".field-row input[type=text],.field-row input[type=number],.field-row select{width:100%}"
+                + ".hint{display:block;color:var(--muted);font-size:12px;margin-top:4px}"
+                + ".savebar{display:flex;align-items:center;gap:12px;padding:6px 0 24px}"
+                + ".savebar .status{margin-left:0}"
+                + ".button-row{display:flex;gap:8px;flex-wrap:wrap}"
+                + ".engine-row{display:flex;gap:8px;align-items:center;margin-bottom:8px}"
+                + ".engine-row input{flex:1;min-width:0}"
+                + ".engine-row button{flex:0 0 auto}"
+                + ".card-body .check{margin:0}"
+                + "button.primary{background:var(--link);border-color:var(--link);color:#ffffff;font-weight:600}"
+                + "@media (max-width:640px){.field-row{flex-direction:column;align-items:stretch;gap:6px}"
+                + ".field-row>.label{width:auto;flex:none}}"
+                + ".filters .status{margin-left:auto;margin-right:4px}"
+                + ".filter.active{background:var(--link);border-color:var(--link);color:#ffffff}"
+                + "button.danger{color:#d9534f;border-color:#d9534f}"
                 + "</style><script>var VLT_THEME=" + ThemeJson() + ";"
                 + "function vantageApplyTheme(dark){var t=VLT_THEME[dark?'dark':'light'];if(!t){return;}"
                 + "var s=document.documentElement.style;s.setProperty('color-scheme',dark?'dark':'light');"
                 + "s.setProperty('--bg',t.bg);s.setProperty('--fg',t.fg);s.setProperty('--muted',t.muted);"
-                + "s.setProperty('--border',t.border);s.setProperty('--link',t.link);s.setProperty('--btn',t.btn);}"
-                + "</script></head><body><h1>" + Escape(title) + "</h1>"
-                + "<div class=\"sub\">" + Escape(subtitle) + "</div>"
+                + "s.setProperty('--border',t.border);s.setProperty('--link',t.link);s.setProperty('--btn',t.btn);"
+                + "s.setProperty('--card',t.card);s.setProperty('--input',t.input);}"
+                + "</script></head><body>"
+                + (hideHeader
+                    ? string.Empty
+                    : "<h1>" + Escape(title) + "</h1><div class=\"sub\">" + Escape(subtitle) + "</div>")
                 + body + "</body></html>";
         }
 
@@ -652,7 +1121,9 @@ function clearDrop(){
                 + "',muted:'" + Hex(palette.TextSecondary)
                 + "',border:'" + Hex(palette.AddressBorder)
                 + "',link:'" + Hex(palette.Accent)
-                + "',btn:'" + Hex(palette.ButtonHover) + "'}";
+                + "',btn:'" + Hex(palette.ButtonHover)
+                + "',card:'" + Hex(palette.ChromeBackground)
+                + "',input:'" + Hex(palette.AddressBackground) + "'}";
         }
 
         private static string Hex(System.Drawing.Color color)

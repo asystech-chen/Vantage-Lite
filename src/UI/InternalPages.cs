@@ -56,14 +56,13 @@ namespace VantageLite.UI
 
             if (total == 0)
             {
-                body.Append("<p class=\"empty\">还没有书签。打开页面后按 Ctrl+D 添加到书签工具栏。</p>");
+                body.Append("<p class=\"empty\">还没有书签。按 Ctrl+D 添加，或继续用下面的文件夹整理。</p>");
             }
-            else
-            {
-                body.Append("<ul class=\"tree\">");
-                AppendChildren(root, body, new int[1]);
-                body.Append("</ul>");
-            }
+
+            // 即使没有书签，也要渲染文件夹树，否则空文件夹无法管理。
+            body.Append("<ul class=\"tree\">");
+            AppendChildren(root, body, new int[1]);
+            body.Append("</ul>");
 
             body.Append("<div id=\"menu\" class=\"menu\">");
             body.Append("<div data-folder=\"1\" data-action=\"newFolder\" onclick=\"menuAction('newFolder')\">新建子文件夹</div>");
@@ -176,7 +175,9 @@ function showMenu(ev,id){
     var el=items[i];
     var folderOnly=el.getAttribute('data-folder')==='1';
     var action=el.getAttribute('data-action');
-    var hide=(folderOnly&&!isFolder)||(action==='paste'&&!hasClip);
+    var sys=!!(nodes[id]&&nodes[id].system);
+    var hide=(folderOnly&&!isFolder)||(action==='paste'&&!hasClip)||
+      (sys&&(action==='delete'||action==='rename'||action==='cut'||action==='move'));
     el.style.display=hide?'none':'block';
   }
   menu.style.display='block';
@@ -278,8 +279,13 @@ function confirmMove(){if(moving){post({cmd:'move',id:moving,parent:document.get
                 }
 
                 first[0] = false;
+                bool system = child.Id == BookmarkStore.ToolbarId ||
+                              child.Id == BookmarkStore.OtherId ||
+                              child.Id == BookmarkStore.RootId;
+
                 sb.Append(Json(child.Id)).Append(":{title:").Append(Json(child.Title))
-                    .Append(",folder:").Append(child.IsFolder ? "true" : "false").Append('}');
+                    .Append(",folder:").Append(child.IsFolder ? "true" : "false")
+                    .Append(",system:").Append(system ? "true" : "false").Append('}');
 
                 if (child.IsFolder)
                 {

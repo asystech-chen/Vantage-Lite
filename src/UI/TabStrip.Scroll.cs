@@ -60,6 +60,7 @@ namespace VantageLite.UI
                 if (_items.TryGetValue(_lastTabs[i].Id, out item))
                 {
                     item.Width = width;
+                    item.Height = viewportHeight;
                 }
             }
 

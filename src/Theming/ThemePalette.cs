@@ -21,6 +21,8 @@ namespace VantageLite.Theming
         public Color AddressBorder;
         public Color ButtonHover;
         public Color ButtonPressed;
+        public Color CaptionHover;
+        public Color CaptionPressed;
         public Color Accent;
         public Color CloseHover;
         public Color WebViewBackground;
@@ -40,6 +42,8 @@ namespace VantageLite.Theming
             AddressBorder = Color.FromArgb(58, 65, 80),
             ButtonHover = Color.FromArgb(47, 54, 67),
             ButtonPressed = Color.FromArgb(58, 67, 82),
+            CaptionHover = Color.FromArgb(40, 45, 54),
+            CaptionPressed = Color.FromArgb(52, 58, 69),
             Accent = Color.FromArgb(76, 154, 255),
             CloseHover = Color.FromArgb(196, 43, 28),
             WebViewBackground = Color.FromArgb(24, 27, 33)
@@ -60,6 +64,8 @@ namespace VantageLite.Theming
             AddressBorder = Color.FromArgb(201, 209, 220),
             ButtonHover = Color.FromArgb(232, 237, 244),
             ButtonPressed = Color.FromArgb(220, 227, 236),
+            CaptionHover = Color.FromArgb(214, 221, 231),
+            CaptionPressed = Color.FromArgb(199, 208, 220),
             Accent = Color.FromArgb(15, 108, 189),
             CloseHover = Color.FromArgb(196, 43, 28),
             WebViewBackground = Color.FromArgb(255, 255, 255)

@@ -17,6 +17,8 @@ namespace VantageLite.UI
         public event EventHandler<int> TabSelected;
         public event EventHandler<int> TabCloseRequested;
         public event EventHandler NewTabRequested;
+        public event EventHandler DragRequested;
+        public event EventHandler ToggleMaximizeRequested;
 
         private readonly Panel _viewport;
         private readonly FlowLayoutPanel _panel;
@@ -33,6 +35,10 @@ namespace VantageLite.UI
         // 用状态位而不是超时，慢速松开也不会误开新标签。
         private bool _middleDownOnTab;
 
+        // 左键在空白处按下后，移动超过阈值才算拖动窗口，避免吞掉双击最大化。
+        private bool _leftDown;
+        private Point _leftDownPoint;
+
         public TabStrip()
         {
             SetStyle(
@@ -47,13 +53,16 @@ namespace VantageLite.UI
             _measureFont = ThemeFonts.Ui(9F);
 
             Dock = DockStyle.Top;
-            Height = 36;
-            Padding = new Padding(8, 4, 8, 0);
+            Height = WindowChrome.TitleBarHeight;
+            // 顶部不留内边距：标签直接贴住窗口上缘；底部只留 4px 收边。
+            Padding = new Padding(8, 0, 8, 4);
 
             _viewport = new Panel();
             _viewport.Dock = DockStyle.Fill;
             _viewport.MouseUp += TabStrip_MouseUp;
             _viewport.MouseDown += TabStrip_MouseDown;
+            _viewport.MouseMove += TabStrip_MouseMove;
+            _viewport.DoubleClick += TabStrip_DoubleClick;
             _viewport.SizeChanged += delegate { LayoutTabs(true); };
 
             _panel = new BufferedFlowLayoutPanel();
@@ -64,10 +73,14 @@ namespace VantageLite.UI
             _panel.Margin = Padding.Empty;
             _panel.MouseUp += TabStrip_MouseUp;
             _panel.MouseDown += TabStrip_MouseDown;
+            _panel.MouseMove += TabStrip_MouseMove;
+            _panel.DoubleClick += TabStrip_DoubleClick;
             _viewport.Controls.Add(_panel);
 
             MouseUp += TabStrip_MouseUp;
             MouseDown += TabStrip_MouseDown;
+            MouseMove += TabStrip_MouseMove;
+            DoubleClick += TabStrip_DoubleClick;
 
             _newTabButton = new FlatButton();
             _newTabButton.Text = IconFont.Add;
@@ -108,22 +121,23 @@ namespace VantageLite.UI
         public void ApplyTheme()
         {
             ThemePalette palette = ThemeManager.Current;
-            BackColor = palette.TabStripBackground;
+            Color backdrop = WindowChrome.BackdropColor;
+            BackColor = backdrop;
 
             if (_viewport != null)
             {
-                _viewport.BackColor = palette.TabStripBackground;
+                _viewport.BackColor = backdrop;
             }
 
             if (_panel != null)
             {
-                _panel.BackColor = palette.TabStripBackground;
+                _panel.BackColor = backdrop;
             }
 
             if (_newTabButton != null)
             {
                 _newTabButton.UseVisualStyleBackColor = false;
-                _newTabButton.BackColor = palette.TabStripBackground;
+                _newTabButton.BackColor = backdrop;
                 _newTabButton.ForeColor = palette.TextSecondary;
                 _newTabButton.FlatAppearance.MouseOverBackColor = palette.ButtonHover;
                 _newTabButton.FlatAppearance.MouseDownBackColor = palette.ButtonPressed;
@@ -213,6 +227,13 @@ namespace VantageLite.UI
         /// </summary>
         private void TabStrip_MouseDown(object sender, MouseEventArgs e)
         {
+            if (e.Button == MouseButtons.Left)
+            {
+                _leftDown = true;
+                _leftDownPoint = e.Location;
+                return;
+            }
+
             if (e.Button == MouseButtons.Middle)
             {
                 // 空白处按下：这是一次全新的中键点击，解除上一条标签的抑制状态。
@@ -220,8 +241,32 @@ namespace VantageLite.UI
             }
         }
 
+        private void TabStrip_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (!_leftDown || (e.Button & MouseButtons.Left) == 0)
+            {
+                return;
+            }
+
+            if (Math.Abs(e.X - _leftDownPoint.X) < 5 && Math.Abs(e.Y - _leftDownPoint.Y) < 5)
+            {
+                return;
+            }
+
+            _leftDown = false;
+            Raise(DragRequested);
+        }
+
+        private void TabStrip_DoubleClick(object sender, EventArgs e)
+        {
+            _leftDown = false;
+            Raise(ToggleMaximizeRequested);
+        }
+
         private void TabStrip_MouseUp(object sender, MouseEventArgs e)
         {
+            _leftDown = false;
+
             if (e.Button != MouseButtons.Middle)
             {
                 return;

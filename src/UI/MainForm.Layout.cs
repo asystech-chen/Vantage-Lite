@@ -16,16 +16,21 @@ namespace VantageLite.UI
 
             Text = "Vantage Lite";
             Icon = LoadApplicationIcon();
+            FormBorderStyle = FormBorderStyle.None;
             StartPosition = FormStartPosition.CenterScreen;
             ClientSize = new Size(1200, 800);
             MinimumSize = new Size(800, 560);
+            // 顶部不留缩放边：标签要贴住窗口上缘，方便鼠标直接命中。
+            Padding = new Padding(WindowChrome.ResizeBorder, 0, WindowChrome.ResizeBorder, WindowChrome.ResizeBorder);
             BackColor = VantageLite.Theming.ThemeManager.Current.WindowBackground;
 
             _contentHost = new Panel();
             _contentHost.Dock = DockStyle.Fill;
 
-            _tabStrip = new TabStrip();
-            _tabStrip.Dock = DockStyle.Top;
+            _titleBar = new TitleBar();
+            _titleBar.Dock = DockStyle.Top;
+
+            _tabStrip = _titleBar.Tabs;
 
             _navigationBar = new NavigationBar();
             _navigationBar.Dock = DockStyle.Top;
@@ -33,11 +38,11 @@ namespace VantageLite.UI
             _bookmarksBar = new BookmarksBar();
             _bookmarksBar.Dock = DockStyle.Top;
 
-            // 添加顺序决定停靠优先级：最后添加的 Top 最靠上。标签条在上，地址栏在下。
+            // 添加顺序决定停靠优先级：最后添加的 Top 最靠上。标题栏（标签条）在最上面，地址栏在下。
             Controls.Add(_contentHost);
             Controls.Add(_bookmarksBar);
             Controls.Add(_navigationBar);
-            Controls.Add(_tabStrip);
+            Controls.Add(_titleBar);
 
             ResumeLayout(true);
         }
@@ -56,6 +61,11 @@ namespace VantageLite.UI
             _navigationBar.BookmarkRequested += delegate { ToggleBookmark(); };
             _navigationBar.DownloadsRequested += delegate { ToggleDownloadsPanel(); };
             _navigationBar.MenuRequested += delegate { ShowMainMenu(); };
+            _titleBar.MinimizeRequested += delegate { WindowState = FormWindowState.Minimized; };
+            _titleBar.MaximizeToggleRequested += delegate { ToggleMaximize(); };
+            _titleBar.CloseRequested += delegate { Close(); };
+            _tabStrip.DragRequested += delegate { WindowChrome.BeginDrag(this); };
+            _tabStrip.ToggleMaximizeRequested += delegate { ToggleMaximize(); };
             _bookmarksBar.OpenRequested += delegate (object sender, string url) { OpenBookmarkInNewTab(url); };
             _bookmarksBar.ManageRequested += delegate { ShowBookmarkManager(); };
             _bookmarksBar.Changed += delegate { UpdateBookmarkState(); RenderBookmarksPage(); };

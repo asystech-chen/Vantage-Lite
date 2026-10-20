@@ -277,7 +277,7 @@ namespace VantageLite.UI
                 return;
             }
 
-            Color background = ThemeManager.Current.TabStripBackground;
+            Color background = WindowChrome.BackdropColor;
 
             if (_fadeLeft > 0)
             {
@@ -318,9 +318,10 @@ namespace VantageLite.UI
         private void UpdateVisual()
         {
             ThemePalette palette = ThemeManager.Current;
+            Color inactive = WindowChrome.MicaEnabled ? WindowChrome.BackdropColor : palette.TabInactive;
             Color background = _active
                 ? palette.TabActive
-                : (_hovered ? palette.TabHover : palette.TabInactive);
+                : (_hovered ? palette.TabHover : inactive);
 
             BackColor = background;
             _closeButton.UseVisualStyleBackColor = false;

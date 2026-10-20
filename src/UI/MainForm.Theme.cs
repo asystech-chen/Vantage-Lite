@@ -22,6 +22,16 @@ namespace VantageLite.UI
         {
             ThemeManager.ApplyWindowTheme(this);
 
+            // Mica 生效时，未绘制区域要留纯黑，DWM 才会透出桌面材质。
+            BackColor = WindowChrome.MicaEnabled
+                ? System.Drawing.Color.Black
+                : ThemeManager.Current.WindowBackground;
+
+            if (_titleBar != null)
+            {
+                _titleBar.ApplyTheme();
+            }
+
             if (_navigationBar != null)
             {
                 _navigationBar.ApplyTheme();

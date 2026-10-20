@@ -27,6 +27,7 @@ namespace VantageLite.UI
         private NavigationBar _navigationBar;
         private BookmarksBar _bookmarksBar;
         private TabStrip _tabStrip;
+        private TitleBar _titleBar;
         private Panel _contentHost;
         private TabManager _tabManager;
         private BrowserTab _attachedTab;
@@ -140,6 +141,7 @@ namespace VantageLite.UI
             VantageLite.Theming.ThemeManager.SetMode(_settings.ThemeMode);
 
             BuildLayout();
+            RestoreWindowState();
             WireNavigationEvents();
             InitializeTheme();
 
@@ -410,6 +412,8 @@ namespace VantageLite.UI
 
         private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
         {
+            SaveWindowState();
+
             if (_downloads != null)
             {
                 _downloads.MarkActiveInterrupted();

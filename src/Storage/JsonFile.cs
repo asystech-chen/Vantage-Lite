@@ -82,6 +82,9 @@ namespace VantageLite.Storage
         [DataMember(Name = "restoreSession", Order = 15)]
         public bool RestoreSession { get; set; }
 
+        [DataMember(Name = "enableMica", Order = 16)]
+        public bool EnableMica { get; set; }
+
         [OnDeserializing]
         private void OnDeserializing(StreamingContext context)
         {
@@ -97,6 +100,7 @@ namespace VantageLite.Storage
             CustomSearchEngines = new List<CustomSearchEngine>();
             DownloadDirectory = string.Empty;
             RestoreSession = true;
+            EnableMica = false;
             // HomeMode 故意不填：旧配置由 MainForm 按 HomeUrl 推断。
         }
 
@@ -118,7 +122,8 @@ namespace VantageLite.Storage
                 HomeMode = DefaultHomeMode,
                 CustomSearchEngines = new List<CustomSearchEngine>(),
                 DownloadDirectory = string.Empty,
-                RestoreSession = true
+                RestoreSession = true,
+                EnableMica = false
             };
         }
     }

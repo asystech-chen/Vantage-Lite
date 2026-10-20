@@ -112,13 +112,13 @@ namespace VantageLite.UI
             if (node.IsFolder)
             {
                 button.Click += delegate { ShowFolderMenu(button, node); };
-                _toolTip.SetToolTip(button, node.Title);
+                _toolTip.SetToolTip(button, string.Empty);
             }
             else
             {
                 string url = node.Url;
                 button.Click += delegate { RaiseOpen(url); };
-                _toolTip.SetToolTip(button, url);
+                _toolTip.SetToolTip(button, node.Title + "\n" + url);
             }
 
             button.MouseUp += delegate (object sender, MouseEventArgs e)

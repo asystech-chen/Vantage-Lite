@@ -101,6 +101,11 @@ namespace VantageLite.Browser
         {
             get
             {
+                if (_internalAddress != null)
+                {
+                    return _internalAddress;
+                }
+
                 WebView2 view = _webView;
                 CoreWebView2 core = _core;
 

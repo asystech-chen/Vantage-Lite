@@ -8,7 +8,7 @@ namespace VantageLite.UI
 {
     /// <summary>
     /// 内置页面（历史/书签管理）的 HTML 与脚本生成。依赖：Storage / ThemeManager。
-    /// 改动注意：所有用户数据必须 HTML 转义；书签操作通过 web message 发回宿主。
+    /// 改动注意：用户数据必须 HTML 转义；书签操作通过 web message 发回宿主。
     /// </summary>
     internal static class InternalPages
     {
@@ -50,9 +50,6 @@ namespace VantageLite.UI
 
             body.Append("<div class=\"bar\">");
             body.Append("<button onclick=\"newFolder('").Append(BookmarkStore.ToolbarId).Append("')\">＋ 文件夹</button>");
-            body.Append("<button onclick=\"pasteTo('").Append(BookmarkStore.ToolbarId).Append("')\"")
-                .Append(store != null && store.ClipboardId != null ? string.Empty : " disabled")
-                .Append(">粘贴</button>");
             body.Append("<button onclick=\"toggleBar()\">书签栏</button>");
             body.Append("<span class=\"clip\">").Append(Escape(ClipboardText(store))).Append("</span>");
             body.Append("</div>");
@@ -68,6 +65,16 @@ namespace VantageLite.UI
                 body.Append("</ul>");
             }
 
+            body.Append("<div id=\"menu\" class=\"menu\">");
+            body.Append("<div data-folder=\"1\" data-action=\"newFolder\" onclick=\"menuAction('newFolder')\">新建子文件夹</div>");
+            body.Append("<div data-folder=\"1\" data-action=\"paste\" onclick=\"menuAction('paste')\">粘贴</div>");
+            body.Append("<div data-action=\"cut\" onclick=\"menuAction('cut')\">剪切</div>");
+            body.Append("<div data-action=\"copy\" onclick=\"menuAction('copy')\">复制</div>");
+            body.Append("<div data-action=\"move\" onclick=\"menuAction('move')\">移动到文件夹…</div>");
+            body.Append("<div data-action=\"rename\" onclick=\"menuAction('rename')\">重命名…</div>");
+            body.Append("<div class=\"danger\" data-action=\"delete\" onclick=\"menuAction('delete')\">删除</div>");
+            body.Append("</div>");
+
             body.Append("<div id=\"moveBox\" class=\"modal\"><div class=\"panel\">");
             body.Append("<div class=\"panel-title\">移动到文件夹</div>");
             body.Append("<select id=\"moveSelect\"></select>");
@@ -76,7 +83,7 @@ namespace VantageLite.UI
 
             body.Append(BuildScript(store));
 
-            return Page("书签", "共 " + total + " 个书签", body.ToString());
+            return Page("书签", "共 " + total + " 个书签 · 点行尾 ⋯ 管理", body.ToString());
         }
 
         private static void AppendChildren(BookmarkNode node, StringBuilder sb, int[] rendered)
@@ -93,15 +100,9 @@ namespace VantageLite.UI
                 if (child.IsFolder)
                 {
                     sb.Append("<li class=\"folder\"><div class=\"row\"><span class=\"name\">📁 ")
-                        .Append(Escape(child.Title)).Append("</span><span class=\"acts\">")
-                        .Append(Button("＋", "newFolder('" + child.Id + "')", false))
-                        .Append(Button("粘贴", "pasteTo('" + child.Id + "')", true))
-                        .Append(Button("重命名", "rename('" + child.Id + "')", false))
-                        .Append(Button("剪切", "cut('" + child.Id + "')", false))
-                        .Append(Button("复制", "copy('" + child.Id + "')", false))
-                        .Append(Button("移动", "move('" + child.Id + "')", false))
-                        .Append(Button("删除", "del('" + child.Id + "')", false))
-                        .Append("</span></div><ul class=\"tree\">");
+                        .Append(Escape(child.Title)).Append("</span>")
+                        .Append(MoreButton(child.Id))
+                        .Append("</div><ul class=\"tree\">");
 
                     AppendChildren(child, sb, rendered);
                     sb.Append("</ul></li>");
@@ -117,24 +118,16 @@ namespace VantageLite.UI
                     sb.Append("<li><div class=\"row\"><a href=\"").Append(Escape(child.Url))
                         .Append("\" target=\"_blank\">")
                         .Append(Escape(DisplayTitle(child.Title, child.Url))).Append("</a>")
-                        .Append("<span class=\"acts\">")
-                        .Append(Button("重命名", "rename('" + child.Id + "')", false))
-                        .Append(Button("剪切", "cut('" + child.Id + "')", false))
-                        .Append(Button("复制", "copy('" + child.Id + "')", false))
-                        .Append(Button("移动", "move('" + child.Id + "')", false))
-                        .Append(Button("删除", "del('" + child.Id + "')", false))
-                        .Append("</span></div>")
+                        .Append(MoreButton(child.Id)).Append("</div>")
                         .Append("<div class=\"url\">").Append(Escape(child.Url))
                         .Append(" · ").Append(FormatTime(child.CreatedUtc)).Append("</div></li>");
                 }
             }
         }
 
-        private static string Button(string text, string onClick, bool paste)
+        private static string MoreButton(string id)
         {
-            // 粘贴按钮在无剪贴板时由脚本统一禁用（data-paste 标记）。
-            string extra = paste ? " data-paste=\"1\"" : string.Empty;
-            return "<button" + extra + " onclick=\"" + onClick + "\">" + Escape(text) + "</button>";
+            return "<button class=\"more\" onclick=\"showMenu(event,'" + id + "')\">⋯</button>";
         }
 
         private static string BuildScript(BookmarkStore store)
@@ -142,18 +135,44 @@ namespace VantageLite.UI
             StringBuilder sb = new StringBuilder();
             sb.Append("<script>");
             sb.Append("var folders=").Append(FoldersJson(store)).Append(";");
-            sb.Append("var titles=").Append(TitlesJson(store == null ? null : store.Root)).Append(";");
+            sb.Append("var nodes=").Append(NodesJson(store == null ? null : store.Root)).Append(";");
             sb.Append("var hasClip=").Append(store != null && store.ClipboardId != null ? "true" : "false").Append(";");
-            sb.Append("var moving=null;");
+            sb.Append("var moving=null;var menuFor=null;");
             sb.Append(@"
 function post(o){try{window.chrome.webview.postMessage(JSON.stringify(o));}catch(e){}}
 function newFolder(parent){var n=prompt('文件夹名称','新建文件夹');if(n&&n.trim()){post({cmd:'newFolder',parent:parent,name:n.trim()});}}
-function rename(id){var n=prompt('新名称',titles[id]||'');if(n&&n.trim()){post({cmd:'rename',id:id,name:n.trim()});}}
-function del(id){if(confirm('删除「'+(titles[id]||'')+'」？')){post({cmd:'delete',id:id});}}
+function rename(id){var n=prompt('新名称',(nodes[id]||{}).title||'');if(n&&n.trim()){post({cmd:'rename',id:id,name:n.trim()});}}
+function del(id){if(confirm('删除「'+((nodes[id]||{}).title||'')+'」？')){post({cmd:'delete',id:id});}}
 function cut(id){post({cmd:'cut',id:id});}
 function copy(id){post({cmd:'copy',id:id});}
 function pasteTo(id){if(hasClip){post({cmd:'paste',parent:id});}}
 function toggleBar(){post({cmd:'shortcut',name:'bookmarksbar'});}
+function showMenu(ev,id){
+  ev.preventDefault();ev.stopPropagation();
+  menuFor=id;
+  var isFolder=!!(nodes[id]&&nodes[id].folder);
+  var menu=document.getElementById('menu');
+  var items=menu.children;
+  for(var i=0;i<items.length;i++){
+    var el=items[i];
+    var folderOnly=el.getAttribute('data-folder')==='1';
+    var action=el.getAttribute('data-action');
+    var hide=(folderOnly&&!isFolder)||(action==='paste'&&!hasClip);
+    el.style.display=hide?'none':'block';
+  }
+  menu.style.display='block';
+  menu.style.left=Math.min(ev.pageX,window.innerWidth-200)+'px';
+  menu.style.top=Math.min(ev.pageY,window.innerHeight-240)+'px';
+}
+function hideMenu(){var m=document.getElementById('menu');if(m){m.style.display='none';}}
+document.addEventListener('click',hideMenu);
+function menuAction(a){
+  var id=menuFor;hideMenu();if(!id){return;}
+  if(a==='newFolder'){newFolder(id);}else if(a==='paste'){pasteTo(id);}
+  else if(a==='cut'){cut(id);}else if(a==='copy'){copy(id);}
+  else if(a==='move'){move(id);}else if(a==='rename'){rename(id);}
+  else if(a==='delete'){del(id);}
+}
 function move(id){
   moving=id;
   var s=document.getElementById('moveSelect');
@@ -169,7 +188,6 @@ function move(id){
 }
 function hideMove(){document.getElementById('moveBox').style.display='none';}
 function confirmMove(){if(moving){post({cmd:'move',id:moving,parent:document.getElementById('moveSelect').value});}hideMove();}
-if(!hasClip){var bs=document.querySelectorAll('button[data-paste]');for(var i=0;i<bs.length;i++){bs[i].disabled=true;}}
 ");
             sb.Append("</script>");
             return sb.ToString();
@@ -183,7 +201,7 @@ if(!hasClip){var bs=document.querySelectorAll('button[data-paste]');for(var i=0;
                 AppendFoldersJson(store.Root, 0, sb, new bool[1]);
             }
 
-            return sb.Append("]").ToString();
+            return sb.Append(']').ToString();
         }
 
         private static void AppendFoldersJson(BookmarkNode node, int depth, StringBuilder sb, bool[] first)
@@ -216,15 +234,15 @@ if(!hasClip){var bs=document.querySelectorAll('button[data-paste]');for(var i=0;
             }
         }
 
-        private static string TitlesJson(BookmarkNode node)
+        private static string NodesJson(BookmarkNode node)
         {
             StringBuilder sb = new StringBuilder("{");
             bool[] first = new bool[1] { true };
-            AppendTitlesJson(node, sb, first);
+            AppendNodesJson(node, sb, first);
             return sb.Append('}').ToString();
         }
 
-        private static void AppendTitlesJson(BookmarkNode node, StringBuilder sb, bool[] first)
+        private static void AppendNodesJson(BookmarkNode node, StringBuilder sb, bool[] first)
         {
             if (node == null || node.Children == null)
             {
@@ -241,11 +259,12 @@ if(!hasClip){var bs=document.querySelectorAll('button[data-paste]');for(var i=0;
                 }
 
                 first[0] = false;
-                sb.Append(Json(child.Id)).Append(':').Append(Json(child.Title));
+                sb.Append(Json(child.Id)).Append(":{title:").Append(Json(child.Title))
+                    .Append(",folder:").Append(child.IsFolder ? "true" : "false").Append('}');
 
                 if (child.IsFolder)
                 {
-                    AppendTitlesJson(child, sb, first);
+                    AppendNodesJson(child, sb, first);
                 }
             }
         }
@@ -310,13 +329,18 @@ if(!hasClip){var bs=document.querySelectorAll('button[data-paste]');for(var i=0;
                 + ".tree .tree{padding-left:20px}"
                 + ".row{display:flex;align-items:center;gap:8px}"
                 + ".name{font-weight:600}"
-                + ".acts{margin-left:auto;display:flex;gap:4px;flex-wrap:wrap}"
                 + "button{font:12px/1 \"Segoe UI\",\"Microsoft YaHei\",sans-serif;padding:4px 8px;"
                 + "border:1px solid " + border + ";border-radius:4px;background:" + buttonBg + ";color:" + foreground + ";cursor:pointer}"
                 + "button:hover{border-color:" + link + "}"
-                + "button:disabled{opacity:.4;cursor:default}"
+                + ".more{margin-left:auto;border:none;background:transparent;color:" + muted + ";font-size:16px;padding:0 8px}"
+                + ".more:hover{background:" + buttonBg + ";border-radius:4px}"
                 + ".bar{display:flex;align-items:center;gap:8px;margin-bottom:12px}"
                 + ".clip{color:" + muted + ";font-size:12px;margin-left:4px}"
+                + ".menu{position:absolute;display:none;background:" + background + ";border:1px solid " + border
+                + ";border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,.35);padding:4px;z-index:10;min-width:160px}"
+                + ".menu div{padding:6px 10px;border-radius:4px;cursor:pointer;font-size:13px}"
+                + ".menu div:hover{background:" + buttonBg + "}"
+                + ".menu .danger{color:#d9534f}"
                 + ".modal{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;align-items:center;justify-content:center}"
                 + ".panel{background:" + background + ";padding:20px;border-radius:8px;min-width:320px;box-shadow:0 10px 30px rgba(0,0,0,.3)}"
                 + ".panel-title{font-weight:600;margin-bottom:10px}"

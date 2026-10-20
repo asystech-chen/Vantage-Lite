@@ -102,9 +102,18 @@ namespace VantageLite.UI
 
         private void TabManager_WebMessage(object sender, string message)
         {
+            Log.Info("[bookmarks] message: " + message);
+
             BookmarkCommand command = JsonFile.Parse<BookmarkCommand>(message);
             if (command == null || string.IsNullOrEmpty(command.Cmd))
             {
+                Log.Warn("[bookmarks] unparsed message: " + message);
+                return;
+            }
+
+            if (string.Equals(command.Cmd, "ping", StringComparison.OrdinalIgnoreCase))
+            {
+                Log.Info("[bookmarks] page ready");
                 return;
             }
 
@@ -155,6 +164,8 @@ namespace VantageLite.UI
                     changed = false;
                     break;
             }
+
+            Log.Info("[bookmarks] " + command.Cmd + " changed=" + changed + " id=" + command.Id + " parent=" + command.ParentId);
 
             if (!changed)
             {

@@ -138,6 +138,7 @@ namespace VantageLite.UI
             sb.Append("var nodes=").Append(NodesJson(store == null ? null : store.Root)).Append(";");
             sb.Append("var hasClip=").Append(store != null && store.ClipboardId != null ? "true" : "false").Append(";");
             sb.Append("var moving=null;var menuFor=null;");
+            sb.Append("try{window.chrome.webview.postMessage(JSON.stringify({cmd:'ping'}));}catch(e){}");
             sb.Append(@"
 function post(o){try{window.chrome.webview.postMessage(JSON.stringify(o));}catch(e){}}
 function newFolder(parent){var n=prompt('文件夹名称','新建文件夹');if(n&&n.trim()){post({cmd:'newFolder',parent:parent,name:n.trim()});}}

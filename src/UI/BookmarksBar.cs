@@ -363,7 +363,7 @@ namespace VantageLite.UI
                 menu.Dispose();
             };
 
-            menu.Show(owner, new Point(0, owner.Height));
+            menu.Show(Cursor.Position);
         }
 
         private ToolStripMenuItem MenuItem(string text, Action action)

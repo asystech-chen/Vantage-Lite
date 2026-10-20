@@ -94,6 +94,12 @@ namespace VantageLite.UI
                 }
             }
 
+            // 未设置悬停/按下色时回退到 BackColor，否则会填透明色导致透出下层内容。
+            if (background.IsEmpty)
+            {
+                background = BackColor;
+            }
+
             using (SolidBrush brush = new SolidBrush(background))
             {
                 e.Graphics.FillRectangle(brush, ClientRectangle);

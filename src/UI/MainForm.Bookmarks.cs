@@ -76,25 +76,9 @@ namespace VantageLite.UI
                 return;
             }
 
-            string html;
+            string html = BuildInternalPageHtml(address);
 
-            if (string.Equals(address, NewTabAddress, StringComparison.OrdinalIgnoreCase))
-            {
-                html = InternalPages.NewTab(_settings, _bookmarks);
-            }
-            else if (string.Equals(address, HistoryAddress, StringComparison.OrdinalIgnoreCase))
-            {
-                html = InternalPages.History(_history.Items);
-            }
-            else if (string.Equals(address, AboutAddress, StringComparison.OrdinalIgnoreCase))
-            {
-                html = InternalPages.About(Application.ProductVersion, WebViewEnvironment.RuntimeVersion);
-            }
-            else if (string.Equals(address, PreferencesAddress, StringComparison.OrdinalIgnoreCase))
-            {
-                html = InternalPages.Preferences(_settings);
-            }
-            else
+            if (html == null)
             {
                 html = InternalPages.Bookmarks(_bookmarks, _expandedBookmarks);
             }
@@ -110,6 +94,39 @@ namespace VantageLite.UI
                 _faviconRefreshTimer.Stop();
                 _faviconRefreshTimer.Start();
             }
+        }
+
+        /// <summary>
+        /// 按 about: 地址生成内置页 HTML；丢弃的标签恢复时也走这里，保证内容与当前设置一致。
+        /// </summary>
+        private string BuildInternalPageHtml(string address)
+        {
+            if (string.Equals(address, NewTabAddress, StringComparison.OrdinalIgnoreCase))
+            {
+                return InternalPages.NewTab(_settings, _bookmarks);
+            }
+
+            if (string.Equals(address, HistoryAddress, StringComparison.OrdinalIgnoreCase))
+            {
+                return InternalPages.History(_history.Items);
+            }
+
+            if (string.Equals(address, AboutAddress, StringComparison.OrdinalIgnoreCase))
+            {
+                return InternalPages.About(Application.ProductVersion, WebViewEnvironment.RuntimeVersion);
+            }
+
+            if (string.Equals(address, PreferencesAddress, StringComparison.OrdinalIgnoreCase))
+            {
+                return InternalPages.Preferences(_settings);
+            }
+
+            if (string.Equals(address, BookmarksAddress, StringComparison.OrdinalIgnoreCase))
+            {
+                return InternalPages.Bookmarks(_bookmarks, _expandedBookmarks);
+            }
+
+            return null;
         }
 
         private void FaviconRefreshTimer_Tick(object sender, EventArgs e)
@@ -300,6 +317,12 @@ namespace VantageLite.UI
             if (string.Equals(command.Cmd, "settings", StringComparison.OrdinalIgnoreCase))
             {
                 ApplySettings(command);
+                return;
+            }
+
+            if (string.Equals(command.Cmd, "pickDownloadDir", StringComparison.OrdinalIgnoreCase))
+            {
+                PickDownloadDirectory();
                 return;
             }
 
@@ -516,6 +539,11 @@ namespace VantageLite.UI
                 _settings.CustomSearchEngines = engines;
             }
 
+            if (command.DownloadDirectory != null)
+            {
+                _settings.DownloadDirectory = command.DownloadDirectory.Trim();
+            }
+
             if (_settings.SearchEngine != null &&
                 _settings.SearchEngine.StartsWith("custom:", StringComparison.OrdinalIgnoreCase))
             {
@@ -551,6 +579,7 @@ namespace VantageLite.UI
                 _tabManager.SetMaxLiveTabs(_settings.MaxLiveTabs);
                 _tabManager.SetSuspendAfterSeconds(_settings.SuspendAfterSeconds);
                 _tabManager.SetDiscardAfterMinutes(_settings.DiscardAfterMinutes);
+                _tabManager.SetDownloadDirectory(_settings.DownloadDirectory);
             }
 
             VantageLite.Theming.ThemeManager.SetMode(_settings.ThemeMode);
@@ -564,6 +593,54 @@ namespace VantageLite.UI
             {
                 page.PostWebMessage("已保存");
             }
+        }
+
+        /// <summary>
+        /// 设置页「浏览…」：选择下载目录，保存后回传给页面更新输入框。
+        /// </summary>
+        private void PickDownloadDirectory()
+        {
+            using (FolderBrowserDialog dialog = new FolderBrowserDialog())
+            {
+                dialog.Description = "选择下载文件的保存目录";
+                dialog.ShowNewFolderButton = true;
+
+                string current = _settings == null ? string.Empty : _settings.DownloadDirectory;
+                if (!string.IsNullOrWhiteSpace(current) && Directory.Exists(current))
+                {
+                    dialog.SelectedPath = current;
+                }
+
+                if (dialog.ShowDialog(this) != DialogResult.OK)
+                {
+                    return;
+                }
+
+                _settings.DownloadDirectory = dialog.SelectedPath;
+                JsonFile.Save(Path.Combine(AppPaths.DataDirectory, "settings.json"), _settings);
+
+                if (_tabManager != null)
+                {
+                    _tabManager.SetDownloadDirectory(_settings.DownloadDirectory);
+                }
+
+                BrowserTab page = ActiveTab;
+                if (page != null)
+                {
+                    page.PostWebMessage(
+                        "{\"downloadDir\":\"" + EscapeJson(_settings.DownloadDirectory) + "\"}");
+                }
+            }
+        }
+
+        private static string EscapeJson(string value)
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                return string.Empty;
+            }
+
+            return value.Replace("\\", "\\\\").Replace("\"", "\\\"");
         }
 
         private void ApplyThemeMode(string mode)

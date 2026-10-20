@@ -228,6 +228,11 @@ namespace VantageLite.Browser
         }
 
         /// <summary>
+        /// 按地址重新生成内置页 HTML（丢弃/自愈后恢复用）。
+        /// </summary>
+        public Func<string, string> InternalHtmlProvider { get; set; }
+
+        /// <summary>
         /// 显示内置页面（历史/书签）。地址栏保留 about: 地址，不计入浏览历史。
         /// </summary>
         public void ShowInternalPage(string address, string html)

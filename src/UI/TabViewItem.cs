@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 using VantageLite.Browser;
 using VantageLite.Theming;
@@ -24,6 +25,8 @@ namespace VantageLite.UI
         private int _spinAngle;
         private string _titleText;
         private Color _titleColor;
+        private int _fadeLeft;
+        private int _fadeRight;
 
         public TabViewItem(int tabId)
         {
@@ -66,6 +69,8 @@ namespace VantageLite.UI
             _closeButton.Font = IconFont.Create(8F);
             _closeButton.TabStop = false;
             _closeButton.Cursor = Cursors.Default;
+            _closeButton.FlatAppearance.MouseOverBackColor = ThemeManager.Current.CloseHover;
+            _closeButton.FlatAppearance.MouseDownBackColor = ThemeManager.Current.CloseHover;
             _closeButton.Click += delegate { Raise(CloseRequested); };
             _closeButton.MouseEnter += OnCloseMouseEnter;
             _closeButton.MouseLeave += OnCloseMouseLeave;
@@ -77,6 +82,7 @@ namespace VantageLite.UI
             MouseDown += OnMouseDown;
             MouseEnter += OnMouseEnter;
             MouseLeave += OnMouseLeave;
+            MouseMove += delegate { UpdateCloseVisibility(); };
 
             ApplyTheme();
         }
@@ -163,16 +169,41 @@ namespace VantageLite.UI
             UpdateVisual();
         }
 
+        /// <summary>
+        /// 设置左右两端被标签条视口裁切时的渐变宽度（像素）。
+        /// </summary>
+        public void SetFade(int left, int right)
+        {
+            if (_fadeLeft == left && _fadeRight == right)
+            {
+                return;
+            }
+
+            _fadeLeft = left;
+            _fadeRight = right;
+            UpdateCloseVisibility();
+            Invalidate();
+        }
+
         protected override void OnResize(EventArgs e)
         {
             base.OnResize(e);
 
-            if (_closeButton != null)
+            UpdateCloseVisibility();
+            Invalidate();
+        }
+
+        private void UpdateCloseVisibility()
+        {
+            if (_closeButton == null)
             {
-                _closeButton.Visible = Width >= 88;
+                return;
             }
 
-            Invalidate();
+            // 宽标签一直显示；窄标签（溢出时）鼠标移上去才显示，避免常驻挤掉标题。
+            bool over = ClientRectangle.Contains(PointToClient(Cursor.Position));
+            _closeButton.Visible =
+                (Width >= 88 || over) && _fadeLeft + _fadeRight < Width - 24;
         }
 
         protected override void OnPaint(PaintEventArgs e)
@@ -231,6 +262,57 @@ namespace VantageLite.UI
                 TextFormatFlags.SingleLine |
                 TextFormatFlags.EndEllipsis |
                 TextFormatFlags.NoPrefix);
+
+            DrawFades(e.Graphics);
+        }
+
+        /// <summary>
+        /// 标签滚到视口边缘时，用背景色渐变盖住被裁切的一端。
+        /// 渐变画在标签自身上，避免额外覆盖窗口拦截鼠标事件。
+        /// </summary>
+        private void DrawFades(Graphics graphics)
+        {
+            if (_fadeLeft <= 0 && _fadeRight <= 0)
+            {
+                return;
+            }
+
+            Color background = ThemeManager.Current.TabStripBackground;
+
+            if (_fadeLeft > 0)
+            {
+                int width = Math.Min(_fadeLeft, Width);
+                if (width > 1)
+                {
+                    Rectangle rect = new Rectangle(0, 0, width, Height);
+                    using (LinearGradientBrush brush = new LinearGradientBrush(
+                        new Rectangle(0, 0, width, Height),
+                        background,
+                        Color.FromArgb(0, background),
+                        LinearGradientMode.Horizontal))
+                    {
+                        graphics.FillRectangle(brush, rect);
+                    }
+                }
+            }
+
+            if (_fadeRight > 0)
+            {
+                int width = Math.Min(_fadeRight, Width);
+                if (width > 1)
+                {
+                    int x = Width - width;
+                    Rectangle rect = new Rectangle(x, 0, width, Height);
+                    using (LinearGradientBrush brush = new LinearGradientBrush(
+                        new Rectangle(x, 0, width, Height),
+                        Color.FromArgb(0, background),
+                        background,
+                        LinearGradientMode.Horizontal))
+                    {
+                        graphics.FillRectangle(brush, rect);
+                    }
+                }
+            }
         }
 
         private void UpdateVisual()
@@ -243,6 +325,8 @@ namespace VantageLite.UI
             BackColor = background;
             _closeButton.UseVisualStyleBackColor = false;
             _closeButton.BackColor = background;
+            _closeButton.FlatAppearance.MouseOverBackColor = palette.CloseHover;
+            _closeButton.FlatAppearance.MouseDownBackColor = palette.CloseHover;
             _indicator.BackColor = _active ? palette.Accent : background;
 
             if (_tab == null)
@@ -268,23 +352,27 @@ namespace VantageLite.UI
         {
             _hovered = true;
             UpdateVisual();
+            UpdateCloseVisibility();
         }
 
         private void OnMouseLeave(object sender, EventArgs e)
         {
             _hovered = false;
             UpdateVisual();
+            UpdateCloseVisibility();
         }
 
         private void OnCloseMouseEnter(object sender, EventArgs e)
         {
             _closeButton.BackColor = ThemeManager.Current.CloseHover;
             _closeButton.ForeColor = Color.White;
+            UpdateCloseVisibility();
         }
 
         private void OnCloseMouseLeave(object sender, EventArgs e)
         {
             UpdateVisual();
+            UpdateCloseVisibility();
         }
 
         private void OnMouseDown(object sender, MouseEventArgs e)

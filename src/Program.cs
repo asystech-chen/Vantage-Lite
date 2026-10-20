@@ -80,7 +80,7 @@ namespace VantageLite
             {
                 Log.Error("Fatal error in message loop", ex);
                 MessageBox.Show(
-                    "程序发生致命错误：\n" + ex.Message,
+                    "程序发生致命错误：\n" + Log.Describe(ex),
                     "Vantage Lite",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);

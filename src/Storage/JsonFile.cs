@@ -76,6 +76,9 @@ namespace VantageLite.Storage
         [DataMember(Name = "customEngines", Order = 13)]
         public List<CustomSearchEngine> CustomSearchEngines { get; set; }
 
+        [DataMember(Name = "downloadDir", Order = 14)]
+        public string DownloadDirectory { get; set; }
+
         [OnDeserializing]
         private void OnDeserializing(StreamingContext context)
         {
@@ -89,6 +92,7 @@ namespace VantageLite.Storage
             ThemeMode = DefaultThemeMode;
             ClearOnExit = false;
             CustomSearchEngines = new List<CustomSearchEngine>();
+            DownloadDirectory = string.Empty;
             // HomeMode 故意不填：旧配置由 MainForm 按 HomeUrl 推断。
         }
 
@@ -108,7 +112,8 @@ namespace VantageLite.Storage
                 ThemeMode = DefaultThemeMode,
                 ClearOnExit = false,
                 HomeMode = DefaultHomeMode,
-                CustomSearchEngines = new List<CustomSearchEngine>()
+                CustomSearchEngines = new List<CustomSearchEngine>(),
+                DownloadDirectory = string.Empty
             };
         }
     }

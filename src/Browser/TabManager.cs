@@ -65,6 +65,11 @@ namespace VantageLite.Browser
 
         public BrowserTab ActiveTab { get; private set; }
 
+        /// <summary>
+        /// 内置页 HTML 提供器：丢弃/自愈后恢复 about:newtab 等页面时重新生成内容。
+        /// </summary>
+        public Func<string, string> InternalHtmlProvider { get; set; }
+
         public int MaxLiveTabs
         {
             get { return _maxLiveTabs; }
@@ -110,6 +115,7 @@ namespace VantageLite.Browser
         public async Task<BrowserTab> CreateTabAsync(string url, string internalAddress, string internalHtml)
         {
             BrowserTab tab = new BrowserTab(_nextId++, _environment, _enableDevTools, url, internalAddress, internalHtml);
+            tab.InternalHtmlProvider = InternalHtmlProvider;
             tab.TitleChanged += TabTitleChanged;
             tab.NewWindowRequested += TabNewWindowRequested;
             tab.Navigated += TabNavigated;
@@ -132,6 +138,9 @@ namespace VantageLite.Browser
             }
 
             await ActivateTabAsync(tab.Id);
+
+            // 下载目录设置放在标签条刷新之后，避免 Profile COM 调用拖慢新标签出现。
+            ApplyDownloadDirectory(tab);
             await EnforceLiveLimitAsync();
 
             if (_windowMinimized && tab.IsLive)

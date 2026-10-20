@@ -101,14 +101,32 @@ namespace VantageLite.Browser
             }
 
             // 内置页作为首个页面：直接 NavigateToString，避免先加载 about:blank 再跳转。
-            if (!string.IsNullOrEmpty(_pendingInternalHtml))
+            // 丢弃后恢复时没有缓存 HTML，由 provider 按当前设置/书签重新生成。
+            if (!string.IsNullOrEmpty(_internalAddress))
             {
-                string address = _pendingInternalAddress ?? _url;
+                string address = _internalAddress;
                 string html = _pendingInternalHtml;
+
                 _pendingInternalAddress = null;
                 _pendingInternalHtml = null;
-                ShowInternalPage(address, html);
-                return;
+
+                if (html == null && InternalHtmlProvider != null)
+                {
+                    try
+                    {
+                        html = InternalHtmlProvider(address);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Warn("[tab " + _id + "] internal page rebuild failed: " + Log.Describe(ex));
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(html))
+                {
+                    ShowInternalPage(address, html);
+                    return;
+                }
             }
 
             string url = _restorePending ? _url : _pendingUrl;

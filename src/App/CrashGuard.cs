@@ -46,7 +46,7 @@ namespace VantageLite.App
 
             try
             {
-                string message = ex == null ? title : title + "：\n" + ex.Message;
+                string message = ex == null ? title : title + "：\n" + VantageLite.Diagnostics.Log.Describe(ex);
                 MessageBox.Show(
                     message + "\n\n日志：" + logHint,
                     "Vantage Lite",

@@ -250,14 +250,19 @@ namespace VantageLite.Browser
                 return false;
             }
 
-            // 内置页面无法按 URL 重建，丢弃后回到空白页。
+            // 内置页丢弃后保留地址，恢复时由 provider 重新生成 HTML。
             if (_internalAddress != null)
             {
-                _url = "about:blank";
-                _internalAddress = null;
+                _url = _internalAddress;
+                _pendingUrl = null;
+                _pendingInternalAddress = _internalAddress;
+                _pendingInternalHtml = null;
+            }
+            else
+            {
+                _pendingUrl = _url;
             }
 
-            _pendingUrl = _url;
             _restorePending = true;
             _stateVersion++;
             _isSuspended = false;
@@ -353,7 +358,18 @@ namespace VantageLite.Browser
             _core = null;
             _isSuspended = false;
             _isThrottled = false;
-            _pendingUrl = _url;
+
+            if (_internalAddress != null)
+            {
+                _pendingUrl = null;
+                _pendingInternalAddress = _internalAddress;
+                _pendingInternalHtml = null;
+            }
+            else
+            {
+                _pendingUrl = _url;
+            }
+
             _restorePending = true;
 
             try

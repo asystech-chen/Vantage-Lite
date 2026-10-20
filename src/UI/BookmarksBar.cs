@@ -22,8 +22,11 @@ namespace VantageLite.UI
         public event EventHandler Changed;
 
         private readonly FlowLayoutPanel _panel;
+        private readonly Button _overflowButton;
         private readonly ToolTip _toolTip;
         private readonly List<Button> _buttons;
+        private readonly List<BookmarkNode> _childNodes;
+        private readonly List<BookmarkNode> _hiddenNodes;
         private readonly Panel _dropLine;
         private BookmarkStore _store;
         private Label _hintLabel;
@@ -43,6 +46,8 @@ namespace VantageLite.UI
             SetStyle(ControlStyles.Selectable, false);
 
             _buttons = new List<Button>();
+            _childNodes = new List<BookmarkNode>();
+            _hiddenNodes = new List<BookmarkNode>();
             _toolTip = new ToolTip();
             ThemeManager.ApplyToolTip(_toolTip);
 
@@ -57,7 +62,21 @@ namespace VantageLite.UI
             _panel.AllowDrop = true;
             _panel.DragOver += Panel_DragOver;
             _panel.DragDrop += Panel_DragDrop;
+            _panel.SizeChanged += delegate { Relayout(); };
             MouseUp += Bar_MouseUp;
+
+            _overflowButton = new FlatButton();
+            _overflowButton.Text = IconFont.More;
+            _overflowButton.Dock = DockStyle.Right;
+            _overflowButton.Width = 28;
+            _overflowButton.FlatStyle = FlatStyle.Flat;
+            _overflowButton.FlatAppearance.BorderSize = 0;
+            _overflowButton.Font = IconFont.Create(10F);
+            _overflowButton.TabStop = false;
+            _overflowButton.Cursor = Cursors.Default;
+            _overflowButton.Visible = false;
+            _overflowButton.Click += delegate { ShowOverflowMenu(); };
+            _toolTip.SetToolTip(_overflowButton, "显示放不下的书签");
 
             _dropLine = new Panel();
             _dropLine.Height = 2;
@@ -66,6 +85,7 @@ namespace VantageLite.UI
             _dropLine.BackColor = ThemeManager.Current.Accent;
 
             Controls.Add(_panel);
+            Controls.Add(_overflowButton);
             Controls.Add(_dropLine);
             _dropLine.BringToFront();
 
@@ -98,6 +118,12 @@ namespace VantageLite.UI
             }
 
             IList<BookmarkNode> children = _store.ToolbarFolder.GetChildren();
+            _childNodes.Clear();
+
+            for (int i = 0; i < children.Count; i++)
+            {
+                _childNodes.Add(children[i]);
+            }
 
             if (children.Count == 0)
             {
@@ -108,6 +134,8 @@ namespace VantageLite.UI
                 _hintLabel.Font = ThemeFonts.Ui(9F);
                 _hintLabel.Margin = new Padding(4, 6, 0, 0);
                 _panel.Controls.Add(_hintLabel);
+                _overflowButton.Visible = false;
+                _hiddenNodes.Clear();
                 ApplyTheme();
                 return;
             }
@@ -121,6 +149,7 @@ namespace VantageLite.UI
             }
 
             ApplyTheme();
+            Relayout();
         }
 
         public void ApplyTheme()
@@ -137,6 +166,14 @@ namespace VantageLite.UI
             if (_dropLine != null && !_dropLine.IsDisposed)
             {
                 _dropLine.BackColor = palette.Accent;
+            }
+
+            if (_overflowButton != null && !_overflowButton.IsDisposed)
+            {
+                ApplyButtonTheme(_overflowButton);
+                _overflowButton.ForeColor = palette.TextSecondary;
+                _overflowButton.FlatAppearance.MouseOverBackColor = palette.ButtonHover;
+                _overflowButton.FlatAppearance.MouseDownBackColor = palette.ButtonPressed;
             }
 
             for (int i = 0; i < _buttons.Count; i++)
@@ -682,6 +719,13 @@ namespace VantageLite.UI
             }
 
             _buttons.Clear();
+            _childNodes.Clear();
+            _hiddenNodes.Clear();
+
+            if (_overflowButton != null)
+            {
+                _overflowButton.Visible = false;
+            }
 
             if (_hintLabel != null)
             {
@@ -689,6 +733,104 @@ namespace VantageLite.UI
                 _hintLabel.Dispose();
                 _hintLabel = null;
             }
+        }
+
+        /// <summary>
+        /// 按当前宽度决定显示多少个书签，放不下的收进右侧「…」菜单。
+        /// 窗口缩放、书签增删后都会重新分配。
+        /// </summary>
+        private void Relayout()
+        {
+            if (_panel == null || _overflowButton == null)
+            {
+                return;
+            }
+
+            if (_buttons.Count == 0)
+            {
+                _overflowButton.Visible = false;
+                _hiddenNodes.Clear();
+                return;
+            }
+
+            int available = _panel.ClientSize.Width;
+            if (available <= 0)
+            {
+                return;
+            }
+
+            int total = 0;
+            for (int i = 0; i < _buttons.Count; i++)
+            {
+                total += _buttons[i].Width + _buttons[i].Margin.Horizontal;
+            }
+
+            int fit;
+
+            if (total <= available)
+            {
+                fit = _buttons.Count;
+                _overflowButton.Visible = false;
+            }
+            else
+            {
+                int budget = Math.Max(0, available - _overflowButton.Width - 8);
+                int used = 0;
+                fit = 0;
+
+                for (int i = 0; i < _buttons.Count; i++)
+                {
+                    int need = _buttons[i].Width + _buttons[i].Margin.Horizontal;
+
+                    if (used + need > budget)
+                    {
+                        break;
+                    }
+
+                    used += need;
+                    fit++;
+                }
+
+                // 窗口极窄时也至少保留一个，避免整条空白。
+                if (fit == 0 && budget > 0)
+                {
+                    fit = 1;
+                }
+
+                _overflowButton.Visible = fit < _buttons.Count;
+            }
+
+            for (int i = 0; i < _buttons.Count; i++)
+            {
+                _buttons[i].Visible = i < fit;
+            }
+
+            _hiddenNodes.Clear();
+
+            for (int i = fit; i < _childNodes.Count && i < _buttons.Count; i++)
+            {
+                _hiddenNodes.Add(_childNodes[i]);
+            }
+        }
+
+        /// <summary>
+        /// 右侧「…」菜单：显示当前放不下的书签，样式与文件夹菜单一致。
+        /// </summary>
+        private void ShowOverflowMenu()
+        {
+            if (_hiddenNodes.Count == 0)
+            {
+                return;
+            }
+
+            ContextMenuStrip menu = NewMenu(true);
+
+            for (int i = 0; i < _hiddenNodes.Count; i++)
+            {
+                menu.Items.Add(CreateMenuItem(_hiddenNodes[i], true, menu));
+            }
+
+            ShowMenuAtButton(_overflowButton, menu);
         }
 
         private void Panel_DragOver(object sender, DragEventArgs e)

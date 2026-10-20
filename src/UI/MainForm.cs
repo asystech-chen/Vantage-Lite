@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.Web.WebView2.Core;
 using VantageLite.App;
@@ -83,6 +84,11 @@ namespace VantageLite.UI
             if (_settings.NewTabUrl == null)
             {
                 _settings.NewTabUrl = string.Empty;
+            }
+
+            if (_settings.DownloadDirectory == null)
+            {
+                _settings.DownloadDirectory = string.Empty;
             }
 
             if (string.IsNullOrWhiteSpace(_settings.ThemeMode))
@@ -199,24 +205,48 @@ namespace VantageLite.UI
                 _tabManager.Navigated += TabManager_Navigated;
                 _tabManager.WebMessage += TabManager_WebMessage;
                 _tabManager.LastTabClosed += delegate { CreateNewTab(); };
+                _tabManager.InternalHtmlProvider = BuildInternalPageHtml;
+
+                _tabManager.SetDownloadDirectory(_settings.DownloadDirectory);
 
                 _tabStrip.TabSelected += TabStrip_TabSelected;
                 _tabStrip.TabCloseRequested += TabStrip_TabCloseRequested;
                 _tabStrip.NewTabRequested += TabStrip_NewTabRequested;
 
                 Log.Info("WebView2 environment ready. max live tabs = " + maxLiveTabs);
-                await CreateTabForTargetAsync(ResolveHomeTarget());
+                await OpenInitialTabAsync();
             }
             catch (Exception ex)
             {
                 Log.Error("WebView2 初始化失败", ex);
                 MessageDialog.Show(
                     this,
-                    "浏览器内核初始化失败：\n" + ex.Message,
+                    "浏览器内核初始化失败：\n" + Log.Describe(ex),
                     "Vantage Lite",
                     MessageBoxButtons.OK);
                 Close();
             }
+        }
+
+        /// <summary>
+        /// 首次标签创建：WebView2 偶发初始化失败时重试一次，避免直接闪退。
+        /// </summary>
+        private async Task OpenInitialTabAsync()
+        {
+            string target = ResolveHomeTarget();
+
+            try
+            {
+                await CreateTabForTargetAsync(target);
+                return;
+            }
+            catch (Exception ex)
+            {
+                Log.Warn("首次标签创建失败，准备重试：" + Log.Describe(ex));
+            }
+
+            await Task.Delay(500);
+            await CreateTabForTargetAsync(target);
         }
 
         private void MainForm_FormClosing(object sender, FormClosingEventArgs e)

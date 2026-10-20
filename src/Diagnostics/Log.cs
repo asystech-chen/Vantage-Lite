@@ -95,6 +95,46 @@ namespace VantageLite.Diagnostics
             Write(LogLevel.Error, message, exception);
         }
 
+        /// <summary>
+        /// 安全地把异常转成文本：某些异常（如 WebView2 初始化失败）的 ToString 本身会抛异常。
+        /// 日志与弹窗只能用它，绝不能直接拼接 exception。
+        /// </summary>
+        public static string Describe(Exception exception)
+        {
+            if (exception == null)
+            {
+                return string.Empty;
+            }
+
+            try
+            {
+                return exception.ToString();
+            }
+            catch
+            {
+            }
+
+            string type = null;
+
+            try
+            {
+                type = exception.GetType().FullName;
+            }
+            catch
+            {
+            }
+
+            try
+            {
+                return (type ?? "Exception") + ": " + exception.Message;
+            }
+            catch
+            {
+            }
+
+            return type ?? "Exception (ToString failed)";
+        }
+
         public static void Shutdown()
         {
             lock (Sync)
@@ -115,13 +155,27 @@ namespace VantageLite.Diagnostics
                 return;
             }
 
-            string line = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")
-                + " [" + LevelText(level) + "] "
-                + (message ?? string.Empty);
+            string line;
 
-            if (exception != null)
+            try
             {
-                line += Environment.NewLine + exception;
+                line = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")
+                    + " [" + LevelText(level) + "] "
+                    + (message ?? string.Empty);
+
+                if (exception != null)
+                {
+                    line += Environment.NewLine + Describe(exception);
+                }
+            }
+            catch
+            {
+                // 极少数异常在取 Message/ToString 时也会失败，降级为固定文本。
+                line = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")
+                    + " [" + LevelText(level) + "] "
+                    + (message ?? string.Empty)
+                    + Environment.NewLine
+                    + "Exception (format failed)";
             }
 
             lock (Sync)

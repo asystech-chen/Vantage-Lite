@@ -366,6 +366,16 @@ namespace VantageLite.UI
             body.Append("<div><button onclick=\"addCustomEngine()\">＋ 添加搜索引擎</button></div>");
             body.Append("</div></section>");
 
+            body.Append("<section class=\"card\"><div class=\"card-head\"><h2>下载</h2>")
+                .Append("<p>文件保存位置；下载面板由 WebView2 提供</p></div><div class=\"card-body\">");
+            body.Append("<div class=\"field-row\"><span class=\"label\">保存目录</span>")
+                .Append("<span class=\"control dir-row\"><input id=\"downloadDir\" type=\"text\" value=\"")
+                .Append(Escape(settings.DownloadDirectory))
+                .Append("\" placeholder=\"留空则使用系统下载文件夹\">")
+                .Append("<button onclick=\"pickDownloadDir()\">浏览…</button></span></div>");
+            body.Append("<span class=\"hint\">留空则使用系统默认下载文件夹；修改后新下载立即生效</span>");
+            body.Append("</div></section>");
+
             body.Append("<section class=\"card\"><div class=\"card-head\"><h2>界面</h2>")
                 .Append("<p>主题与工具栏</p></div><div class=\"card-body\">");
             body.Append("<div class=\"field-row\"><span class=\"label\">主题</span><span class=\"control\">")
@@ -436,13 +446,14 @@ namespace VantageLite.UI
                 + "document.getElementById('newTabUrlRow').style.display=(m==='custom')?'flex':'none';"
                 + "document.getElementById('newTabShortcutRow').style.display=(m==='builtin')?'flex':'none';}");
             body.Append("syncNewTabFields();");
+            body.Append("function pickDownloadDir(){post({cmd:'pickDownloadDir'});}");
             body.Append("var saveTimer=null;"
                 + "function scheduleSave(){if(saveTimer){clearTimeout(saveTimer);}saveTimer=setTimeout(saveSettings,300);}");
             body.Append("(function(){var els=document.querySelectorAll('.settings input,.settings select');"
                 + "for(var i=0;i<els.length;i++){var el=els[i];"
                 + "if(el.id==='themeMode'){continue;}"
                 + "el.addEventListener('change',saveSettings);"
-                + "if(el.type==='text'||el.type==='number'){el.addEventListener('input',scheduleSave);}}})();");
+                + "if((el.type==='text'||el.type==='number')&&el.id!=='downloadDir'){el.addEventListener('input',scheduleSave);}}})();");
             body.Append("function saveSettings(){"
                 + "var homeMode=document.getElementById('homeMode').value;"
                 + "var home=document.getElementById('home').value.trim();"
@@ -459,14 +470,18 @@ namespace VantageLite.UI
                 + "var newTabUrl=document.getElementById('newTabUrl').value.trim();"
                 + "var ntShortcuts=document.getElementById('ntShortcuts').checked;"
                 + "var bar=document.getElementById('bar').checked;"
+                + "var downloadDir=document.getElementById('downloadDir').value.trim();"
                 + "var engines=[];var rows=document.querySelectorAll('#customEngines .engine-row');"
                 + "for(var i=0;i<rows.length;i++){var n=rows[i].querySelector('.ce-name').value.trim();"
                 + "var u=rows[i].querySelector('.ce-url').value.trim();if(n&&u){engines.push({name:n,url:u});}}"
-                + "post({cmd:'settings',homeMode:homeMode,home:home,customEngines:engines,maxTabs:maxTabs,suspendSeconds:suspend,discardMinutes:discard,search:search,theme:themeMode,clearOnExit:clearOnExit,newTabMode:newTabMode,newTabUrl:newTabUrl,newTabShortcuts:ntShortcuts,bookmarksBar:bar});"
+                + "post({cmd:'settings',homeMode:homeMode,home:home,customEngines:engines,maxTabs:maxTabs,suspendSeconds:suspend,discardMinutes:discard,search:search,theme:themeMode,clearOnExit:clearOnExit,newTabMode:newTabMode,newTabUrl:newTabUrl,newTabShortcuts:ntShortcuts,bookmarksBar:bar,downloadDir:downloadDir});"
                 + "}");
             body.Append("if(window.chrome&&window.chrome.webview){"
                 + "window.chrome.webview.addEventListener('message',function(e){"
-                + "var s=document.getElementById('status');if(s){s.textContent=e.data||'';}});}");
+                + "var s=document.getElementById('status');var d=e.data;"
+                + "if(typeof d==='string'&&d.charAt(0)==='{'){try{var o=JSON.parse(d);"
+                + "if(o&&o.downloadDir!==undefined){document.getElementById('downloadDir').value=o.downloadDir;return;}}catch(x){}}"
+                + "if(s){s.textContent=d||'';}});}");
             body.Append("</script>");
 
             return Page("设置", "Vantage Lite 基础选项", body.ToString());
@@ -1083,6 +1098,9 @@ function clearDrop(){
                 + ".engine-row{display:flex;gap:8px;align-items:center;margin-bottom:8px}"
                 + ".engine-row input{flex:1;min-width:0}"
                 + ".engine-row button{flex:0 0 auto}"
+                + ".dir-row{display:flex;gap:8px;align-items:center}"
+                + ".dir-row input[type=text]{flex:1;width:auto;min-width:0}"
+                + ".dir-row button{flex:0 0 auto}"
                 + ".card-body .check{margin:0}"
                 + "button.primary{background:var(--link);border-color:var(--link);color:#ffffff;font-weight:600}"
                 + "@media (max-width:640px){.field-row{flex-direction:column;align-items:stretch;gap:6px}"

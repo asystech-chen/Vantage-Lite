@@ -69,5 +69,8 @@ namespace VantageLite.Storage
 
         [DataMember(Name = "customEngines", Order = 20, EmitDefaultValue = false)]
         public List<CustomSearchEngine> CustomSearchEngines { get; set; }
+
+        [DataMember(Name = "downloadDir", Order = 21, EmitDefaultValue = false)]
+        public string DownloadDirectory { get; set; }
     }
 }

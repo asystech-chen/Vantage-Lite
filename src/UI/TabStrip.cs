@@ -9,21 +9,25 @@ namespace VantageLite.UI
 {
     /// <summary>
     /// 标签条：显示所有标签、当前活动标签、关闭按钮和新建按钮。
-    /// 依赖：BrowserTab（只读展示）/ ThemeManager。改动注意：Sync 必须保持控件顺序与标签顺序一致。
+    /// 依赖：BrowserTab（只读展示）/ ThemeManager / IMessageFilter（滚轮横向滚动）。
+    /// 改动注意：Sync 必须保持控件顺序与标签顺序一致；布局与滚动在 TabStrip.Scroll.cs。
     /// </summary>
-    public sealed class TabStrip : UserControl
+    public sealed partial class TabStrip : UserControl, IMessageFilter
     {
         public event EventHandler<int> TabSelected;
         public event EventHandler<int> TabCloseRequested;
         public event EventHandler NewTabRequested;
 
+        private readonly Panel _viewport;
         private readonly FlowLayoutPanel _panel;
         private readonly Button _newTabButton;
         private readonly Dictionary<int, TabViewItem> _items;
         private readonly ToolTip _toolTip;
+        private readonly Font _measureFont;
 
         // 记住最近一次 Sync 的数据，窗口宽度变化时据此重排标签。
         private IList<BrowserTab> _lastTabs;
+        private BrowserTab _lastActive;
 
         // 中键在标签上按下后，这次点击的 MouseUp 不应再触发“空白处新建标签”。
         // 用状态位而不是超时，慢速松开也不会误开新标签。
@@ -31,24 +35,37 @@ namespace VantageLite.UI
 
         public TabStrip()
         {
+            SetStyle(
+                ControlStyles.OptimizedDoubleBuffer |
+                ControlStyles.AllPaintingInWmPaint,
+                true);
+            DoubleBuffered = true;
+
             _items = new Dictionary<int, TabViewItem>();
             _toolTip = new ToolTip();
             ThemeManager.ApplyToolTip(_toolTip);
+            _measureFont = ThemeFonts.Ui(9F);
 
             Dock = DockStyle.Top;
             Height = 36;
             Padding = new Padding(8, 4, 8, 0);
 
-            _panel = new FlowLayoutPanel();
-            _panel.Dock = DockStyle.Fill;
+            _viewport = new Panel();
+            _viewport.Dock = DockStyle.Fill;
+            _viewport.MouseUp += TabStrip_MouseUp;
+            _viewport.MouseDown += TabStrip_MouseDown;
+            _viewport.SizeChanged += delegate { LayoutTabs(true); };
+
+            _panel = new BufferedFlowLayoutPanel();
             _panel.WrapContents = false;
             _panel.AutoScroll = false;
             _panel.FlowDirection = FlowDirection.LeftToRight;
             _panel.Padding = Padding.Empty;
             _panel.Margin = Padding.Empty;
-            _panel.SizeChanged += delegate { ApplyWidths(); };
             _panel.MouseUp += TabStrip_MouseUp;
             _panel.MouseDown += TabStrip_MouseDown;
+            _viewport.Controls.Add(_panel);
+
             MouseUp += TabStrip_MouseUp;
             MouseDown += TabStrip_MouseDown;
 
@@ -59,25 +76,30 @@ namespace VantageLite.UI
             _newTabButton.FlatStyle = FlatStyle.Flat;
             _newTabButton.FlatAppearance.BorderSize = 0;
             _newTabButton.Font = IconFont.Create(11F);
-            _newTabButton.Margin = new Padding(2, 0, 0, 0);
             _newTabButton.TabStop = false;
             _newTabButton.Cursor = Cursors.Default;
             _newTabButton.Click += delegate { Raise(NewTabRequested); };
             _toolTip.SetToolTip(_newTabButton, "新建标签页 (Ctrl+T)");
+            // 按钮直接挂在视口上：未溢出时跟随最后一个标签，溢出时固定在最右侧。
+            _viewport.Controls.Add(_newTabButton);
+            // Controls.Add 追加到集合末尾（Z 序在后面），必须提到最前，否则会被滚动面板盖住。
+            _newTabButton.BringToFront();
 
-            _panel.Controls.Add(_newTabButton);
-            Controls.Add(_panel);
+            Controls.Add(_viewport);
 
             ApplyTheme();
             ThemeManager.ThemeChanged += ThemeManager_ThemeChanged;
+            Application.AddMessageFilter(this);
         }
 
         protected override void Dispose(bool disposing)
         {
             if (disposing)
             {
+                Application.RemoveMessageFilter(this);
                 ThemeManager.ThemeChanged -= ThemeManager_ThemeChanged;
                 _toolTip.Dispose();
+                _measureFont.Dispose();
             }
 
             base.Dispose(disposing);
@@ -87,22 +109,38 @@ namespace VantageLite.UI
         {
             ThemePalette palette = ThemeManager.Current;
             BackColor = palette.TabStripBackground;
-            _panel.BackColor = palette.TabStripBackground;
-            _newTabButton.UseVisualStyleBackColor = false;
-            _newTabButton.BackColor = palette.TabStripBackground;
-            _newTabButton.ForeColor = palette.TextSecondary;
-            _newTabButton.FlatAppearance.MouseOverBackColor = palette.ButtonHover;
-            _newTabButton.FlatAppearance.MouseDownBackColor = palette.ButtonPressed;
+
+            if (_viewport != null)
+            {
+                _viewport.BackColor = palette.TabStripBackground;
+            }
+
+            if (_panel != null)
+            {
+                _panel.BackColor = palette.TabStripBackground;
+            }
+
+            if (_newTabButton != null)
+            {
+                _newTabButton.UseVisualStyleBackColor = false;
+                _newTabButton.BackColor = palette.TabStripBackground;
+                _newTabButton.ForeColor = palette.TextSecondary;
+                _newTabButton.FlatAppearance.MouseOverBackColor = palette.ButtonHover;
+                _newTabButton.FlatAppearance.MouseDownBackColor = palette.ButtonPressed;
+            }
 
             foreach (TabViewItem item in _items.Values)
             {
                 item.ApplyTheme();
             }
+
+            Invalidate();
         }
 
         public void Sync(IList<BrowserTab> tabs, BrowserTab activeTab)
         {
             _lastTabs = tabs;
+            _lastActive = activeTab;
 
             HashSet<int> alive = new HashSet<int>();
             for (int i = 0; i < tabs.Count; i++)
@@ -119,76 +157,55 @@ namespace VantageLite.UI
                 }
             }
 
-            for (int i = 0; i < removed.Count; i++)
+            // 整批修改期间暂停布局，避免新建标签先以默认宽度出现、再被压缩导致闪烁。
+            _panel.SuspendLayout();
+
+            try
             {
-                TabViewItem item = _items[removed[i]];
-                _items.Remove(removed[i]);
-                _panel.Controls.Remove(item);
-                item.Dispose();
-            }
-
-            int width = CalculateTabWidth(tabs.Count);
-
-            for (int i = 0; i < tabs.Count; i++)
-            {
-                BrowserTab tab = tabs[i];
-                TabViewItem item;
-
-                if (!_items.TryGetValue(tab.Id, out item))
+                for (int i = 0; i < removed.Count; i++)
                 {
-                    item = new TabViewItem(tab.Id);
-                    item.SelectRequested += OnItemSelectRequested;
-                    item.CloseRequested += OnItemCloseRequested;
-                    item.MiddleCloseRequested += OnItemMiddleCloseRequested;
-                    _items[tab.Id] = item;
-                    _panel.Controls.Add(item);
+                    TabViewItem item = _items[removed[i]];
+                    _items.Remove(removed[i]);
+                    _panel.Controls.Remove(item);
+                    item.Dispose();
                 }
 
-                item.Width = width;
-                item.Update(tab, tab == activeTab);
-                _toolTip.SetToolTip(item, tab.DisplayTitle + "\n" + (tab.Url ?? string.Empty));
-                _panel.Controls.SetChildIndex(item, Math.Min(i, _panel.Controls.Count - 1));
-            }
+                int buttonWidth = _newTabButton == null ? 0 : _newTabButton.Width + 2;
+                int width = CalculateTabWidth(
+                    tabs.Count,
+                    Math.Max(1, _viewport.ClientSize.Width - buttonWidth));
 
-            _panel.Controls.SetChildIndex(_newTabButton, _panel.Controls.Count - 1);
-        }
-
-        /// <summary>
-        /// 只重算宽度：窗口 resize 时标签顺序不变，无需重建控件。
-        /// </summary>
-        private void ApplyWidths()
-        {
-            if (_lastTabs == null || _lastTabs.Count == 0)
-            {
-                return;
-            }
-
-            int width = CalculateTabWidth(_lastTabs.Count);
-            for (int i = 0; i < _lastTabs.Count; i++)
-            {
-                TabViewItem item;
-                if (_items.TryGetValue(_lastTabs[i].Id, out item))
+                for (int i = 0; i < tabs.Count; i++)
                 {
-                    item.Width = width;
+                    BrowserTab tab = tabs[i];
+                    TabViewItem item;
+
+                    if (!_items.TryGetValue(tab.Id, out item))
+                    {
+                        item = new TabViewItem(tab.Id);
+                        item.Width = width;
+                        item.SelectRequested += OnItemSelectRequested;
+                        item.CloseRequested += OnItemCloseRequested;
+                        item.MiddleCloseRequested += OnItemMiddleCloseRequested;
+                        _items[tab.Id] = item;
+                        _panel.Controls.Add(item);
+                    }
+
+                    item.Update(tab, tab == activeTab);
+                    _toolTip.SetToolTip(item, tab.DisplayTitle + "\n" + (tab.Url ?? string.Empty));
+                    _panel.Controls.SetChildIndex(item, Math.Min(i, _panel.Controls.Count - 1));
                 }
-            }
-        }
 
-        private int CalculateTabWidth(int tabCount)
-        {
-            if (tabCount <= 0)
+                // 在恢复布局前就把宽度和滚动偏移算好，避免先按旧偏移绘制、
+                // 再滚到新标签造成标签栏满时新建标签的闪烁。
+                LayoutTabs(true);
+            }
+            finally
             {
-                return 180;
+                // 必须立即执行布局：ResumeLayout(false) 会留下待处理布局，
+                // 新标签要等到下一次外部布局才出现，表现为“标签栏半天不刷新”。
+                _panel.ResumeLayout(true);
             }
-
-            int available = _panel.ClientSize.Width - _newTabButton.Width - 16 - tabCount * 2;
-            if (available <= 0)
-            {
-                return 160;
-            }
-
-            int width = available / tabCount;
-            return Math.Max(64, Math.Min(200, width));
         }
 
         /// <summary>
@@ -284,6 +301,21 @@ namespace VantageLite.UI
             {
                 handler(this, EventArgs.Empty);
             }
+        }
+    }
+
+    /// <summary>
+    /// 双缓冲的 FlowLayoutPanel：标签增删/宽度重算时避免背景闪烁。
+    /// </summary>
+    internal sealed class BufferedFlowLayoutPanel : FlowLayoutPanel
+    {
+        public BufferedFlowLayoutPanel()
+        {
+            SetStyle(
+                ControlStyles.OptimizedDoubleBuffer |
+                ControlStyles.AllPaintingInWmPaint,
+                true);
+            DoubleBuffered = true;
         }
     }
 }

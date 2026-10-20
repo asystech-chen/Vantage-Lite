@@ -72,6 +72,7 @@ namespace VantageLite.Browser
                 ConfigureCore(core);
                 _isSuspended = false;
                 _isThrottled = false;
+                _statusBarSuppressed = false;
 
                 // 页面内表单改动标记，用于丢弃前的脏数据保护。
                 await core.AddScriptToExecuteOnDocumentCreatedAsync(DirtyFormScript.Source);

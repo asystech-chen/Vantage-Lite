@@ -24,6 +24,7 @@ namespace VantageLite.UI
         private TabManager _tabManager;
         private BrowserTab _attachedTab;
         private bool _minimized;
+        private Timer _resizeSettleTimer;
 
         public MainForm()
             : this(new CommandLineOptions())
@@ -36,6 +37,10 @@ namespace VantageLite.UI
             BuildLayout();
             WireNavigationEvents();
             InitializeTheme();
+
+            _resizeSettleTimer = new Timer();
+            _resizeSettleTimer.Interval = 250;
+            _resizeSettleTimer.Tick += ResizeSettleTimer_Tick;
 
             Load += MainForm_Load;
             FormClosed += MainForm_FormClosed;
@@ -114,6 +119,7 @@ namespace VantageLite.UI
         private void MainForm_FormClosed(object sender, FormClosedEventArgs e)
         {
             Log.Info("Main window closed.");
+            _resizeSettleTimer.Dispose();
             ShutdownTheme();
 
             if (_tabManager != null)

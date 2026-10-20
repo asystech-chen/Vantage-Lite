@@ -30,6 +30,7 @@ namespace VantageLite.Browser
         private bool _disposed;
         private int _stateVersion;
         private bool _isThrottled;
+        private bool _statusBarSuppressed;
 
         public int Id
         {

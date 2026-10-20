@@ -30,6 +30,54 @@ namespace VantageLite.Browser
             core.ProcessFailed += Core_ProcessFailed;
         }
 
+        /// <summary>
+        /// 暂时关闭内置链接预览条。窗口 resize 时预览条不会跟随移动，
+        /// 会留在旧位置形成残影；先关掉，等缩放结束后再恢复。
+        /// </summary>
+        public void SuppressStatusBar()
+        {
+            CoreWebView2 core = _core;
+            if (core == null || _statusBarSuppressed)
+            {
+                return;
+            }
+
+            _statusBarSuppressed = true;
+
+            try
+            {
+                core.Settings.IsStatusBarEnabled = false;
+            }
+            catch
+            {
+                _statusBarSuppressed = false;
+            }
+        }
+
+        public void RestoreStatusBar()
+        {
+            if (!_statusBarSuppressed)
+            {
+                return;
+            }
+
+            _statusBarSuppressed = false;
+
+            CoreWebView2 core = _core;
+            if (core == null)
+            {
+                return;
+            }
+
+            try
+            {
+                core.Settings.IsStatusBarEnabled = true;
+            }
+            catch
+            {
+            }
+        }
+
         private void Core_SourceChanged(object sender, CoreWebView2SourceChangedEventArgs e)
         {
             CoreWebView2 core = sender as CoreWebView2;

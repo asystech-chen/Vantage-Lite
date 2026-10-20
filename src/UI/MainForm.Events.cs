@@ -160,20 +160,45 @@ namespace VantageLite.UI
             }
 
             bool minimized = WindowState == FormWindowState.Minimized;
-            if (minimized == _minimized)
+
+            if (minimized != _minimized)
+            {
+                _minimized = minimized;
+
+                try
+                {
+                    await _tabManager.SetMinimizedAsync(minimized);
+                }
+                catch (Exception ex)
+                {
+                    Log.Error("window state transition failed", ex);
+                }
+            }
+
+            if (minimized)
             {
                 return;
             }
 
-            _minimized = minimized;
-
-            try
+            // 缩放期间先关掉链接预览条，避免它停在旧位置；停止缩放后再恢复。
+            BrowserTab active = ActiveTab;
+            if (active != null)
             {
-                await _tabManager.SetMinimizedAsync(minimized);
+                active.SuppressStatusBar();
             }
-            catch (Exception ex)
+
+            _resizeSettleTimer.Stop();
+            _resizeSettleTimer.Start();
+        }
+
+        private void ResizeSettleTimer_Tick(object sender, EventArgs e)
+        {
+            _resizeSettleTimer.Stop();
+
+            BrowserTab active = ActiveTab;
+            if (active != null)
             {
-                Log.Error("window state transition failed", ex);
+                active.RestoreStatusBar();
             }
         }
 

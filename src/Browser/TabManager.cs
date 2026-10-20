@@ -158,6 +158,7 @@ namespace VantageLite.Browser
 
                 tab.SetContentVisibility(true);
                 tab.Resume();
+                tab.RestoreStatusBar();
                 tab.FocusContent();
                 RaiseTabsChanged();
                 return;
@@ -199,6 +200,7 @@ namespace VantageLite.Browser
                 return;
             }
 
+            tab.RestoreStatusBar();
             tab.FocusContent();
             RaiseActiveChanged();
             RaiseTabsChanged();

@@ -23,6 +23,8 @@ namespace VantageLite.Browser
         private readonly Timer _maintenanceTimer;
 
         private int _nextId;
+        private int _activationVersion;
+        private bool _windowMinimized;
         private bool _disposed;
         private bool _maintenanceBusy;
 
@@ -89,23 +91,69 @@ namespace VantageLite.Browser
             }
 
             await ActivateTabAsync(tab.Id);
+            await EnforceLiveLimitAsync();
+
+            if (_windowMinimized && tab.IsLive)
+            {
+                tab.Visible = false;
+                await tab.SuspendAsync();
+            }
+
             LogTabState("create");
             return tab;
+        }
+
+        /// <summary>
+        /// 新建标签后立即执行上限检查，避免定时器 5 秒间隔内内存冲高。
+        /// </summary>
+        private async Task EnforceLiveLimitAsync()
+        {
+            if (_disposed || _maintenanceBusy)
+            {
+                return;
+            }
+
+            _maintenanceBusy = true;
+
+            try
+            {
+                if (await TrimToLiveLimitAsync())
+                {
+                    RaiseTabsChanged();
+                    LogTabState("limit");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("[tabs] enforce limit failed", ex);
+            }
+            finally
+            {
+                _maintenanceBusy = false;
+            }
         }
 
         public async Task ActivateTabAsync(int id)
         {
             BrowserTab tab = Find(id);
-            if (tab == null)
+            if (tab == null || _disposed)
             {
                 return;
             }
+
+            // 激活序号：连续快速点击时只有最后一次激活可以改焦点。
+            int version = ++_activationVersion;
 
             if (tab == ActiveTab)
             {
                 if (tab.IsDiscarded)
                 {
                     await tab.EnsureLiveAsync();
+                }
+
+                if (version != _activationVersion || _disposed || tab.IsDisposed)
+                {
+                    return;
                 }
 
                 tab.Visible = true;
@@ -143,6 +191,12 @@ namespace VantageLite.Browser
             else
             {
                 tab.Resume();
+            }
+
+            if (version != _activationVersion || _disposed || tab.IsDisposed)
+            {
+                Log.Debug("[tabs] activation superseded: tab " + tab.Id);
+                return;
             }
 
             tab.FocusContent();

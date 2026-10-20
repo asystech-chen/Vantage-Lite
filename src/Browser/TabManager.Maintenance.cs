@@ -51,6 +51,11 @@ namespace VantageLite.Browser
                     continue;
                 }
 
+                if (tab.IsPlayingAudio)
+                {
+                    continue;
+                }
+
                 double idleSeconds = (now - tab.LastDeactivatedUtc).TotalSeconds;
                 if (_suspendAfterSeconds > 0 && idleSeconds >= _suspendAfterSeconds)
                 {
@@ -61,28 +66,10 @@ namespace VantageLite.Browser
                 }
             }
 
-            // 2) 超过硬上限 -> 按 LRU 销毁，跳过活动标签和脏表单。
-            int liveCount = _tabs.Count(t => t.IsLive);
-            if (liveCount > _maxLiveTabs)
+            // 2) 超过硬上限 -> 按 LRU 销毁，跳过活动标签、播放中的页面和脏表单。
+            if (await TrimToLiveLimitAsync())
             {
-                List<BrowserTab> candidates = _tabs
-                    .Where(t => !t.IsDisposed && t != ActiveTab && t.IsLive)
-                    .OrderBy(t => t.LastActivatedUtc)
-                    .ToList();
-
-                for (int i = 0; i < candidates.Count && liveCount > _maxLiveTabs; i++)
-                {
-                    if (await TryDiscardAsync(candidates[i]))
-                    {
-                        liveCount--;
-                        changed = true;
-                    }
-                }
-
-                if (liveCount > _maxLiveTabs)
-                {
-                    Log.Warn("[tabs] live tabs still above limit; remaining candidates hold unsaved input");
-                }
+                changed = true;
             }
 
             // 3) 挂起太久 -> 允许真正销毁。
@@ -92,7 +79,7 @@ namespace VantageLite.Browser
                 {
                     BrowserTab tab = _tabs[i];
 
-                    if (tab.IsDisposed || tab == ActiveTab || !tab.IsSuspended)
+                    if (tab.IsDisposed || tab == ActiveTab || !tab.IsSuspended || tab.IsPlayingAudio)
                     {
                         continue;
                     }
@@ -114,10 +101,52 @@ namespace VantageLite.Browser
             }
         }
 
+        /// <summary>
+        /// 把存活 WebView2 数量压回上限。播放音频的标签和脏表单标签受保护。
+        /// </summary>
+        private async Task<bool> TrimToLiveLimitAsync()
+        {
+            int liveCount = _tabs.Count(t => t.IsLive);
+            if (liveCount <= _maxLiveTabs)
+            {
+                return false;
+            }
+
+            List<BrowserTab> candidates = _tabs
+                .Where(t => !t.IsDisposed && t != ActiveTab && t.IsLive && !t.IsPlayingAudio)
+                .OrderBy(t => t.LastActivatedUtc)
+                .ToList();
+
+            bool changed = false;
+
+            for (int i = 0; i < candidates.Count && liveCount > _maxLiveTabs; i++)
+            {
+                if (await TryDiscardAsync(candidates[i]))
+                {
+                    liveCount--;
+                    changed = true;
+                }
+            }
+
+            if (liveCount > _maxLiveTabs)
+            {
+                Log.Warn("[tabs] live tabs above limit: " + liveCount
+                    + " (protected: audio or unsaved input)");
+            }
+
+            return changed;
+        }
+
         private async Task<bool> TryDiscardAsync(BrowserTab tab)
         {
             if (tab.IsDisposed || !tab.IsLive)
             {
+                return false;
+            }
+
+            if (tab.IsPlayingAudio)
+            {
+                Log.Debug("[tabs] discard skipped (playing audio): tab " + tab.Id);
                 return false;
             }
 

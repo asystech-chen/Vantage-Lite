@@ -11,28 +11,34 @@ namespace VantageLite.Browser
     /// </summary>
     public sealed partial class BrowserTab
     {
-        private void ConfigureCore()
+        private void ConfigureCore(CoreWebView2 core)
         {
-            _core.Settings.AreDevToolsEnabled = _enableDevTools;
-            _core.Settings.AreDefaultContextMenusEnabled = true;
-            _core.Settings.IsStatusBarEnabled = true;
-            _core.Settings.IsSwipeNavigationEnabled = false;
-            _core.Profile.PreferredColorScheme = ThemeManager.IsDark
+            core.Settings.AreDevToolsEnabled = _enableDevTools;
+            core.Settings.AreDefaultContextMenusEnabled = true;
+            core.Settings.IsStatusBarEnabled = true;
+            core.Settings.IsSwipeNavigationEnabled = false;
+            core.Profile.PreferredColorScheme = ThemeManager.IsDark
                 ? CoreWebView2PreferredColorScheme.Dark
                 : CoreWebView2PreferredColorScheme.Light;
 
-            _core.SourceChanged += Core_SourceChanged;
-            _core.DocumentTitleChanged += Core_DocumentTitleChanged;
-            _core.HistoryChanged += Core_HistoryChanged;
-            _core.NavigationStarting += Core_NavigationStarting;
-            _core.NavigationCompleted += Core_NavigationCompleted;
-            _core.NewWindowRequested += Core_NewWindowRequested;
-            _core.ProcessFailed += Core_ProcessFailed;
+            core.SourceChanged += Core_SourceChanged;
+            core.DocumentTitleChanged += Core_DocumentTitleChanged;
+            core.HistoryChanged += Core_HistoryChanged;
+            core.NavigationStarting += Core_NavigationStarting;
+            core.NavigationCompleted += Core_NavigationCompleted;
+            core.NewWindowRequested += Core_NewWindowRequested;
+            core.ProcessFailed += Core_ProcessFailed;
         }
 
         private void Core_SourceChanged(object sender, CoreWebView2SourceChangedEventArgs e)
         {
-            _url = _core.Source;
+            CoreWebView2 core = sender as CoreWebView2;
+            if (core == null || !ReferenceEquals(core, _core))
+            {
+                return;
+            }
+
+            _url = core.Source;
             Log.Debug("[tab " + _id + "] source: " + _url);
 
             EventHandler<string> handler = AddressChanged;
@@ -44,7 +50,13 @@ namespace VantageLite.Browser
 
         private void Core_DocumentTitleChanged(object sender, object e)
         {
-            _title = _core.DocumentTitle;
+            CoreWebView2 core = sender as CoreWebView2;
+            if (core == null || !ReferenceEquals(core, _core))
+            {
+                return;
+            }
+
+            _title = core.DocumentTitle;
 
             EventHandler<string> handler = TitleChanged;
             if (handler != null)

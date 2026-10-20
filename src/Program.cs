@@ -47,6 +47,12 @@ namespace VantageLite
                 return;
             }
 
+            // 同一数据目录只允许一个实例，避免 WebView2 进程组翻倍。
+            if (!SingleInstance.TryAcquire(options))
+            {
+                return;
+            }
+
             string logFile = options.EnableLog ? AppPaths.ResolveLogFile(options.LogFile) : null;
             Log.Initialize(options.LogLevel, logFile, options.ConsoleOutput);
             CrashGuard.Install();
@@ -103,7 +109,7 @@ namespace VantageLite
             Console.WriteLine("  --log-file=PATH             指定日志文件路径");
             Console.WriteLine("  --console                   日志同时输出到控制台");
             Console.WriteLine("  --user-data-dir=PATH        指定用户数据目录");
-            Console.WriteLine("  --max-live-tabs=N           最多保留的 WebView2 实例数，默认 10（1-50）");
+            Console.WriteLine("  --max-live-tabs=N           最多保留的 WebView2 实例数，默认 8（1-50）");
             Console.WriteLine("  --suspend-after-seconds=N   后台标签静默多少秒后挂起，默认 30（0=不挂起）");
             Console.WriteLine("  --discard-after-minutes=N   挂起多少分钟后销毁，默认 60（0=不销毁）");
             Console.WriteLine("  --url=URL                   启动页（也可直接传 URL）");

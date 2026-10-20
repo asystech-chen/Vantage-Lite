@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.Web.WebView2.Core;
+using Microsoft.Web.WebView2.WinForms;
 using VantageLite.Diagnostics;
 using VantageLite.Theming;
 
@@ -13,6 +14,9 @@ namespace VantageLite.Browser
     /// </summary>
     public sealed partial class BrowserTab
     {
+        private readonly object _suspendGate = new object();
+        private Task<bool> _suspendTask;
+
         /// <summary>
         /// 跟随系统明暗主题：窗口底色 + 网页 prefers-color-scheme。
         /// </summary>
@@ -37,36 +41,100 @@ namespace VantageLite.Browser
         /// 挂起后台标签：保留 DOM/表单/滚动位置，只暂停脚本和渲染。
         /// 调用前控件必须不可见，否则 TrySuspendAsync 会抛 COMException。
         /// </summary>
-        public async Task<bool> SuspendAsync()
+        public Task<bool> SuspendAsync()
+        {
+            lock (_suspendGate)
+            {
+                if (_suspendTask != null && !_suspendTask.IsCompleted)
+                {
+                    return _suspendTask;
+                }
+
+                _suspendTask = SuspendCoreAsync();
+                return _suspendTask;
+            }
+        }
+
+        private async Task<bool> SuspendCoreAsync()
         {
             DropDisposedWebView();
 
-            if (_webView == null || _core == null || _isSuspended || _disposed)
+            WebView2 view = _webView;
+            CoreWebView2 core = _core;
+
+            if (view == null || core == null || _isSuspended || _disposed)
             {
                 return false;
             }
 
             try
             {
+                int stateVersion = _stateVersion;
+
                 // 先记录脏表单状态，挂起后不能再执行脚本查询。
                 _hasUnsavedInput = await IsDirtyAsync();
 
-                DropDisposedWebView();
-                if (_webView == null || _core == null)
+                // 等待期间标签可能被丢弃、激活或被替换，必须确认仍是同一实例且状态未变。
+                if (IsStale(view, core) || stateVersion != _stateVersion)
                 {
+                    Log.Debug("[tab " + _id + "] suspend skipped (stale)");
                     return false;
                 }
 
-                bool suspended = await _core.TrySuspendAsync();
+                bool suspended = await core.TrySuspendAsync();
+
+                if (IsStale(view, core) || stateVersion != _stateVersion)
+                {
+                    // 挂起过程中标签被激活：立刻恢复，避免活动标签停在挂起态。
+                    if (suspended && !IsStale(view, core) && core.IsSuspended)
+                    {
+                        try
+                        {
+                            core.Resume();
+                        }
+                        catch
+                        {
+                        }
+                    }
+
+                    Log.Debug("[tab " + _id + "] suspend result ignored (stale)");
+                    return false;
+                }
+
                 _isSuspended = suspended;
-                Log.Info("[tab " + _id + "] suspend: " + (suspended ? "ok" : "refused"));
+
+                if (suspended)
+                {
+                    Log.Info("[tab " + _id + "] suspend: ok");
+                }
+                else
+                {
+                    // 挂起被拒绝（音频/下载/长连接等）：退到低内存目标级别。
+                    SetMemoryTarget(true);
+                    Log.Info("[tab " + _id + "] suspend: refused; memory target low");
+                }
+
                 return suspended;
             }
             catch (Exception ex)
             {
-                if (_disposed || _webView == null || _webView.IsDisposed)
+                if (IsStale(view, core))
                 {
-                    Log.Debug("[tab " + _id + "] suspend skipped (disposed)");
+                    Log.Debug("[tab " + _id + "] suspend skipped (stale)");
+                    return false;
+                }
+
+                if (IsDisposedError(ex))
+                {
+                    if (!IsCoreAlive(core, view))
+                    {
+                        DropDeadWebView(view);
+                        return false;
+                    }
+
+                    // 对象仍可用：当作挂起被拒绝，用低内存目标兜底。
+                    SetMemoryTarget(true);
+                    Log.Info("[tab " + _id + "] suspend failed but core alive; memory target low");
                     return false;
                 }
 
@@ -79,17 +147,32 @@ namespace VantageLite.Browser
         {
             DropDisposedWebView();
 
-            if (_webView == null || _disposed)
+            WebView2 view = _webView;
+            CoreWebView2 core = _core;
+
+            if (view == null || core == null || _disposed)
             {
                 return;
             }
 
-            if (_core != null && _core.IsSuspended)
+            try
             {
-                _core.Resume();
+                if (core.IsSuspended)
+                {
+                    core.Resume();
+                }
+            }
+            catch (Exception ex)
+            {
+                if (!IsStale(view, core))
+                {
+                    Log.Warn("[tab " + _id + "] resume failed: " + ex.Message);
+                }
             }
 
+            _stateVersion++;
             _isSuspended = false;
+            SetMemoryTarget(false);
         }
 
         /// <summary>
@@ -99,14 +182,16 @@ namespace VantageLite.Browser
         {
             DropDisposedWebView();
 
-            if (_core == null || _disposed)
+            CoreWebView2 core = _core;
+
+            if (core == null || _disposed)
             {
                 return false;
             }
 
             try
             {
-                string result = await _core.ExecuteScriptAsync("window.__vantageDirty === true");
+                string result = await core.ExecuteScriptAsync("window.__vantageDirty === true");
                 return string.Equals(result, "true", StringComparison.OrdinalIgnoreCase);
             }
             catch
@@ -122,29 +207,46 @@ namespace VantageLite.Browser
         {
             DropDisposedWebView();
 
-            if (_webView == null || _disposed)
+            WebView2 view = _webView;
+            CoreWebView2 core = _core;
+
+            if (view == null || _disposed)
             {
                 return false;
             }
 
-            if (_core != null)
+            if (core != null)
             {
-                if (_core.IsSuspended)
+                try
                 {
-                    _core.Resume();
-                }
+                    if (core.IsSuspended)
+                    {
+                        core.Resume();
+                    }
 
-                _url = _core.Source;
-                _title = _core.DocumentTitle;
-                await CaptureScrollAsync();
+                    _url = core.Source;
+                    _title = core.DocumentTitle;
+                    await CaptureScrollAsync(core);
+                }
+                catch (Exception ex)
+                {
+                    Log.Debug("[tab " + _id + "] discard capture skipped: " + ex.Message);
+                }
+            }
+
+            if (IsStale(view, core))
+            {
+                Log.Debug("[tab " + _id + "] discard skipped (stale)");
+                return false;
             }
 
             _pendingUrl = _url;
             _restorePending = true;
+            _stateVersion++;
             _isSuspended = false;
 
-            Controls.Remove(_webView);
-            _webView.Dispose();
+            Controls.Remove(view);
+            view.Dispose();
             _webView = null;
             _core = null;
 
@@ -159,11 +261,11 @@ namespace VantageLite.Browser
             return true;
         }
 
-        private async Task CaptureScrollAsync()
+        private async Task CaptureScrollAsync(CoreWebView2 core)
         {
             try
             {
-                string result = await _core.ExecuteScriptAsync("window.scrollX + ',' + window.scrollY");
+                string result = await core.ExecuteScriptAsync("window.scrollX + ',' + window.scrollY");
                 string text = result == null ? string.Empty : result.Trim('"');
                 string[] parts = text.Split(',');
                 int x;
@@ -204,6 +306,110 @@ namespace VantageLite.Browser
                 _core = null;
                 _isSuspended = false;
             }
+        }
+
+        /// <summary>
+        /// 控件还在、但 CoreWebView2 已经不可用（典型：controller 已释放）。
+        /// 这种 WebView2 无法恢复，直接按丢弃处理，切回时重建。
+        /// </summary>
+        private void DropDeadWebView(WebView2 view)
+        {
+            if (!ReferenceEquals(_webView, view))
+            {
+                Log.Debug("[tab " + _id + "] suspend skipped (disposed)");
+                return;
+            }
+
+            _webView = null;
+            _core = null;
+            _isSuspended = false;
+            _isThrottled = false;
+            _pendingUrl = _url;
+            _restorePending = true;
+
+            try
+            {
+                Controls.Remove(view);
+                view.Dispose();
+            }
+            catch
+            {
+            }
+
+            Log.Info("[tab " + _id + "] webview dropped (dead), restore on demand: " + _url);
+        }
+
+        /// <summary>
+        /// 探活：真正触碰一次 COM 属性，判断 CoreWebView2 是否还能用。
+        /// </summary>
+        private static bool IsCoreAlive(CoreWebView2 core, WebView2 view)
+        {
+            if (core == null || view == null || view.IsDisposed)
+            {
+                return false;
+            }
+
+            try
+            {
+                string probe = core.Source;
+                return probe != null;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool IsDisposedError(Exception ex)
+        {
+            return ex != null
+                && ex.Message != null
+                && ex.Message.IndexOf("disposed", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        /// <summary>
+        /// 设置 Chromium 内存目标级别。Low 是尽力而为，恢复活跃时必须显式设回 Normal。
+        /// </summary>
+        private void SetMemoryTarget(bool low)
+        {
+            CoreWebView2 core = _core;
+            WebView2 view = _webView;
+
+            if (core == null || view == null || view.IsDisposed || _disposed)
+            {
+                return;
+            }
+
+            if (low == _isThrottled)
+            {
+                return;
+            }
+
+            try
+            {
+                core.MemoryUsageTargetLevel = low
+                    ? CoreWebView2MemoryUsageTargetLevel.Low
+                    : CoreWebView2MemoryUsageTargetLevel.Normal;
+
+                _isThrottled = low;
+                Log.Info("[tab " + _id + "] memory target: " + (low ? "low" : "normal"));
+            }
+            catch (Exception ex)
+            {
+                Log.Debug("[tab " + _id + "] memory target failed: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// 判断手里这对 view/core 是否已经失效（标签销毁、WebView2 被替换或控件已释放）。
+        /// </summary>
+        private bool IsStale(WebView2 view, CoreWebView2 core)
+        {
+            return _disposed
+                || view == null
+                || view.IsDisposed
+                || !ReferenceEquals(_webView, view)
+                || !ReferenceEquals(_core, core);
         }
 
     }

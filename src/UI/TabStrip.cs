@@ -22,6 +22,9 @@ namespace VantageLite.UI
         private readonly Dictionary<int, TabViewItem> _items;
         private readonly ToolTip _toolTip;
 
+        // 记住最近一次 Sync 的数据，窗口宽度变化时据此重排标签。
+        private IList<BrowserTab> _lastTabs;
+
         public TabStrip()
         {
             _items = new Dictionary<int, TabViewItem>();
@@ -38,6 +41,7 @@ namespace VantageLite.UI
             _panel.FlowDirection = FlowDirection.LeftToRight;
             _panel.Padding = Padding.Empty;
             _panel.Margin = Padding.Empty;
+            _panel.SizeChanged += delegate { ApplyWidths(); };
 
             _newTabButton = new Button();
             _newTabButton.Text = IconFont.Add;
@@ -88,6 +92,8 @@ namespace VantageLite.UI
 
         public void Sync(IList<BrowserTab> tabs, BrowserTab activeTab)
         {
+            _lastTabs = tabs;
+
             HashSet<int> alive = new HashSet<int>();
             for (int i = 0; i < tabs.Count; i++)
             {
@@ -134,6 +140,27 @@ namespace VantageLite.UI
             }
 
             _panel.Controls.SetChildIndex(_newTabButton, _panel.Controls.Count - 1);
+        }
+
+        /// <summary>
+        /// 只重算宽度：窗口 resize 时标签顺序不变，无需重建控件。
+        /// </summary>
+        private void ApplyWidths()
+        {
+            if (_lastTabs == null || _lastTabs.Count == 0)
+            {
+                return;
+            }
+
+            int width = CalculateTabWidth(_lastTabs.Count);
+            for (int i = 0; i < _lastTabs.Count; i++)
+            {
+                TabViewItem item;
+                if (_items.TryGetValue(_lastTabs[i].Id, out item))
+                {
+                    item.Width = width;
+                }
+            }
         }
 
         private int CalculateTabWidth(int tabCount)

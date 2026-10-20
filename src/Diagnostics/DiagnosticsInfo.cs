@@ -62,6 +62,7 @@ namespace VantageLite.Diagnostics
         {
             long oursBytes = 0;
             long totalBytes = 0;
+            long oursWorkingSet = 0;
             int oursCount = 0;
             int totalCount = 0;
 
@@ -80,6 +81,7 @@ namespace VantageLite.Diagnostics
                         {
                             oursBytes += bytes;
                             oursCount++;
+                            oursWorkingSet += processes[i].WorkingSet64;
                         }
                     }
                     catch
@@ -95,8 +97,10 @@ namespace VantageLite.Diagnostics
             {
             }
 
+            // ours=私有提交（偏大），ws=工作集（与任务管理器接近）。
             return "host=" + (GetHostPrivateBytes() / 1024 / 1024) + "MB"
                 + ", ours=" + (oursBytes / 1024 / 1024) + "MB/" + oursCount + "p"
+                + ", ws=" + (oursWorkingSet / 1024 / 1024) + "MB"
                 + ", total=" + (totalBytes / 1024 / 1024) + "MB/" + totalCount + "p";
         }
 

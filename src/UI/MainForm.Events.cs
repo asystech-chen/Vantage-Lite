@@ -152,6 +152,31 @@ namespace VantageLite.UI
             }
         }
 
+        private async void MainForm_Resize(object sender, EventArgs e)
+        {
+            if (_tabManager == null)
+            {
+                return;
+            }
+
+            bool minimized = WindowState == FormWindowState.Minimized;
+            if (minimized == _minimized)
+            {
+                return;
+            }
+
+            _minimized = minimized;
+
+            try
+            {
+                await _tabManager.SetMinimizedAsync(minimized);
+            }
+            catch (Exception ex)
+            {
+                Log.Error("window state transition failed", ex);
+            }
+        }
+
         private void Tab_ProcessFailed(object sender, string kind)
         {
             if (sender != ActiveTab)

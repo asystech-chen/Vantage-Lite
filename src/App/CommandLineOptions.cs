@@ -28,7 +28,7 @@ namespace VantageLite.App
         {
             LogLevel = LogLevel.Info;
             EnableDevTools = true;
-            MaxLiveTabs = 10;
+            MaxLiveTabs = 8;
             SuspendAfterSeconds = 30;
             DiscardAfterMinutes = 60;
             Warnings = new List<string>();

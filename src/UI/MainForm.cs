@@ -23,6 +23,7 @@ namespace VantageLite.UI
         private Panel _contentHost;
         private TabManager _tabManager;
         private BrowserTab _attachedTab;
+        private bool _minimized;
 
         public MainForm()
             : this(new CommandLineOptions())
@@ -38,6 +39,7 @@ namespace VantageLite.UI
 
             Load += MainForm_Load;
             FormClosed += MainForm_FormClosed;
+            Resize += MainForm_Resize;
         }
 
         private BrowserTab ActiveTab

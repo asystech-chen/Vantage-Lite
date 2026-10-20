@@ -1,9 +1,7 @@
 using System;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
-using VantageLite.Diagnostics;
 using VantageLite.Theming;
 
 namespace VantageLite.Browser
@@ -30,6 +28,8 @@ namespace VantageLite.Browser
         private int _pendingScrollY;
         private bool _hasUnsavedInput;
         private bool _disposed;
+        private int _stateVersion;
+        private bool _isThrottled;
 
         public int Id
         {
@@ -38,7 +38,7 @@ namespace VantageLite.Browser
 
         public bool IsLive
         {
-            get { return _webView != null && !_webView.IsDisposed; }
+            get { return !_disposed && _webView != null && !_webView.IsDisposed; }
         }
 
         public bool IsDiscarded
@@ -61,11 +61,60 @@ namespace VantageLite.Browser
             get { return _hasUnsavedInput; }
         }
 
+        public bool IsThrottled
+        {
+            get { return _isThrottled; }
+        }
+
+        /// <summary>
+        /// 页面是否正在播放音频/视频。播放中的标签不能被挂起或丢弃，否则会中断播放。
+        /// </summary>
+        public bool IsPlayingAudio
+        {
+            get
+            {
+                CoreWebView2 core = _core;
+                WebView2 view = _webView;
+
+                if (core == null || view == null || view.IsDisposed || _disposed)
+                {
+                    return false;
+                }
+
+                try
+                {
+                    return core.IsDocumentPlayingAudio;
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+        }
+
         public DateTime LastDeactivatedUtc { get; set; }
 
         public string Url
         {
-            get { return _core != null ? _core.Source : _url; }
+            get
+            {
+                WebView2 view = _webView;
+                CoreWebView2 core = _core;
+
+                if (core != null && view != null && !view.IsDisposed)
+                {
+                    try
+                    {
+                        return core.Source;
+                    }
+                    catch
+                    {
+                        // 控件释放过程中读取会抛异常，退回缓存的 URL。
+                    }
+                }
+
+                return _url;
+            }
         }
 
         public string DisplayTitle
@@ -111,49 +160,6 @@ namespace VantageLite.Browser
 
             Dock = DockStyle.Fill;
             BackColor = ThemeManager.Current.WebViewBackground;
-        }
-
-        public async Task EnsureLiveAsync()
-        {
-            DropDisposedWebView();
-
-            if (_webView != null)
-            {
-                return;
-            }
-
-            Log.Info("[tab " + _id + "] creating WebView2");
-            WebView2 view = new WebView2();
-            view.Dock = DockStyle.Fill;
-            view.DefaultBackgroundColor = ThemeManager.Current.WebViewBackground;
-
-            try
-            {
-                Controls.Add(view);
-                await view.EnsureCoreWebView2Async(_environment);
-                _webView = view;
-                _core = view.CoreWebView2;
-                ConfigureCore();
-                _isSuspended = false;
-
-                // 页面内表单改动标记，用于丢弃前的脏数据保护。
-                await _core.AddScriptToExecuteOnDocumentCreatedAsync(DirtyFormScript.Source);
-            }
-            catch
-            {
-                Controls.Remove(view);
-                view.Dispose();
-                throw;
-            }
-
-            string url = _restorePending ? _url : _pendingUrl;
-            _restorePending = false;
-            _pendingUrl = null;
-
-            if (!string.IsNullOrEmpty(url))
-            {
-                Navigate(url);
-            }
         }
 
         public void Navigate(string url)

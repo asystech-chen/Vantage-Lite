@@ -95,8 +95,6 @@ namespace VantageLite.UI
         {
             string text = node.IsFolder ? node.Title + " ▾" : node.Title;
             Button button = new Button();
-            button.Text = text;
-            button.AutoEllipsis = true;
             button.TextAlign = ContentAlignment.MiddleLeft;
             button.Padding = new Padding(4, 0, 4, 0);
             button.Height = 24;
@@ -105,6 +103,11 @@ namespace VantageLite.UI
             button.TabStop = false;
             button.Cursor = Cursors.Default;
             button.Font = ThemeFonts.Ui(9.5F);
+
+            // AutoEllipsis 会额外弹出“完整文本”系统提示，和自定义 ToolTip 重叠；
+            // 这里手动截断，保证只有一个提示来源。
+            text = Shorten(text, button.Font, 166);
+            button.Text = text;
 
             int width = TextRenderer.MeasureText(text, button.Font).Width + 14;
             button.Width = Math.Max(36, Math.Min(180, width));
@@ -131,6 +134,24 @@ namespace VantageLite.UI
 
             ApplyButtonTheme(button);
             return button;
+        }
+
+        private static string Shorten(string text, Font font, int maxWidth)
+        {
+            if (string.IsNullOrEmpty(text) || TextRenderer.MeasureText(text, font).Width <= maxWidth)
+            {
+                return text ?? string.Empty;
+            }
+
+            string value = text;
+
+            while (value.Length > 1 &&
+                   TextRenderer.MeasureText(value + "…", font).Width > maxWidth)
+            {
+                value = value.Substring(0, value.Length - 1);
+            }
+
+            return value + "…";
         }
 
         private void ShowFolderMenu(Button button, BookmarkNode folder)

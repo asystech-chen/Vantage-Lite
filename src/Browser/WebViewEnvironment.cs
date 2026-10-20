@@ -18,14 +18,21 @@ namespace VantageLite.Browser
             {
                 try
                 {
+                    DetectionError = null;
                     return CoreWebView2Environment.GetAvailableBrowserVersionString();
                 }
-                catch
+                catch (Exception ex)
                 {
+                    DetectionError = ex.GetType().Name + ": " + ex.Message;
                     return null;
                 }
             }
         }
+
+        /// <summary>
+        /// 最近一次检测失败的异常信息（成功时为 null），用于日志定位。
+        /// </summary>
+        public static string DetectionError { get; private set; }
 
         public static bool IsRuntimeAvailable
         {

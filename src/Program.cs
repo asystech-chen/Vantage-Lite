@@ -5,6 +5,7 @@ using System.Windows.Forms;
 using VantageLite.App;
 using VantageLite.Browser;
 using VantageLite.Diagnostics;
+using VantageLite.Theming;
 using VantageLite.UI;
 
 namespace VantageLite
@@ -74,6 +75,11 @@ namespace VantageLite
 
             try
             {
+                if (!RunStartupChecks())
+                {
+                    return;
+                }
+
                 Application.Run(new MainForm(options));
             }
             catch (Exception ex)
@@ -90,6 +96,53 @@ namespace VantageLite
                 Log.Info("Vantage Lite exiting.");
                 Log.Shutdown();
             }
+        }
+
+        /// <summary>
+        /// 启动前检查：WebView2 缺失时引导安装并退出；本目录首次启动时提示便携版。
+        /// 返回 false 表示程序应直接退出。
+        /// </summary>
+        private static bool RunStartupChecks()
+        {
+            if (!WebViewEnvironment.IsRuntimeAvailable)
+            {
+                bool registered = StartupNotice.IsRuntimeRegistered;
+
+                Log.Warn("未检测到可用的 WebView2 Runtime（注册信息残留=" + registered + "）");
+
+                if (!string.IsNullOrEmpty(WebViewEnvironment.DetectionError))
+                {
+                    Log.Warn("WebView2 检测异常：" + WebViewEnvironment.DetectionError);
+                }
+
+                ThemeManager.Initialize();
+                ThemeManager.SetMode("system");
+
+                if (StartupDialogs.ShowWebViewMissing(registered))
+                {
+                    if (!StartupNotice.OpenWebViewDownloadPage())
+                    {
+                        ManualDownloadDialog.Show(StartupNotice.WebViewDownloadUrl);
+                    }
+                }
+
+                return false;
+            }
+
+            if (StartupNotice.IsFirstRunInDirectory)
+            {
+                Log.Info("首次在本目录启动，显示便携版提示");
+                ThemeManager.Initialize();
+                ThemeManager.SetMode("system");
+
+                if (!StartupDialogs.ShowPortableNotice())
+                {
+                    Log.Info("用户选择先搬动目录，退出程序");
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         private static string GetVersionText()

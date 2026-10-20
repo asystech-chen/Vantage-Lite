@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Threading.Tasks;
@@ -186,29 +185,6 @@ namespace VantageLite.UI
 
         private async void MainForm_Load(object sender, EventArgs e)
         {
-            if (!WebViewEnvironment.IsRuntimeAvailable)
-            {
-                DialogResult result = MessageDialog.Show(
-                    this,
-                    "未检测到 WebView2 Runtime。\n\nVantage Lite 需要 Microsoft Edge WebView2 Runtime 才能运行。\n是否打开官方下载页面？",
-                    "Vantage Lite",
-                    MessageBoxButtons.YesNo);
-
-                if (result == DialogResult.Yes)
-                {
-                    try
-                    {
-                        Process.Start("https://developer.microsoft.com/microsoft-edge/webview2/");
-                    }
-                    catch
-                    {
-                    }
-                }
-
-                Close();
-                return;
-            }
-
             try
             {
                 Log.Info("Creating WebView2 environment...");

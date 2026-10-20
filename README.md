@@ -6,7 +6,7 @@ Windows 极简浏览器外壳，基于 **WebView2 (Edge Chromium)**。
 
 - 目标：启动即用、无账号、无同步、无推荐、无后台服务
 - 非目标：扩展、密码管理、与 Vantage (Firefox) 配置兼容
-- 当前版本：0.16.1
+- 当前版本：0.16.2
 - 已实现：多标签、后台挂起/丢弃、书签与历史、书签栏拖拽、下载管理、会话恢复、单文件 exe、明暗主题、自绘标题栏（标签栏并入）、高 DPI 适配、内置页
 
 ## 构建
@@ -24,7 +24,7 @@ bin\Release\net48\VantageLite.exe
 ```
 
 WebView2 的托管 DLL 和 x64 Loader 已嵌入 exe，**分发只需要这一个文件**。
-运行时会在 exe 同目录创建 `UserData\` 和 `Logs\`，请放在可写目录。
+运行时会在 exe 同目录创建 `UserData\`、`data\` 和 `Logs\`。建议把程序放在空目录中使用，避免生成的文件与目录里其他内容混在一起。
 
 ## 运行
 
@@ -35,6 +35,8 @@ bin\Release\net48\VantageLite.exe
 默认打开 ASYS 起始页：`https://asystech.cn/start/index.html`
 
 运行前提：系统已安装 **WebView2 Evergreen Runtime**（Win11 和绝大多数 Win10 自带）。
+
+如果安装程序提示「已安装」但 Vantage Lite 仍提示缺少运行时，通常是 WebView2 注册信息损坏：先在「设置 → 应用」中卸载 Microsoft Edge WebView2 Runtime，或修复 Microsoft Edge，再安装运行时。
 
 ## 命令行开关
 

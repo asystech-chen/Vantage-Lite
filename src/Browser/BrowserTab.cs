@@ -51,7 +51,7 @@ namespace VantageLite.Browser
             get { return !IsLive; }
         }
 
-        public bool IsDisposed
+        public new bool IsDisposed
         {
             get { return _disposed; }
         }

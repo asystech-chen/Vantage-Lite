@@ -41,4 +41,5 @@ exit /b 0
 :failed
 echo.
 echo === Build FAILED ===
-exit /b 1
+pause
+exit

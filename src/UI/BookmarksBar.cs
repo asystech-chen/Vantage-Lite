@@ -104,13 +104,17 @@ namespace VantageLite.UI
             button.Cursor = Cursors.Default;
             button.Font = ThemeFonts.Ui(9.5F);
 
+            // 宽度上限至少能完整放下「新建文件夹 ▾」，高 DPI 下也不会被截成「11…」。
+            int folderReference = TextRenderer.MeasureText("新建文件夹 ▾", button.Font).Width + 24;
+            int maxWidth = Math.Max(220, folderReference);
+
             // AutoEllipsis 会额外弹出“完整文本”系统提示，和自定义 ToolTip 重叠；
             // 这里手动截断，保证只有一个提示来源。
-            text = Shorten(text, button.Font, 166);
+            text = Shorten(text, button.Font, maxWidth - 16);
             button.Text = text;
 
-            int width = TextRenderer.MeasureText(text, button.Font).Width + 14;
-            button.Width = Math.Max(36, Math.Min(180, width));
+            int width = TextRenderer.MeasureText(text, button.Font).Width + 20;
+            button.Width = Math.Max(44, Math.Min(maxWidth, width));
 
             if (node.IsFolder)
             {

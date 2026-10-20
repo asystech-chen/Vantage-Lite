@@ -77,7 +77,7 @@ namespace VantageLite.Browser
             _host.Controls.Add(tab);
             tab.Dock = DockStyle.Fill;
             // 初始化期间保持可见，避免隐藏父容器导致 WebView2 创建失败；激活时会隐藏其他标签。
-            tab.Visible = true;
+            tab.SetContentVisibility(true);
 
             try
             {
@@ -95,7 +95,7 @@ namespace VantageLite.Browser
 
             if (_windowMinimized && tab.IsLive)
             {
-                tab.Visible = false;
+                tab.SetContentVisibility(false);
                 await tab.SuspendAsync();
             }
 
@@ -156,7 +156,7 @@ namespace VantageLite.Browser
                     return;
                 }
 
-                tab.Visible = true;
+                tab.SetContentVisibility(true);
                 tab.Resume();
                 tab.FocusContent();
                 RaiseTabsChanged();
@@ -174,7 +174,7 @@ namespace VantageLite.Browser
 
             for (int i = 0; i < _tabs.Count; i++)
             {
-                _tabs[i].Visible = (_tabs[i] == tab);
+                _tabs[i].SetContentVisibility(_tabs[i] == tab);
             }
 
             if (tab.IsDiscarded)

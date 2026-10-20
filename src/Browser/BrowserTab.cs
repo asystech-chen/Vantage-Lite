@@ -216,6 +216,29 @@ namespace VantageLite.Browser
             }
         }
 
+        /// <summary>
+        /// 同步标签与内部 WebView2 的可见性。
+        /// TrySuspendAsync 只认 CoreWebView2Controller.IsVisible，父容器隐藏不会自动同步。
+        /// </summary>
+        public void SetContentVisibility(bool visible)
+        {
+            Visible = visible;
+
+            WebView2 view = _webView;
+            if (view == null || view.IsDisposed || view.Visible == visible)
+            {
+                return;
+            }
+
+            try
+            {
+                view.Visible = visible;
+            }
+            catch
+            {
+            }
+        }
+
         public void FocusContent()
         {
             if (_webView != null)

@@ -26,7 +26,7 @@ namespace VantageLite.Browser
                 BrowserTab active = ActiveTab;
                 if (active != null && !active.IsDisposed)
                 {
-                    active.Visible = true;
+                    active.SetContentVisibility(true);
 
                     if (active.IsDiscarded)
                     {
@@ -47,7 +47,7 @@ namespace VantageLite.Browser
 
             for (int i = 0; i < _tabs.Count; i++)
             {
-                _tabs[i].Visible = false;
+                _tabs[i].SetContentVisibility(false);
             }
 
             // 给 WebView2 一点时间处理隐藏，否则 TrySuspendAsync 会因“仍可见”被拒绝。

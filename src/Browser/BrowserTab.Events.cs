@@ -1,4 +1,6 @@
 using System;
+using System.Drawing;
+using System.IO;
 using Microsoft.Web.WebView2.Core;
 using VantageLite.Diagnostics;
 using VantageLite.Theming;
@@ -29,6 +31,7 @@ namespace VantageLite.Browser
             core.NewWindowRequested += Core_NewWindowRequested;
             core.ProcessFailed += Core_ProcessFailed;
             core.WebMessageReceived += Core_WebMessageReceived;
+            core.FaviconChanged += Core_FaviconChanged;
         }
 
         /// <summary>
@@ -144,6 +147,7 @@ namespace VantageLite.Browser
                 return;
             }
 
+            ResetFavicon();
             _url = e.Uri;
             Log.Info("[tab " + _id + "] navigation starting: " + e.Uri);
             RaiseLoading(true);
@@ -203,6 +207,78 @@ namespace VantageLite.Browser
             if (handler != null)
             {
                 handler(this, uri);
+            }
+        }
+
+        private async void Core_FaviconChanged(object sender, object e)
+        {
+            CoreWebView2 core = sender as CoreWebView2;
+            if (core == null || !ReferenceEquals(core, _core))
+            {
+                return;
+            }
+
+            try
+            {
+                using (Stream stream = await core.GetFaviconAsync(CoreWebView2FaviconImageFormat.Png))
+                {
+                    if (stream == null)
+                    {
+                        return;
+                    }
+
+                    using (MemoryStream buffer = new MemoryStream())
+                    {
+                        stream.CopyTo(buffer);
+                        buffer.Position = 0;
+                        SetFavicon(Image.FromStream(buffer));
+                    }
+                }
+            }
+            catch
+            {
+                // 网站没有 favicon 或格式不支持：保留占位圆点。
+            }
+        }
+
+        private void SetFavicon(Image image)
+        {
+            if (_disposed)
+            {
+                if (image != null)
+                {
+                    image.Dispose();
+                }
+
+                return;
+            }
+
+            if (_favicon != null)
+            {
+                _favicon.Dispose();
+            }
+
+            _favicon = image;
+
+            EventHandler handler = FaviconChanged;
+            if (handler != null)
+            {
+                handler(this, EventArgs.Empty);
+            }
+        }
+
+        private void ResetFavicon()
+        {
+            if (_favicon != null)
+            {
+                _favicon.Dispose();
+                _favicon = null;
+
+                EventHandler handler = FaviconChanged;
+                if (handler != null)
+                {
+                    handler(this, EventArgs.Empty);
+                }
             }
         }
 

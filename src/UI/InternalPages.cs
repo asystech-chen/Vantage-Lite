@@ -30,8 +30,9 @@ namespace VantageLite.UI
                 for (int i = 0; i < count; i++)
                 {
                     HistoryEntry item = items[i];
-                    body.Append("<li><a href=\"").Append(Escape(item.Url)).Append("\">")
-                        .Append(Escape(DisplayTitle(item.Title, item.Url))).Append("</a>")
+                    body.Append("<li><div class=\"row\">").Append(Icon(item.Url, false))
+                        .Append("<a href=\"").Append(Escape(item.Url)).Append("\">")
+                        .Append(Escape(DisplayTitle(item.Title, item.Url))).Append("</a></div>")
                         .Append("<div class=\"url\">").Append(Escape(item.Url))
                         .Append(" · ").Append(FormatTime(item.VisitedUtc)).Append("</div></li>");
                 }
@@ -114,7 +115,9 @@ namespace VantageLite.UI
                 {
                     sb.Append("<li class=\"folder\"><div class=\"folder-head\" onclick=\"toggleFolder('")
                         .Append(child.Id).Append("',event)\"><span class=\"tri\" id=\"tri_")
-                        .Append(child.Id).Append("\">▸</span><span class=\"name\">")
+                        .Append(child.Id).Append("\">▸</span>")
+                        .Append(Icon(null, true))
+                        .Append("<span class=\"name\">")
                         .Append(Escape(child.Title)).Append("</span>")
                         .Append(MoreButton(child.Id))
                         .Append("</div><ul class=\"tree\" id=\"ul_").Append(child.Id)
@@ -131,7 +134,8 @@ namespace VantageLite.UI
                     }
 
                     rendered[0]++;
-                    sb.Append("<li><div class=\"row\"><a href=\"").Append(Escape(child.Url))
+                    sb.Append("<li><div class=\"row\">").Append(Icon(child.Url, false))
+                        .Append("<a href=\"").Append(Escape(child.Url))
                         .Append("\" target=\"_blank\">")
                         .Append(Escape(DisplayTitle(child.Title, child.Url))).Append("</a>")
                         .Append(MoreButton(child.Id)).Append("</div>")
@@ -340,6 +344,39 @@ function confirmMove(){if(moving){post({cmd:'move',id:moving,parent:document.get
             return (store.ClipboardCut ? "已剪切「" : "已复制「") + store.ClipboardTitle + "」";
         }
 
+        private static string Icon(string url, bool folder)
+        {
+            if (folder)
+            {
+                return "<span class=\"fav folder\"></span>";
+            }
+
+            string origin = Origin(url);
+            if (origin == null)
+            {
+                return "<span class=\"fav\"></span>";
+            }
+
+            return "<span class=\"fav\"><img src=\"" + Escape(origin)
+                + "/favicon.ico\" loading=\"lazy\" onerror=\"this.style.display='none'\"></span>";
+        }
+
+        private static string Origin(string url)
+        {
+            Uri uri;
+            if (!Uri.TryCreate(url, UriKind.Absolute, out uri))
+            {
+                return null;
+            }
+
+            if (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
+            {
+                return null;
+            }
+
+            return uri.GetLeftPart(UriPartial.Authority);
+        }
+
         private static int CountBookmarks(BookmarkNode node, int count)
         {
             if (node == null || node.Children == null)
@@ -399,6 +436,10 @@ function confirmMove(){if(moving){post({cmd:'move',id:moving,parent:document.get
                 + ".clip{color:" + muted + ";font-size:12px;margin-left:4px}"
                 + ".status{color:" + muted + ";font-size:12px;margin-left:auto}"
                 + ".folder-head{display:flex;align-items:center;gap:6px;cursor:pointer}"
+                + ".fav{display:inline-block;width:16px;height:16px;flex:0 0 16px;background-repeat:no-repeat;background-size:16px 16px;"
+                + "background-image:url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16'><circle cx='8' cy='8' r='6' fill='none' stroke='%23999999'/><path d='M2 8h12M8 2c2.5 2.5 2.5 9.5 0 12M8 2c-2.5 2.5-2.5 9.5 0 12' fill='none' stroke='%23999999'/></svg>\")}"
+                + ".fav img{width:16px;height:16px;display:block;border-radius:2px}"
+                + ".fav.folder{background-image:url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16'><path d='M1.5 4.5h4.2l1.5 2h7.3v6.8h-13z' fill='%23d6aa3c'/></svg>\")}"
                 + ".tri{width:14px;color:" + muted + ";font-size:10px}"
                 + ".menu{position:absolute;display:none;background:" + background + ";border:1px solid " + border
                 + ";border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,.35);padding:4px;z-index:10;min-width:160px}"

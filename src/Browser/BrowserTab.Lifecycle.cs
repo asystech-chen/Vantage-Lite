@@ -304,6 +304,12 @@ namespace VantageLite.Browser
         {
             _disposed = true;
 
+            if (_favicon != null)
+            {
+                _favicon.Dispose();
+                _favicon = null;
+            }
+
             if (disposing && _webView != null)
             {
                 Controls.Remove(_webView);

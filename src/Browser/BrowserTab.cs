@@ -1,4 +1,5 @@
 using System;
+using System.Drawing;
 using System.Windows.Forms;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
@@ -33,6 +34,7 @@ namespace VantageLite.Browser
         private bool _isThrottled;
         private bool _statusBarSuppressed;
         private string _internalAddress;
+        private Image _favicon;
 
         public int Id
         {
@@ -67,6 +69,11 @@ namespace VantageLite.Browser
         public bool IsThrottled
         {
             get { return _isThrottled; }
+        }
+
+        public Image Favicon
+        {
+            get { return _favicon; }
         }
 
         /// <summary>
@@ -153,6 +160,7 @@ namespace VantageLite.Browser
         public event EventHandler<string> ProcessFailed;
         public event EventHandler<NavigatedEventArgs> Navigated;
         public event EventHandler<string> WebMessage;
+        public event EventHandler FaviconChanged;
 
         public BrowserTab(
             int id,

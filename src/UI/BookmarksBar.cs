@@ -104,17 +104,58 @@ namespace VantageLite.UI
             button.Cursor = Cursors.Default;
             button.Font = ThemeFonts.Ui(9.5F);
 
+            button.ImageAlign = ContentAlignment.MiddleLeft;
+            button.TextImageRelation = TextImageRelation.ImageBeforeText;
+
+            int iconSpace = 22;
+
             // 宽度上限至少能完整放下「新建文件夹 ▾」，高 DPI 下也不会被截成「11…」。
-            int folderReference = TextRenderer.MeasureText("新建文件夹 ▾", button.Font).Width + 24;
-            int maxWidth = Math.Max(220, folderReference);
+            int folderReference = TextRenderer.MeasureText("新建文件夹 ▾", button.Font).Width + 24 + iconSpace;
+            int maxWidth = Math.Max(242, folderReference);
 
             // AutoEllipsis 会额外弹出“完整文本”系统提示，和自定义 ToolTip 重叠；
             // 这里手动截断，保证只有一个提示来源。
-            text = Shorten(text, button.Font, maxWidth - 16);
+            text = Shorten(text, button.Font, maxWidth - 16 - iconSpace);
             button.Text = text;
 
-            int width = TextRenderer.MeasureText(text, button.Font).Width + 20;
-            button.Width = Math.Max(44, Math.Min(maxWidth, width));
+            int width = TextRenderer.MeasureText(text, button.Font).Width + 20 + iconSpace;
+            button.Width = Math.Max(66, Math.Min(maxWidth, width));
+
+            if (node.IsFolder)
+            {
+                button.Image = FolderIcon();
+            }
+            else
+            {
+                button.Image = GlobeIcon();
+
+                Image cached = FaviconCache.GetOrLoad(node.Url, delegate (Image image)
+                {
+                    if (image == null)
+                    {
+                        return;
+                    }
+
+                    try
+                    {
+                        button.BeginInvoke(new Action(delegate
+                        {
+                            if (!button.IsDisposed)
+                            {
+                                button.Image = image;
+                            }
+                        }));
+                    }
+                    catch
+                    {
+                    }
+                });
+
+                if (cached != null)
+                {
+                    button.Image = cached;
+                }
+            }
 
             if (node.IsFolder)
             {
@@ -138,6 +179,48 @@ namespace VantageLite.UI
 
             ApplyButtonTheme(button);
             return button;
+        }
+
+        private static Image _folderIcon;
+        private static Image _globeIcon;
+
+        private static Image FolderIcon()
+        {
+            if (_folderIcon == null)
+            {
+                Bitmap bitmap = new Bitmap(16, 16);
+                using (Graphics graphics = Graphics.FromImage(bitmap))
+                using (Font font = IconFont.Create(12F))
+                using (SolidBrush brush = new SolidBrush(Color.FromArgb(214, 170, 60)))
+                {
+                    graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+                    graphics.DrawString(IconFont.Folder, font, brush, -1, -2);
+                }
+
+                _folderIcon = bitmap;
+            }
+
+            return _folderIcon;
+        }
+
+        private static Image GlobeIcon()
+        {
+            if (_globeIcon == null)
+            {
+                Bitmap bitmap = new Bitmap(16, 16);
+                using (Graphics graphics = Graphics.FromImage(bitmap))
+                using (Pen pen = new Pen(Color.FromArgb(140, 146, 156), 1.2F))
+                {
+                    graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                    graphics.DrawEllipse(pen, 2, 2, 12, 12);
+                    graphics.DrawLine(pen, 2, 8, 14, 8);
+                    graphics.DrawEllipse(pen, 6, 2, 4, 12);
+                }
+
+                _globeIcon = bitmap;
+            }
+
+            return _globeIcon;
         }
 
         private static string Shorten(string text, Font font, int maxWidth)

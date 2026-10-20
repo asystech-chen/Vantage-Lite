@@ -74,9 +74,39 @@ namespace VantageLite.UI
 
         public void Update(BrowserTab tab, bool active)
         {
-            _tab = tab;
+            if (!ReferenceEquals(_tab, tab))
+            {
+                if (_tab != null)
+                {
+                    _tab.FaviconChanged -= Tab_FaviconChanged;
+                }
+
+                _tab = tab;
+
+                if (_tab != null)
+                {
+                    _tab.FaviconChanged += Tab_FaviconChanged;
+                }
+            }
+
             _active = active;
             UpdateVisual();
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && _tab != null)
+            {
+                _tab.FaviconChanged -= Tab_FaviconChanged;
+                _tab = null;
+            }
+
+            base.Dispose(disposing);
+        }
+
+        private void Tab_FaviconChanged(object sender, EventArgs e)
+        {
+            Invalidate();
         }
 
         public void ApplyTheme()
@@ -103,10 +133,30 @@ namespace VantageLite.UI
             int rightPadding = (_closeButton != null && _closeButton.Visible)
                 ? _closeButton.Width + 14
                 : 10;
+
+            const int iconSize = 16;
+            int left = 8;
+            Image icon = _tab == null ? null : _tab.Favicon;
+
+            if (icon != null)
+            {
+                e.Graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+                e.Graphics.DrawImage(icon, new Rectangle(left, (Height - iconSize) / 2, iconSize, iconSize));
+            }
+            else
+            {
+                using (SolidBrush brush = new SolidBrush(ThemeManager.Current.TextDisabled))
+                {
+                    e.Graphics.FillEllipse(brush, left + 5, (Height - 6) / 2, 6, 6);
+                }
+            }
+
+            left += iconSize + 6;
+
             Rectangle textRect = new Rectangle(
-                10,
+                left,
                 2,
-                Math.Max(0, Width - rightPadding),
+                Math.Max(0, Width - left - rightPadding),
                 Height - 3);
 
             TextRenderer.DrawText(

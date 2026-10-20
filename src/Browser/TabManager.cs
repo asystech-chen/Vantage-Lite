@@ -16,7 +16,7 @@ namespace VantageLite.Browser
         private readonly Control _host;
         private readonly CoreWebView2Environment _environment;
         private readonly bool _enableDevTools;
-        private readonly int _maxLiveTabs;
+        private int _maxLiveTabs;
         private readonly int _suspendAfterSeconds;
         private readonly int _discardAfterMinutes;
         private readonly List<BrowserTab> _tabs;
@@ -67,6 +67,11 @@ namespace VantageLite.Browser
         public int MaxLiveTabs
         {
             get { return _maxLiveTabs; }
+        }
+
+        public void SetMaxLiveTabs(int maxLiveTabs)
+        {
+            _maxLiveTabs = Math.Max(1, maxLiveTabs);
         }
 
         public async Task<BrowserTab> CreateTabAsync(string url)

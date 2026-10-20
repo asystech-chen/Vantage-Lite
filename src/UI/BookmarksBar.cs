@@ -24,7 +24,15 @@ namespace VantageLite.UI
         private readonly FlowLayoutPanel _panel;
         private readonly ToolTip _toolTip;
         private readonly List<Button> _buttons;
+        private readonly Panel _dropLine;
         private BookmarkStore _store;
+        private Label _hintLabel;
+        private BookmarkNode _dragNode;
+        private BookmarkNode _dropTarget;
+        private string _dropMode;
+        private Button _dropHighlight;
+        private Point _dragStart;
+        private bool _dragArmed;
 
         public BookmarksBar()
         {
@@ -43,9 +51,20 @@ namespace VantageLite.UI
             _panel.Padding = Padding.Empty;
             _panel.Margin = Padding.Empty;
             _panel.MouseUp += Bar_MouseUp;
+            _panel.AllowDrop = true;
+            _panel.DragOver += Panel_DragOver;
+            _panel.DragDrop += Panel_DragDrop;
             MouseUp += Bar_MouseUp;
 
+            _dropLine = new Panel();
+            _dropLine.Height = 2;
+            _dropLine.Visible = false;
+            _dropLine.Enabled = false;
+            _dropLine.BackColor = ThemeManager.Current.Accent;
+
             Controls.Add(_panel);
+            Controls.Add(_dropLine);
+            _dropLine.BringToFront();
 
             ApplyTheme();
             ThemeManager.ThemeChanged += ThemeManager_ThemeChanged;
@@ -66,6 +85,7 @@ namespace VantageLite.UI
         public void Refresh(BookmarkStore store)
         {
             _store = store;
+            ClearDropVisual();
             ClearButtons();
 
             if (_store == null || _store.ToolbarFolder == null)
@@ -74,6 +94,19 @@ namespace VantageLite.UI
             }
 
             IList<BookmarkNode> children = _store.ToolbarFolder.GetChildren();
+
+            if (children.Count == 0)
+            {
+                _hintLabel = new Label();
+                _hintLabel.Text = "书签工具栏 · 按 Ctrl+D 添加书签";
+                _hintLabel.AutoSize = true;
+                _hintLabel.ForeColor = ThemeManager.Current.TextDisabled;
+                _hintLabel.Font = ThemeFonts.Ui(9F);
+                _hintLabel.Margin = new Padding(4, 6, 0, 0);
+                _panel.Controls.Add(_hintLabel);
+                return;
+            }
+
             for (int i = 0; i < children.Count; i++)
             {
                 BookmarkNode node = children[i];
@@ -179,6 +212,50 @@ namespace VantageLite.UI
                 {
                     ShowItemMenu(button, node);
                 }
+            };
+
+            button.AllowDrop = true;
+            button.MouseDown += delegate (object sender, MouseEventArgs e)
+            {
+                if (e.Button == MouseButtons.Left)
+                {
+                    _dragNode = node;
+                    _dragStart = e.Location;
+                    _dragArmed = true;
+                }
+            };
+            button.MouseMove += delegate (object sender, MouseEventArgs e)
+            {
+                if (!_dragArmed || e.Button != MouseButtons.Left)
+                {
+                    return;
+                }
+
+                if (Math.Abs(e.X - _dragStart.X) < 4 && Math.Abs(e.Y - _dragStart.Y) < 4)
+                {
+                    return;
+                }
+
+                _dragArmed = false;
+                button.DoDragDrop(node, DragDropEffects.Move);
+                _dragNode = null;
+                ClearDropVisual();
+            };
+            button.DragEnter += delegate (object sender, DragEventArgs e)
+            {
+                if (_dragNode != null)
+                {
+                    e.Effect = DragDropEffects.Move;
+                }
+            };
+            button.DragOver += delegate (object sender, DragEventArgs e)
+            {
+                ButtonDragOver(button, node, e);
+            };
+            button.DragLeave += delegate { ClearDropVisual(); };
+            button.DragDrop += delegate (object sender, DragEventArgs e)
+            {
+                ButtonDrop(node);
             };
 
             ApplyButtonTheme(button);
@@ -519,6 +596,167 @@ namespace VantageLite.UI
             }
 
             _buttons.Clear();
+
+            if (_hintLabel != null)
+            {
+                _panel.Controls.Remove(_hintLabel);
+                _hintLabel.Dispose();
+                _hintLabel = null;
+            }
+        }
+
+        private void Panel_DragOver(object sender, DragEventArgs e)
+        {
+            if (_dragNode == null)
+            {
+                return;
+            }
+
+            e.Effect = DragDropEffects.Move;
+            ClearDropVisual();
+        }
+
+        private void Panel_DragDrop(object sender, DragEventArgs e)
+        {
+            if (_dragNode == null || _store == null)
+            {
+                return;
+            }
+
+            _store.Move(_dragNode.Id, BookmarkStore.ToolbarId);
+            _dragNode = null;
+            ClearDropVisual();
+            NotifyChanged();
+        }
+
+        private void ButtonDragOver(Button button, BookmarkNode node, DragEventArgs e)
+        {
+            if (_dragNode == null || node == null ||
+                string.Equals(_dragNode.Id, node.Id, StringComparison.Ordinal))
+            {
+                e.Effect = DragDropEffects.None;
+                ClearDropVisual();
+                return;
+            }
+
+            e.Effect = DragDropEffects.Move;
+
+            Point point = button.PointToClient(new Point(e.X, e.Y));
+            double ratio = button.Height <= 0 ? 0.5 : (double)point.Y / button.Height;
+            string mode = node.IsFolder && ratio > 0.3 && ratio < 0.7
+                ? "into"
+                : (ratio < 0.5 ? "before" : "after");
+
+            _dropTarget = node;
+            _dropMode = mode;
+
+            if (mode == "into")
+            {
+                ShowHighlight(button);
+            }
+            else
+            {
+                HideHighlight();
+                ShowDropLine(button, mode == "before");
+            }
+        }
+
+        private void ButtonDrop(BookmarkNode target)
+        {
+            if (_dragNode == null || _dropTarget == null || _store == null)
+            {
+                ClearDropVisual();
+                return;
+            }
+
+            string mode = _dropMode;
+            string dragId = _dragNode.Id;
+            _dragNode = null;
+            ClearDropVisual();
+
+            if (mode == "into")
+            {
+                _store.Move(dragId, target.Id);
+            }
+            else
+            {
+                BookmarkNode parent = _store.ParentOf(target.Id);
+                if (parent == null)
+                {
+                    return;
+                }
+
+                string before = mode == "before" ? target.Id : NextSiblingId(parent, target.Id);
+                _store.Move(dragId, parent.Id, before);
+            }
+
+            NotifyChanged();
+        }
+
+        private string NextSiblingId(BookmarkNode parent, string id)
+        {
+            IList<BookmarkNode> children = parent.GetChildren();
+
+            for (int i = 0; i < children.Count; i++)
+            {
+                if (string.Equals(children[i].Id, id, StringComparison.Ordinal))
+                {
+                    return i + 1 < children.Count ? children[i + 1].Id : null;
+                }
+            }
+
+            return null;
+        }
+
+        private void ShowDropLine(Button button, bool before)
+        {
+            Point screen = _panel.PointToScreen(new Point(
+                button.Left,
+                before ? button.Top : button.Bottom - 2));
+            Point local = PointToClient(screen);
+
+            _dropLine.SetBounds(local.X, local.Y, button.Width, 2);
+            _dropLine.BackColor = ThemeManager.Current.Accent;
+            _dropLine.Visible = true;
+            _dropLine.BringToFront();
+        }
+
+        private void ShowHighlight(Button button)
+        {
+            HideDropLine();
+
+            if (_dropHighlight != null && _dropHighlight != button)
+            {
+                ApplyButtonTheme(_dropHighlight);
+            }
+
+            _dropHighlight = button;
+            button.BackColor = ThemeManager.Current.ButtonHover;
+        }
+
+        private void HideHighlight()
+        {
+            if (_dropHighlight != null)
+            {
+                ApplyButtonTheme(_dropHighlight);
+                _dropHighlight = null;
+            }
+        }
+
+        private void HideDropLine()
+        {
+            if (_dropLine != null)
+            {
+                _dropLine.Visible = false;
+            }
+        }
+
+        private void ClearDropVisual()
+        {
+            HideDropLine();
+            HideHighlight();
+            _dropTarget = null;
+            _dropMode = null;
         }
 
         private void Bar_MouseUp(object sender, MouseEventArgs e)

@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
 using System.Text;
 using VantageLite.App;
@@ -7,6 +8,35 @@ using VantageLite.Diagnostics;
 
 namespace VantageLite.Storage
 {
+    /// <summary>
+    /// 用户设置。依赖：无。改动注意：字段名即 JSON 键。
+    /// </summary>
+    [DataContract]
+    public sealed class AppSettings
+    {
+        public const string DefaultHomeUrl = "https://asystech.cn/start/index.html";
+        public const int DefaultMaxLiveTabs = 8;
+
+        [DataMember(Name = "home", Order = 0)]
+        public string HomeUrl { get; set; }
+
+        [DataMember(Name = "maxTabs", Order = 1)]
+        public int MaxLiveTabs { get; set; }
+
+        [DataMember(Name = "bookmarksBar", Order = 2)]
+        public bool ShowBookmarksBar { get; set; }
+
+        public static AppSettings CreateDefault()
+        {
+            return new AppSettings
+            {
+                HomeUrl = DefaultHomeUrl,
+                MaxLiveTabs = DefaultMaxLiveTabs,
+                ShowBookmarksBar = true
+            };
+        }
+    }
+
     /// <summary>
     /// 极简 JSON 读写：原子写入（临时文件 + 替换）。
     /// 依赖：AppPaths / Log。改动注意：读取失败一律回退到默认值，不能让数据文件损坏阻断启动。

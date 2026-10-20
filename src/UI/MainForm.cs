@@ -28,6 +28,7 @@ namespace VantageLite.UI
         private BrowserTab _attachedTab;
         private BookmarkStore _bookmarks;
         private HistoryStore _history;
+        private AppSettings _settings;
         private bool _minimized;
         private Timer _resizeSettleTimer;
         private Timer _faviconRefreshTimer;
@@ -44,12 +45,25 @@ namespace VantageLite.UI
             _options = options ?? new CommandLineOptions();
             _bookmarks = new BookmarkStore(Path.Combine(AppPaths.DataDirectory, "bookmarks.json"));
             _history = new HistoryStore(Path.Combine(AppPaths.DataDirectory, "history.json"));
+            _settings = JsonFile.Load<AppSettings>(Path.Combine(AppPaths.DataDirectory, "settings.json"), null)
+                ?? AppSettings.CreateDefault();
+
+            if (string.IsNullOrWhiteSpace(_settings.HomeUrl))
+            {
+                _settings.HomeUrl = AppSettings.DefaultHomeUrl;
+            }
+
+            if (_settings.MaxLiveTabs < 1)
+            {
+                _settings.MaxLiveTabs = AppSettings.DefaultMaxLiveTabs;
+            }
 
             BuildLayout();
             WireNavigationEvents();
             InitializeTheme();
 
             _bookmarksBar.Refresh(_bookmarks);
+            _bookmarksBar.Visible = _settings.ShowBookmarksBar;
 
             _resizeSettleTimer = new Timer();
             _resizeSettleTimer.Interval = 250;
@@ -69,6 +83,16 @@ namespace VantageLite.UI
         private BrowserTab ActiveTab
         {
             get { return _tabManager == null ? null : _tabManager.ActiveTab; }
+        }
+
+        private string HomeUrl
+        {
+            get
+            {
+                return _settings != null && !string.IsNullOrWhiteSpace(_settings.HomeUrl)
+                    ? _settings.HomeUrl
+                    : AppSettings.DefaultHomeUrl;
+            }
         }
 
         private async void MainForm_Load(object sender, EventArgs e)
@@ -102,11 +126,15 @@ namespace VantageLite.UI
                 Log.Info("Creating WebView2 environment...");
                 CoreWebView2Environment environment = await WebViewEnvironment.CreateAsync(_options);
 
+                int maxLiveTabs = _options.MaxLiveTabs != AppSettings.DefaultMaxLiveTabs
+                    ? _options.MaxLiveTabs
+                    : _settings.MaxLiveTabs;
+
                 _tabManager = new TabManager(
                     _contentHost,
                     environment,
                     _options.EnableDevTools,
-                    _options.MaxLiveTabs,
+                    maxLiveTabs,
                     _options.SuspendAfterSeconds,
                     _options.DiscardAfterMinutes);
 
@@ -120,8 +148,8 @@ namespace VantageLite.UI
                 _tabStrip.TabCloseRequested += TabStrip_TabCloseRequested;
                 _tabStrip.NewTabRequested += TabStrip_NewTabRequested;
 
-                Log.Info("WebView2 environment ready. max live tabs = " + _options.MaxLiveTabs);
-                await _tabManager.CreateTabAsync(DefaultHomeUrl);
+                Log.Info("WebView2 environment ready. max live tabs = " + maxLiveTabs);
+                await _tabManager.CreateTabAsync(HomeUrl);
             }
             catch (Exception ex)
             {

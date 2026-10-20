@@ -1,5 +1,7 @@
 using System;
+using System.IO;
 using System.Windows.Forms;
+using VantageLite.App;
 using VantageLite.Browser;
 using VantageLite.Diagnostics;
 using VantageLite.Storage;
@@ -15,6 +17,7 @@ namespace VantageLite.UI
         private const string HistoryAddress = "about:history";
         private const string BookmarksAddress = "about:bookmarks";
         private const string AboutAddress = "about:about";
+        private const string PreferencesAddress = "about:preferences";
 
         // 消息过滤器和页面脚本可能同时触发同一个快捷键，做一次短去抖。
         private DateTime _lastBookmarkToggleUtc;
@@ -77,6 +80,10 @@ namespace VantageLite.UI
             else if (string.Equals(address, AboutAddress, StringComparison.OrdinalIgnoreCase))
             {
                 html = InternalPages.About(Application.ProductVersion, WebViewEnvironment.RuntimeVersion);
+            }
+            else if (string.Equals(address, PreferencesAddress, StringComparison.OrdinalIgnoreCase))
+            {
+                html = InternalPages.Preferences(_settings);
             }
             else
             {
@@ -181,6 +188,8 @@ namespace VantageLite.UI
 
             _lastBarToggleUtc = now;
             _bookmarksBar.Visible = !_bookmarksBar.Visible;
+            _settings.ShowBookmarksBar = _bookmarksBar.Visible;
+            JsonFile.Save(Path.Combine(AppPaths.DataDirectory, "settings.json"), _settings);
         }
 
         /// <summary>
@@ -249,6 +258,12 @@ namespace VantageLite.UI
                 return;
             }
 
+            if (string.Equals(command.Cmd, "settings", StringComparison.OrdinalIgnoreCase))
+            {
+                ApplySettings(command);
+                return;
+            }
+
             bool changed;
 
             switch (command.Cmd)
@@ -297,6 +312,30 @@ namespace VantageLite.UI
             RenderBookmarksPage();
         }
 
+        private void ApplySettings(BookmarkCommand command)
+        {
+            _settings.HomeUrl = string.IsNullOrWhiteSpace(command.Home)
+                ? AppSettings.DefaultHomeUrl
+                : command.Home.Trim();
+            _settings.MaxLiveTabs = Math.Max(1, Math.Min(50, command.MaxTabs));
+            _settings.ShowBookmarksBar = command.BookmarksBar;
+
+            JsonFile.Save(Path.Combine(AppPaths.DataDirectory, "settings.json"), _settings);
+
+            if (_tabManager != null)
+            {
+                _tabManager.SetMaxLiveTabs(_settings.MaxLiveTabs);
+            }
+
+            _bookmarksBar.Visible = _settings.ShowBookmarksBar;
+
+            BrowserTab page = ActiveTab;
+            if (page != null)
+            {
+                page.PostWebMessage("已保存");
+            }
+        }
+
         private static string NormalizeInternalPage(string address)
         {
             if (string.IsNullOrWhiteSpace(address))
@@ -319,6 +358,11 @@ namespace VantageLite.UI
             if (value == AboutAddress || value == "vantage:about")
             {
                 return AboutAddress;
+            }
+
+            if (value == PreferencesAddress || value == "vantage:preferences")
+            {
+                return PreferencesAddress;
             }
 
             return null;
@@ -362,6 +406,7 @@ namespace VantageLite.UI
                 delegate { ToggleBookmarksBar(); }));
 
             menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add(AddMenuItem("设置", delegate { OpenInternalPage(PreferencesAddress); }));
             menu.Items.Add(AddMenuItem("关于 Vantage Lite", delegate { OpenInternalPage(AboutAddress); }));
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add(AddMenuItem("退出", delegate { Close(); }));

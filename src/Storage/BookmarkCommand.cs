@@ -20,5 +20,17 @@ namespace VantageLite.Storage
 
         [DataMember(Name = "name", Order = 3, EmitDefaultValue = false)]
         public string Name { get; set; }
+
+        [DataMember(Name = "before", Order = 4, EmitDefaultValue = false)]
+        public string Before { get; set; }
+
+        [DataMember(Name = "home", Order = 5, EmitDefaultValue = false)]
+        public string Home { get; set; }
+
+        [DataMember(Name = "maxTabs", Order = 6, EmitDefaultValue = false)]
+        public int MaxTabs { get; set; }
+
+        [DataMember(Name = "bookmarksBar", Order = 7, EmitDefaultValue = false)]
+        public bool BookmarksBar { get; set; }
     }
 }

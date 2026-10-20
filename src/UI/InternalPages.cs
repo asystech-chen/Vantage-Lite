@@ -44,6 +44,51 @@ namespace VantageLite.UI
             return Page("历史", "共 " + (items == null ? 0 : items.Count) + " 条", body.ToString());
         }
 
+        public static string Preferences(AppSettings settings)
+        {
+            if (settings == null)
+            {
+                settings = AppSettings.CreateDefault();
+            }
+
+            StringBuilder body = new StringBuilder();
+            body.Append("<div class=\"form\">");
+
+            AppendField(body, "home", "启动页", settings.HomeUrl);
+            body.Append("<label class=\"field\"><span>最大存活标签页</span>")
+                .Append("<input id=\"maxTabs\" type=\"number\" min=\"1\" max=\"50\" value=\"")
+                .Append(settings.MaxLiveTabs).Append("\"></label>");
+            body.Append("<label class=\"check\"><input id=\"bar\" type=\"checkbox\"")
+                .Append(settings.ShowBookmarksBar ? " checked" : string.Empty)
+                .Append("> 显示书签栏</label>");
+            body.Append("<div class=\"actions\"><button onclick=\"saveSettings()\">保存</button>")
+                .Append("<span id=\"status\" class=\"status\"></span></div>");
+
+            body.Append("</div>");
+
+            body.Append("<script>");
+            body.Append("function saveSettings(){"
+                + "var home=document.getElementById('home').value.trim();"
+                + "var maxTabs=parseInt(document.getElementById('maxTabs').value,10);"
+                + "if(!(maxTabs>=1&&maxTabs<=50)){document.getElementById('status').textContent='标签页数量需在 1-50 之间';return;}"
+                + "var bar=document.getElementById('bar').checked;"
+                + "try{window.chrome.webview.postMessage(JSON.stringify({cmd:'settings',home:home,maxTabs:maxTabs,bookmarksBar:bar}));}catch(e){}"
+                + "}");
+            body.Append("if(window.chrome&&window.chrome.webview){"
+                + "window.chrome.webview.addEventListener('message',function(e){"
+                + "var s=document.getElementById('status');if(s){s.textContent=e.data||'';}});}");
+            body.Append("</script>");
+
+            return Page("设置", "Vantage Lite 基础选项", body.ToString());
+        }
+
+        private static void AppendField(StringBuilder sb, string id, string label, string value)
+        {
+            sb.Append("<label class=\"field\"><span>").Append(Escape(label))
+                .Append("</span><input id=\"").Append(id)
+                .Append("\" type=\"text\" value=\"").Append(Escape(value)).Append("\"></label>");
+        }
+
         public static string About(string version, string runtime)
         {
             StringBuilder body = new StringBuilder();
@@ -543,6 +588,11 @@ function clearDrop(){
                 + ".menu div{padding:6px 10px;border-radius:4px;cursor:pointer;font-size:13px}"
                 + ".menu div:hover{background:" + buttonBg + "}"
                 + ".menu .danger{color:#d9534f}"
+                + ".field{display:flex;flex-direction:column;gap:4px;margin-bottom:16px}"
+                + ".field span{color:" + muted + ";font-size:12px}"
+                + ".check{display:flex;align-items:center;gap:8px;margin:8px 0 18px}"
+                + ".actions{display:flex;align-items:center;gap:12px}"
+                + "input[type=number]{padding:6px;font:14px \"Segoe UI\",\"Microsoft YaHei\",sans-serif;box-sizing:border-box}"
                 + ".about .line{display:flex;gap:16px;padding:10px 0;border-bottom:1px solid " + border + "}"
                 + ".about .k{width:150px;color:" + muted + "}"
                 + ".about .v{word-break:break-all}"

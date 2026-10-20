@@ -25,12 +25,6 @@ namespace VantageLite.UI
             UpdateFromActiveTab();
         }
 
-        private void TabManager_Empty(object sender, EventArgs e)
-        {
-            // 延迟关闭，避免在 CloseTabAsync 执行中途销毁控件。
-            BeginInvoke(new Action(Close));
-        }
-
         private void TabStrip_TabSelected(object sender, int id)
         {
             ActivateTabById(id);
@@ -56,9 +50,18 @@ namespace VantageLite.UI
 
         private async void CloseTabById(int id)
         {
-            if (_tabManager != null)
+            if (_tabManager == null)
+            {
+                return;
+            }
+
+            try
             {
                 await _tabManager.CloseTabAsync(id);
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Close tab failed", ex);
             }
         }
 

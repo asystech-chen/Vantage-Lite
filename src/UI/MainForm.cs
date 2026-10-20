@@ -100,7 +100,6 @@ namespace VantageLite.UI
 
                 _tabManager.TabsChanged += TabManager_TabsChanged;
                 _tabManager.ActiveTabChanged += TabManager_ActiveTabChanged;
-                _tabManager.Empty += TabManager_Empty;
                 _tabManager.NewWindowRequested += TabManager_NewWindowRequested;
                 _tabManager.Navigated += TabManager_Navigated;
 

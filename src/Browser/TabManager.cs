@@ -30,7 +30,6 @@ namespace VantageLite.Browser
 
         public event EventHandler TabsChanged;
         public event EventHandler ActiveTabChanged;
-        public event EventHandler Empty;
         public event EventHandler<string> NewWindowRequested;
         public event EventHandler<NavigatedEventArgs> Navigated;
 
@@ -88,7 +87,7 @@ namespace VantageLite.Browser
             catch (Exception ex)
             {
                 Log.Error("[tabs] create failed for tab " + tab.Id, ex);
-                await CloseTabAsync(tab.Id);
+                await CloseTabAsync(tab.Id, false);
                 throw;
             }
 
@@ -209,7 +208,12 @@ namespace VantageLite.Browser
             LogTabState("activate");
         }
 
-        public async Task CloseTabAsync(int id)
+        public Task CloseTabAsync(int id)
+        {
+            return CloseTabAsync(id, true);
+        }
+
+        private async Task CloseTabAsync(int id, bool keepAlive)
         {
             BrowserTab tab = Find(id);
             if (tab == null)
@@ -234,10 +238,10 @@ namespace VantageLite.Browser
                     RaiseTabsChanged();
                     LogTabState("close");
 
-                    EventHandler empty = Empty;
-                    if (empty != null)
+                    // 保留一个空白标签，不直接退出浏览器。
+                    if (keepAlive && !_disposed)
                     {
-                        empty(this, EventArgs.Empty);
+                        await CreateTabAsync("about:blank");
                     }
 
                     return;

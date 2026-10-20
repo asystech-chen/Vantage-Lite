@@ -42,6 +42,8 @@ namespace VantageLite.UI
             _panel.Padding = Padding.Empty;
             _panel.Margin = Padding.Empty;
             _panel.SizeChanged += delegate { ApplyWidths(); };
+            _panel.MouseUp += TabStrip_MouseUp;
+            MouseUp += TabStrip_MouseUp;
 
             _newTabButton = new Button();
             _newTabButton.Text = IconFont.Add;
@@ -178,6 +180,17 @@ namespace VantageLite.UI
 
             int width = available / tabCount;
             return Math.Max(64, Math.Min(200, width));
+        }
+
+        /// <summary>
+        /// 中键点击标签栏空白处新建标签页。点击标签本身不会冒泡到这里。
+        /// </summary>
+        private void TabStrip_MouseUp(object sender, MouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Middle)
+            {
+                Raise(NewTabRequested);
+            }
         }
 
         private void OnItemSelectRequested(object sender, EventArgs e)

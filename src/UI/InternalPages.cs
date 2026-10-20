@@ -157,6 +157,7 @@ namespace VantageLite.UI
             sb.Append("var nodes=").Append(NodesJson(store == null ? null : store.Root)).Append(";");
             sb.Append("var hasClip=").Append(store != null && store.ClipboardId != null ? "true" : "false").Append(";");
             sb.Append("var moving=null;var menuFor=null;");
+            sb.Append("var FAV_GLOBE='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(\"<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='6' fill='none' stroke='#999999'/><path d='M2 8h12M8 2c2.5 2.5 2.5 9.5 0 12M8 2c-2.5 2.5-2.5 9.5 0 12' fill='none' stroke='#999999'/></svg>\");");
             sb.Append("try{window.chrome.webview.postMessage(JSON.stringify({cmd:'ping'}));}catch(e){}");
             sb.Append(@"
 function post(o){try{window.chrome.webview.postMessage(JSON.stringify(o));}catch(e){}}
@@ -348,17 +349,26 @@ function confirmMove(){if(moving){post({cmd:'move',id:moving,parent:document.get
         {
             if (folder)
             {
-                return "<span class=\"fav folder\"></span>";
+                return "<svg class=\"fav\" viewBox=\"0 0 16 16\">"
+                    + "<path d=\"M1.5 4.5h4.2l1.5 2h7.3v6.8h-13z\" fill=\"#d6aa3c\"/></svg>";
             }
 
             string origin = Origin(url);
             if (origin == null)
             {
-                return "<span class=\"fav\"></span>";
+                return GlobeSvg();
             }
 
-            return "<span class=\"fav\"><img src=\"" + Escape(origin)
-                + "/favicon.ico\" loading=\"lazy\" onerror=\"this.style.display='none'\"></span>";
+            return "<img class=\"fav\" src=\"" + Escape(origin)
+                + "/favicon.ico\" onerror=\"this.onerror=null;this.src=FAV_GLOBE\">";
+        }
+
+        private static string GlobeSvg()
+        {
+            return "<svg class=\"fav\" viewBox=\"0 0 16 16\">"
+                + "<circle cx=\"8\" cy=\"8\" r=\"6\" fill=\"none\" stroke=\"#999999\"/>"
+                + "<path d=\"M2 8h12M8 2c2.5 2.5 2.5 9.5 0 12M8 2c-2.5 2.5-2.5 9.5 0 12\" "
+                + "fill=\"none\" stroke=\"#999999\"/></svg>";
         }
 
         private static string Origin(string url)
@@ -436,10 +446,7 @@ function confirmMove(){if(moving){post({cmd:'move',id:moving,parent:document.get
                 + ".clip{color:" + muted + ";font-size:12px;margin-left:4px}"
                 + ".status{color:" + muted + ";font-size:12px;margin-left:auto}"
                 + ".folder-head{display:flex;align-items:center;gap:6px;cursor:pointer}"
-                + ".fav{display:inline-block;width:16px;height:16px;flex:0 0 16px;background-repeat:no-repeat;background-size:16px 16px;"
-                + "background-image:url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16'><circle cx='8' cy='8' r='6' fill='none' stroke='%23999999'/><path d='M2 8h12M8 2c2.5 2.5 2.5 9.5 0 12M8 2c-2.5 2.5-2.5 9.5 0 12' fill='none' stroke='%23999999'/></svg>\")}"
-                + ".fav img{width:16px;height:16px;display:block;border-radius:2px}"
-                + ".fav.folder{background-image:url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16'><path d='M1.5 4.5h4.2l1.5 2h7.3v6.8h-13z' fill='%23d6aa3c'/></svg>\")}"
+                + ".fav{width:16px;height:16px;flex:0 0 16px;display:block;border-radius:2px}"
                 + ".tri{width:14px;color:" + muted + ";font-size:10px}"
                 + ".menu{position:absolute;display:none;background:" + background + ";border:1px solid " + border
                 + ";border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,.35);padding:4px;z-index:10;min-width:160px}"

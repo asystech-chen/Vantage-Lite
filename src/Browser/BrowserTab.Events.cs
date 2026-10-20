@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.IO;
+using System.Threading.Tasks;
 using Microsoft.Web.WebView2.Core;
 using VantageLite.Diagnostics;
 using VantageLite.Theming;
@@ -160,7 +161,19 @@ namespace VantageLite.Browser
                 || uri.StartsWith("data:text/html", StringComparison.OrdinalIgnoreCase);
         }
 
-        private void Core_NavigationCompleted(object sender, CoreWebView2NavigationCompletedEventArgs e)
+        private async Task RefreshFaviconAsync(CoreWebView2 core)
+        {
+            await Task.Delay(400);
+
+            if (_disposed || !ReferenceEquals(core, _core))
+            {
+                return;
+            }
+
+            await LoadFaviconAsync(core);
+        }
+
+        private async void Core_NavigationCompleted(object sender, CoreWebView2NavigationCompletedEventArgs e)
         {
             CoreWebView2 core = sender as CoreWebView2;
             if (core == null || !ReferenceEquals(core, _core))
@@ -183,6 +196,8 @@ namespace VantageLite.Browser
                     }
                 }
 
+                // FaviconChanged 不一定会触发，导航完成后主动取一次。
+                await RefreshFaviconAsync(core);
                 return;
             }
 
@@ -218,12 +233,19 @@ namespace VantageLite.Browser
                 return;
             }
 
+            Log.Info("[tab " + _id + "] favicon: changed");
+            await LoadFaviconAsync(core);
+        }
+
+        private async Task LoadFaviconAsync(CoreWebView2 core)
+        {
             try
             {
                 using (Stream stream = await core.GetFaviconAsync(CoreWebView2FaviconImageFormat.Png))
                 {
                     if (stream == null)
                     {
+                        Log.Info("[tab " + _id + "] favicon: none");
                         return;
                     }
 
@@ -231,13 +253,18 @@ namespace VantageLite.Browser
                     {
                         stream.CopyTo(buffer);
                         buffer.Position = 0;
-                        SetFavicon(Image.FromStream(buffer));
+
+                        using (Image decoded = Image.FromStream(buffer))
+                        {
+                            Log.Info("[tab " + _id + "] favicon: loaded " + decoded.Width + "x" + decoded.Height);
+                            SetFavicon(new Bitmap(decoded));
+                        }
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // 网站没有 favicon 或格式不支持：保留占位圆点。
+                Log.Warn("[tab " + _id + "] favicon failed: " + ex.Message);
             }
         }
 

@@ -41,6 +41,7 @@ namespace VantageLite.UI
         private string _menuDropMode;
         private readonly List<BookmarkDropPopup> _dropPopups = new List<BookmarkDropPopup>();
         private readonly System.Windows.Forms.Timer _dragTimer;
+        private readonly System.Windows.Forms.Timer _relayoutTimer;
         private bool _manualDrag;
         private BookmarkNode _manualNode;
         private Button _manualButton;
@@ -69,6 +70,13 @@ namespace VantageLite.UI
             _dragTimer = new System.Windows.Forms.Timer();
             _dragTimer.Interval = 40;
             _dragTimer.Tick += DragTimer_Tick;
+            _relayoutTimer = new System.Windows.Forms.Timer();
+            _relayoutTimer.Interval = 120;
+            _relayoutTimer.Tick += delegate
+            {
+                _relayoutTimer.Stop();
+                Relayout();
+            };
             _toolTip = new ToolTip();
             ThemeManager.ApplyToolTip(_toolTip);
 
@@ -83,7 +91,12 @@ namespace VantageLite.UI
             _panel.AllowDrop = true;
             _panel.DragOver += Panel_DragOver;
             _panel.DragDrop += Panel_DragDrop;
-            _panel.SizeChanged += delegate { Relayout(); };
+            _panel.SizeChanged += delegate
+            {
+                Relayout();
+                ScheduleRelayout();
+            };
+            Resize += delegate { ScheduleRelayout(); };
             MouseUp += Bar_MouseUp;
 
             _overflowButton = new FlatButton();
@@ -130,6 +143,8 @@ namespace VantageLite.UI
             {
                 _dragTimer.Stop();
                 _dragTimer.Dispose();
+                _relayoutTimer.Stop();
+                _relayoutTimer.Dispose();
                 CloseDragGhost();
                 CloseDropPopups();
                 ThemeManager.ThemeChanged -= ThemeManager_ThemeChanged;
@@ -474,6 +489,8 @@ namespace VantageLite.UI
                 }
 
                 item.Enabled = item.DropDownItems.Count > 0;
+                // 子菜单统一向左展开，避免跑到主窗口右侧外面。
+                item.DropDownDirection = ToolStripDropDownDirection.Left;
 
                 if (showIcon)
                 {
@@ -818,6 +835,12 @@ namespace VantageLite.UI
             }
         }
 
+        private void ScheduleRelayout()
+        {
+            _relayoutTimer.Stop();
+            _relayoutTimer.Start();
+        }
+
         /// <summary>
         /// 按当前宽度决定显示多少个书签，放不下的收进右侧「…」菜单。
         /// 窗口缩放、书签增删后都会重新分配。
@@ -886,6 +909,11 @@ namespace VantageLite.UI
             for (int i = 0; i < _buttons.Count; i++)
             {
                 _buttons[i].Visible = i < fit;
+            }
+
+            if (_overflowButton.Visible)
+            {
+                _overflowButton.BringToFront();
             }
 
             _hiddenNodes.Clear();
@@ -2182,12 +2210,46 @@ namespace VantageLite.UI
                 dropDown.Opened += delegate
                 {
                     Track(dropDown);
-                    ClampDropDown(dropDown, owner);
+                    PlaceSubMenuLeft(dropDown, item, owner);
+
+                    // WinForms 在 Opened 之后还会再摆一次，延迟再校正一遍。
+                    try
+                    {
+                        dropDown.BeginInvoke(new Action(delegate
+                        {
+                            if (!dropDown.IsDisposed && dropDown.Visible)
+                            {
+                                PlaceSubMenuLeft(dropDown, item, owner);
+                            }
+                        }));
+                    }
+                    catch
+                    {
+                    }
                 };
                 dropDown.Closed += delegate { Untrack(dropDown); };
 
                 Attach(item.DropDownItems, menu, owner);
             }
+        }
+
+        private static void PlaceSubMenuLeft(ToolStripDropDown dropDown, ToolStripMenuItem item, Control owner)
+        {
+            try
+            {
+                ToolStrip ownerStrip = item.Owner;
+
+                if (ownerStrip != null)
+                {
+                    Point parent = ownerStrip.PointToScreen(item.Bounds.Location);
+                    dropDown.Location = new Point(parent.X - dropDown.Width - 2, parent.Y);
+                }
+            }
+            catch
+            {
+            }
+
+            ClampDropDown(dropDown, owner);
         }
 
         private static void ClampDropDown(ToolStripDropDown dropDown, Control owner)

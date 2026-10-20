@@ -54,7 +54,7 @@ namespace VantageLite.UI
             _navigationBar.StopRequested += delegate { StopLoading(); };
             _navigationBar.HomeRequested += delegate { NavigateTo(DefaultHomeUrl); };
             _navigationBar.BookmarkRequested += delegate { ToggleBookmark(); };
-            _bookmarksBar.OpenRequested += delegate (object sender, string url) { NavigateTo(url); };
+            _bookmarksBar.OpenRequested += delegate (object sender, string url) { OpenBookmarkInNewTab(url); };
             _bookmarksBar.ManageRequested += delegate { ShowBookmarkManager(); };
             _bookmarksBar.Changed += delegate { UpdateBookmarkState(); RenderBookmarksPage(); };
         }

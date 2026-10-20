@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Net;
+using System.Text;
 using System.Threading;
 using System.Windows.Forms;
 using VantageLite.Storage;
@@ -611,31 +612,16 @@ namespace VantageLite.UI
 
         private static void Load(string key)
         {
-            Image image = null;
+            Image image = Download("https://" + key + "/favicon.ico");
 
-            try
+            // 很多站点 favicon 不在根目录，回退到页面里的 <link rel="icon">。
+            if (image == null)
             {
-                HttpWebRequest request = (HttpWebRequest)WebRequest.Create("https://" + key + "/favicon.ico");
-                request.Timeout = 4000;
-                request.ReadWriteTimeout = 4000;
-                request.UserAgent = "VantageLite";
-                request.AllowAutoRedirect = true;
-
-                using (WebResponse response = request.GetResponse())
-                using (Stream stream = response.GetResponseStream())
-                using (MemoryStream buffer = new MemoryStream())
+                string iconUrl = FindIconUrl(key);
+                if (iconUrl != null)
                 {
-                    stream.CopyTo(buffer);
-                    buffer.Position = 0;
-
-                    using (Image decoded = Image.FromStream(buffer))
-                    {
-                        image = new Bitmap(decoded);
-                    }
+                    image = Download(iconUrl);
                 }
-            }
-            catch
-            {
             }
 
             List<Action<Image>> callbacks;
@@ -660,6 +646,145 @@ namespace VantageLite.UI
                     }
                 }
             }
+        }
+
+        private static Image Download(string url)
+        {
+            try
+            {
+                HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
+                request.Timeout = 4000;
+                request.ReadWriteTimeout = 4000;
+                request.UserAgent = "VantageLite";
+                request.AllowAutoRedirect = true;
+
+                using (WebResponse response = request.GetResponse())
+                using (Stream stream = response.GetResponseStream())
+                using (MemoryStream buffer = new MemoryStream())
+                {
+                    stream.CopyTo(buffer);
+                    buffer.Position = 0;
+
+                    using (Image decoded = Image.FromStream(buffer))
+                    {
+                        return Resize(decoded, 16, 16);
+                    }
+                }
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static Image Resize(Image source, int width, int height)
+        {
+            Bitmap bitmap = new Bitmap(width, height);
+
+            using (Graphics graphics = Graphics.FromImage(bitmap))
+            {
+                graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+                graphics.DrawImage(source, 0, 0, width, height);
+            }
+
+            return bitmap;
+        }
+
+        private static string FindIconUrl(string key)
+        {
+            string baseUrl = "https://" + key + "/";
+            string html = DownloadHtml(baseUrl);
+
+            if (string.IsNullOrEmpty(html))
+            {
+                return null;
+            }
+
+            int index = 0;
+
+            while ((index = html.IndexOf("<link", index, StringComparison.OrdinalIgnoreCase)) >= 0)
+            {
+                int end = html.IndexOf('>', index);
+                if (end < 0)
+                {
+                    break;
+                }
+
+                string tag = html.Substring(index, end - index + 1);
+
+                if (tag.IndexOf("icon", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    string href = ExtractAttribute(tag, "href");
+                    Uri resolved;
+
+                    if (!string.IsNullOrEmpty(href) &&
+                        Uri.TryCreate(new Uri(baseUrl), href, out resolved))
+                    {
+                        return resolved.ToString();
+                    }
+                }
+
+                index = end + 1;
+            }
+
+            return null;
+        }
+
+        private static string DownloadHtml(string url)
+        {
+            try
+            {
+                HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
+                request.Timeout = 4000;
+                request.ReadWriteTimeout = 4000;
+                request.UserAgent = "VantageLite";
+                request.AllowAutoRedirect = true;
+
+                using (WebResponse response = request.GetResponse())
+                using (Stream stream = response.GetResponseStream())
+                using (StreamReader reader = new StreamReader(stream, Encoding.UTF8))
+                {
+                    char[] buffer = new char[262144];
+                    int read = reader.ReadBlock(buffer, 0, buffer.Length);
+                    return new string(buffer, 0, read);
+                }
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static string ExtractAttribute(string tag, string name)
+        {
+            int index = tag.IndexOf(name + "=", StringComparison.OrdinalIgnoreCase);
+            if (index < 0)
+            {
+                return null;
+            }
+
+            int start = index + name.Length + 1;
+            if (start >= tag.Length)
+            {
+                return null;
+            }
+
+            char quote = tag[start];
+
+            if (quote == '\'' || quote == '"')
+            {
+                start++;
+                int end = tag.IndexOf(quote, start);
+                return end > start ? tag.Substring(start, end - start) : null;
+            }
+
+            int stop = start;
+            while (stop < tag.Length && !char.IsWhiteSpace(tag[stop]) && tag[stop] != '>')
+            {
+                stop++;
+            }
+
+            return stop > start ? tag.Substring(start, stop - start) : null;
         }
 
         private static string KeyFor(string url)

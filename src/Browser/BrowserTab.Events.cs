@@ -257,7 +257,7 @@ namespace VantageLite.Browser
                         using (Image decoded = Image.FromStream(buffer))
                         {
                             Log.Info("[tab " + _id + "] favicon: loaded " + decoded.Width + "x" + decoded.Height);
-                            SetFavicon(new Bitmap(decoded));
+                            SetFavicon(new Bitmap(decoded, 16, 16));
                         }
                     }
                 }

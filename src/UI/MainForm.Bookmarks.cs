@@ -71,9 +71,53 @@ namespace VantageLite.UI
             UpdateBookmarkState();
         }
 
-        private void ShowBookmarkManager()
+        private async void ShowBookmarkManager()
         {
-            ShowInternalPage(BookmarksAddress);
+            if (_tabManager == null)
+            {
+                return;
+            }
+
+            // 已经开着管理器就直接切过去，避免开一堆重复标签。
+            for (int i = 0; i < _tabManager.Tabs.Count; i++)
+            {
+                BrowserTab existing = _tabManager.Tabs[i];
+
+                if (string.Equals(existing.Url, BookmarksAddress, StringComparison.OrdinalIgnoreCase))
+                {
+                    await _tabManager.ActivateTabAsync(existing.Id);
+                    return;
+                }
+            }
+
+            try
+            {
+                BrowserTab tab = await _tabManager.CreateTabAsync("about:blank");
+                tab.ShowInternalPage(BookmarksAddress, InternalPages.Bookmarks(_bookmarks));
+                _navigationBar.SetAddress(BookmarksAddress);
+                UpdateBookmarkState();
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Open bookmarks manager failed", ex);
+            }
+        }
+
+        private async void OpenBookmarkInNewTab(string url)
+        {
+            if (_tabManager == null || string.IsNullOrWhiteSpace(url))
+            {
+                return;
+            }
+
+            try
+            {
+                await _tabManager.CreateTabAsync(url);
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Open bookmark failed: " + url, ex);
+            }
         }
 
         private void ToggleBookmarksBar()
@@ -93,10 +137,22 @@ namespace VantageLite.UI
         /// </summary>
         private void RenderBookmarksPage()
         {
-            BrowserTab tab = ActiveTab;
-            if (tab != null && string.Equals(tab.Url, BookmarksAddress, StringComparison.OrdinalIgnoreCase))
+            if (_tabManager == null)
             {
-                ShowInternalPage(BookmarksAddress);
+                return;
+            }
+
+            string html = InternalPages.Bookmarks(_bookmarks);
+
+            for (int i = 0; i < _tabManager.Tabs.Count; i++)
+            {
+                BrowserTab tab = _tabManager.Tabs[i];
+
+                if (tab.IsLive &&
+                    string.Equals(tab.Url, BookmarksAddress, StringComparison.OrdinalIgnoreCase))
+                {
+                    tab.ShowInternalPage(BookmarksAddress, html);
+                }
             }
         }
 

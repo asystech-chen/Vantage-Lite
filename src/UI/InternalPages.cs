@@ -30,7 +30,7 @@ namespace VantageLite.UI
                 for (int i = 0; i < count; i++)
                 {
                     HistoryEntry item = items[i];
-                    body.Append("<li><div class=\"row\">").Append(Icon(item.Url, false))
+                    body.Append("<li><div class=\"row\">").Append(Icon(item.Url, false, i < 40))
                         .Append("<a href=\"").Append(Escape(item.Url)).Append("\">")
                         .Append(Escape(DisplayTitle(item.Title, item.Url))).Append("</a></div>")
                         .Append("<div class=\"url\">").Append(Escape(item.Url))
@@ -116,7 +116,7 @@ namespace VantageLite.UI
                     sb.Append("<li class=\"folder\"><div class=\"folder-head\" onclick=\"toggleFolder('")
                         .Append(child.Id).Append("',event)\"><span class=\"tri\" id=\"tri_")
                         .Append(child.Id).Append("\">▸</span>")
-                        .Append(Icon(null, true))
+                        .Append(Icon(null, true, false))
                         .Append("<span class=\"name\">")
                         .Append(Escape(child.Title)).Append("</span>")
                         .Append(MoreButton(child.Id))
@@ -134,7 +134,7 @@ namespace VantageLite.UI
                     }
 
                     rendered[0]++;
-                    sb.Append("<li><div class=\"row\">").Append(Icon(child.Url, false))
+                    sb.Append("<li><div class=\"row\">").Append(Icon(child.Url, false, rendered[0] < 40))
                         .Append("<a href=\"").Append(Escape(child.Url))
                         .Append("\" target=\"_blank\">")
                         .Append(Escape(DisplayTitle(child.Title, child.Url))).Append("</a>")
@@ -345,12 +345,24 @@ function confirmMove(){if(moving){post({cmd:'move',id:moving,parent:document.get
             return (store.ClipboardCut ? "已剪切「" : "已复制「") + store.ClipboardTitle + "」";
         }
 
-        private static string Icon(string url, bool folder)
+        private static string Icon(string url, bool folder, bool warm)
         {
             if (folder)
             {
                 return "<svg class=\"fav\" viewBox=\"0 0 16 16\">"
                     + "<path d=\"M1.5 4.5h4.2l1.5 2h7.3v6.8h-13z\" fill=\"#d6aa3c\"/></svg>";
+            }
+
+            // 优先使用已缓存的 favicon（支持 <link rel=icon> 的非根路径图标）。
+            string data = FaviconCache.GetDataUri(url);
+            if (!string.IsNullOrEmpty(data))
+            {
+                return "<img class=\"fav\" src=\"" + data + "\">";
+            }
+
+            if (warm)
+            {
+                FaviconCache.GetOrLoad(url, null);
             }
 
             string origin = Origin(url);

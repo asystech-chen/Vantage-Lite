@@ -569,6 +569,25 @@ namespace VantageLite.UI
             new Dictionary<string, Image>(StringComparer.OrdinalIgnoreCase);
         private static readonly Dictionary<string, List<Action<Image>>> Pending =
             new Dictionary<string, List<Action<Image>>>(StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<string, string> DataUris =
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        public static int Version { get; private set; }
+
+        public static string GetDataUri(string url)
+        {
+            string key = KeyFor(url);
+            if (key == null)
+            {
+                return null;
+            }
+
+            lock (Gate)
+            {
+                string data;
+                return DataUris.TryGetValue(key, out data) ? data : null;
+            }
+        }
 
         public static Image GetOrLoad(string url, Action<Image> onLoaded)
         {
@@ -624,11 +643,35 @@ namespace VantageLite.UI
                 }
             }
 
+            string dataUri = null;
+
+            if (image != null)
+            {
+                try
+                {
+                    using (MemoryStream buffer = new MemoryStream())
+                    {
+                        image.Save(buffer, System.Drawing.Imaging.ImageFormat.Png);
+                        dataUri = "data:image/png;base64," + Convert.ToBase64String(buffer.ToArray());
+                    }
+                }
+                catch
+                {
+                }
+            }
+
             List<Action<Image>> callbacks;
 
             lock (Gate)
             {
                 Cache[key] = image;
+                DataUris[key] = dataUri;
+
+                if (dataUri != null)
+                {
+                    Version++;
+                }
+
                 Pending.TryGetValue(key, out callbacks);
                 Pending.Remove(key);
             }

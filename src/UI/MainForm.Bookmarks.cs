@@ -56,6 +56,11 @@ namespace VantageLite.UI
 
         private void ShowInternalPage(string address)
         {
+            RenderInternalPage(address, true);
+        }
+
+        private void RenderInternalPage(string address, bool scheduleFaviconRefresh)
+        {
             BrowserTab tab = ActiveTab;
             if (tab == null)
             {
@@ -69,6 +74,34 @@ namespace VantageLite.UI
             tab.ShowInternalPage(address, html);
             _navigationBar.SetAddress(address);
             UpdateBookmarkState();
+
+            if (scheduleFaviconRefresh)
+            {
+                _faviconRefreshAddress = address;
+                _faviconRefreshVersion = FaviconCache.Version;
+                _faviconRefreshTimer.Stop();
+                _faviconRefreshTimer.Start();
+            }
+        }
+
+        private void FaviconRefreshTimer_Tick(object sender, EventArgs e)
+        {
+            _faviconRefreshTimer.Stop();
+
+            if (_faviconRefreshVersion == FaviconCache.Version)
+            {
+                return;
+            }
+
+            BrowserTab tab = ActiveTab;
+            if (tab == null ||
+                !string.Equals(tab.Url, _faviconRefreshAddress, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            // 图标异步加载完成后重绘一次，让内联 data URI 出现在页面上。
+            RenderInternalPage(_faviconRefreshAddress, false);
         }
 
         private async void ShowBookmarkManager()
@@ -92,10 +125,8 @@ namespace VantageLite.UI
 
             try
             {
-                BrowserTab tab = await _tabManager.CreateTabAsync("about:blank");
-                tab.ShowInternalPage(BookmarksAddress, InternalPages.Bookmarks(_bookmarks));
-                _navigationBar.SetAddress(BookmarksAddress);
-                UpdateBookmarkState();
+                await _tabManager.CreateTabAsync("about:blank");
+                RenderInternalPage(BookmarksAddress, true);
             }
             catch (Exception ex)
             {

@@ -30,6 +30,9 @@ namespace VantageLite.UI
         private HistoryStore _history;
         private bool _minimized;
         private Timer _resizeSettleTimer;
+        private Timer _faviconRefreshTimer;
+        private string _faviconRefreshAddress;
+        private int _faviconRefreshVersion;
 
         public MainForm()
             : this(new CommandLineOptions())
@@ -51,6 +54,10 @@ namespace VantageLite.UI
             _resizeSettleTimer = new Timer();
             _resizeSettleTimer.Interval = 250;
             _resizeSettleTimer.Tick += ResizeSettleTimer_Tick;
+
+            _faviconRefreshTimer = new Timer();
+            _faviconRefreshTimer.Interval = 1500;
+            _faviconRefreshTimer.Tick += FaviconRefreshTimer_Tick;
 
             Application.AddMessageFilter(this);
 
@@ -134,6 +141,7 @@ namespace VantageLite.UI
             Log.Info("Main window closed.");
             Application.RemoveMessageFilter(this);
             _resizeSettleTimer.Dispose();
+            _faviconRefreshTimer.Dispose();
             _history.Save();
             _bookmarks.Save();
             ShutdownTheme();

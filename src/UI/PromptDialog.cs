@@ -4,6 +4,8 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Windows.Forms;
+using Microsoft.Win32;
+using VantageLite.Diagnostics;
 using VantageLite.Theming;
 
 namespace VantageLite.UI
@@ -479,7 +481,7 @@ namespace VantageLite.UI
     /// </summary>
     internal static class AboutDialog
     {
-        public static bool Show(IWin32Window owner, string version)
+        public static bool Show(IWin32Window owner, string version, Action<string> openUrl)
         {
             bool diagnosticsRequested = false;
 
@@ -496,6 +498,14 @@ namespace VantageLite.UI
                 return (int)Math.Round(value * dpi / 96.0);
             };
 
+            // Windows「文本大小」辅助功能（100–225%）。不改变布局基准，只放大文字，
+            // 再根据文字实际高度把对话框撑大，保证不遮挡。
+            double textScale = ReadTextScaleFactor();
+            Func<float, Font> ui = delegate(float points)
+            {
+                return ThemeFonts.Ui((float)(points * textScale));
+            };
+
             using (Form form = new Form())
             {
                 ThemePalette palette = ThemeManager.Current;
@@ -507,7 +517,7 @@ namespace VantageLite.UI
                 form.MinimizeBox = false;
                 form.MaximizeBox = false;
                 form.ShowInTaskbar = false;
-                form.Font = ThemeFonts.Ui(9.5F);
+                form.Font = ui(9.5f);
                 form.BackColor = palette.WindowBackground;
                 form.ForeColor = palette.TextPrimary;
 
@@ -518,7 +528,7 @@ namespace VantageLite.UI
                 Label title = new Label();
                 title.AutoSize = true;
                 title.Text = "Vantage Lite";
-                title.Font = ThemeFonts.Ui(15F);
+                title.Font = ui(15f);
                 title.ForeColor = palette.TextPrimary;
 
                 Label versionLabel = new Label();
@@ -540,9 +550,19 @@ namespace VantageLite.UI
                 repo.VisitedLinkColor = palette.Accent;
                 repo.LinkClicked += delegate
                 {
+                    string url = "https://github.com/asystech-chen/Vantage-Lite";
+                    Log.Info("About: GitHub clicked, callback=" + (openUrl != null));
+                    form.Close();
+
+                    if (openUrl != null)
+                    {
+                        openUrl(url);
+                        return;
+                    }
+
                     try
                     {
-                        Process.Start("https://github.com/asystech-chen/Vantage-Lite");
+                        Process.Start(url);
                     }
                     catch
                     {
@@ -603,6 +623,18 @@ namespace VantageLite.UI
                     y = license.Bottom + px(10);
                     copyright.Location = new Point(left, y);
 
+                    // 文字放大后按实际内容撑大对话框，避免任何遮挡。
+                    int contentRight = Math.Max(description.Right, title.Right);
+                    int neededWidth = Math.Max(px(470), contentRight + px(28));
+                    int neededHeight = Math.Max(px(350), copyright.Bottom + px(24) + px(30) + px(12));
+
+                    if (neededWidth > form.ClientSize.Width || neededHeight > form.ClientSize.Height)
+                    {
+                        form.ClientSize = new Size(
+                            Math.Max(neededWidth, form.ClientSize.Width),
+                            Math.Max(neededHeight, form.ClientSize.Height));
+                    }
+
                     int buttonY = form.ClientSize.Height - px(28) - px(30);
                     int okWidth = px(84);
                     int diagnosticsWidth = px(100);
@@ -640,6 +672,36 @@ namespace VantageLite.UI
                 form.ShowDialog(owner);
                 return diagnosticsRequested;
             }
+        }
+
+        /// <summary>
+        /// 读取 Windows「文本大小」缩放因子（100–225），失败或未设置时返回 1.0。
+        /// </summary>
+        private static double ReadTextScaleFactor()
+        {
+            try
+            {
+                using (RegistryKey key = Registry.CurrentUser.OpenSubKey(
+                    @"Software\Microsoft\Accessibility"))
+                {
+                    object value = key == null ? null : key.GetValue("TextScaleFactor");
+
+                    if (value != null)
+                    {
+                        int factor = Convert.ToInt32(value);
+
+                        if (factor >= 100 && factor <= 225)
+                        {
+                            return factor / 100.0;
+                        }
+                    }
+                }
+            }
+            catch
+            {
+            }
+
+            return 1.0;
         }
 
         /// <summary>

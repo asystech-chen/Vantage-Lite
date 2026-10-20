@@ -188,7 +188,8 @@ namespace VantageLite.UI
             _addressBox = new TextBox();
             _addressBox.BorderStyle = BorderStyle.None;
             _addressBox.Font = ThemeFonts.Ui(10.5F);
-            _addressBox.Dock = DockStyle.Fill;
+            _addressBox.Dock = DockStyle.None;
+            _addressBox.AutoSize = false;
             _addressBox.KeyDown += AddressBox_KeyDown;
             _addressBox.GotFocus += delegate { _addressBox.SelectAll(); };
 
@@ -198,6 +199,11 @@ namespace VantageLite.UI
             _addressHost.Paint += AddressHost_Paint;
             _addressHost.Resize += delegate { _addressHost.Invalidate(); };
             _addressHost.Controls.Add(_addressBox);
+            _addressHost.Resize += delegate
+            {
+                LayoutAddressBox();
+                _addressHost.Invalidate();
+            };
 
             Controls.Add(_addressHost);
             Controls.Add(rightButtons);
@@ -220,7 +226,11 @@ namespace VantageLite.UI
 
         private void ApplyMetrics()
         {
-            Height = WindowChrome.Scale(this, 44);
+            int buttonHeight = WindowChrome.Scale(this, 32);
+            int textHeight = TextRenderer.MeasureText("国Ag", _addressBox == null ? Font : _addressBox.Font).Height;
+            int innerHeight = Math.Max(buttonHeight, textHeight + WindowChrome.Scale(10));
+
+            Height = innerHeight + WindowChrome.Scale(12);
             Padding = new Padding(
                 WindowChrome.Scale(this, 8),
                 WindowChrome.Scale(this, 6),
@@ -241,9 +251,10 @@ namespace VantageLite.UI
             {
                 _addressHost.Padding = new Padding(
                     WindowChrome.Scale(this, 10),
-                    WindowChrome.Scale(this, 4),
+                    WindowChrome.Scale(this, 3),
                     WindowChrome.Scale(this, 10),
-                    WindowChrome.Scale(this, 4));
+                    WindowChrome.Scale(this, 3));
+                LayoutAddressBox();
             }
 
             Button[] navButtons = { _backButton, _forwardButton, _reloadButton, _homeButton, _bookmarkButton, _downloadButton, _menuButton };
@@ -260,6 +271,27 @@ namespace VantageLite.UI
             }
 
             Invalidate();
+        }
+
+        /// <summary>
+        /// 地址框垂直居中，高度按字体实测，避免高 DPI 下文字被上下裁切。
+        /// </summary>
+        private void LayoutAddressBox()
+        {
+            if (_addressBox == null || _addressHost == null)
+            {
+                return;
+            }
+
+            int left = _addressHost.Padding.Left;
+            int top = _addressHost.Padding.Top;
+            int width = Math.Max(0, _addressHost.ClientSize.Width - left - _addressHost.Padding.Right);
+            int available = Math.Max(1, _addressHost.ClientSize.Height - top - _addressHost.Padding.Bottom);
+            int textHeight = TextRenderer.MeasureText("国Ag", _addressBox.Font).Height;
+            int boxHeight = Math.Min(available, textHeight + WindowChrome.Scale(this, 4));
+            int y = top + Math.Max(0, (available - boxHeight) / 2);
+
+            _addressBox.SetBounds(left, y, width, boxHeight);
         }
 
         private GlyphButton CreateButton(string glyph, string toolTip)

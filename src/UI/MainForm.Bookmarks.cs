@@ -1001,7 +1001,7 @@ namespace VantageLite.UI
 
         private void ShowAboutDialog()
         {
-            if (AboutDialog.Show(this, Application.ProductVersion))
+            if (AboutDialog.Show(this, Application.ProductVersion, OpenBookmarkInNewTab))
             {
                 ShowDiagnostics();
             }

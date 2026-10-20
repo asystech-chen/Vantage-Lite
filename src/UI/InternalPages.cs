@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Text;
 using VantageLite.App;
 using VantageLite.Browser;
@@ -282,8 +283,10 @@ namespace VantageLite.UI
 
             StringBuilder body = new StringBuilder();
             body.Append("<div class=\"newtab\">");
-            body.Append("<div class=\"nt-clock\" id=\"ntClock\">--:--</div>");
-            body.Append("<div class=\"nt-date\" id=\"ntDate\"></div>");
+            body.Append("<div class=\"nt-brand\">");
+            body.Append("<div class=\"nt-logo\">").Append(LogoMarkup()).Append("</div>");
+            body.Append("<div class=\"nt-wordmark\">Vantage Lite</div>");
+            body.Append("</div>");
             body.Append("<form class=\"nt-search\" onsubmit=\"return ntSearch(event)\">");
             body.Append("<select id=\"ntEngine\" class=\"nt-engine\" onchange=\"ntEngineChanged()\" title=\"搜索引擎\">");
             AppendSearchOption(body, settings.SearchEngine, "bing", "必应");
@@ -337,12 +340,6 @@ namespace VantageLite.UI
             body.Append("function ntSearch(ev){ev.preventDefault();"
                 + "var q=document.getElementById('ntQuery').value.trim();"
                 + "if(!q){return false;}post({cmd:'navigate',address:ntTarget(q)});return false;}");
-            body.Append("function ntTick(){var d=new Date();"
-                + "var hh=('0'+d.getHours()).slice(-2);var mm=('0'+d.getMinutes()).slice(-2);"
-                + "document.getElementById('ntClock').textContent=hh+':'+mm;"
-                + "var w=['星期日','星期一','星期二','星期三','星期四','星期五','星期六'];"
-                + "document.getElementById('ntDate').textContent=d.getFullYear()+'年'+(d.getMonth()+1)+'月'+d.getDate()+'日 '+w[d.getDay()];}");
-            body.Append("ntTick();setInterval(ntTick,1000);");
             body.Append("</script>");
 
             return Page("新标签页", string.Empty, body.ToString(), true);
@@ -1317,9 +1314,11 @@ snapshotTree();
                 + "select option{background:var(--bg);color:var(--fg)}"
                 + ".warn{background:#c0392b;color:#fff;padding:8px 12px;border-radius:4px;margin-bottom:12px}"
                 + ".panel-buttons{margin-top:14px;display:flex;gap:8px;justify-content:flex-end}"
-                + ".newtab{max-width:760px;margin:12vh auto 0;padding:0 8px;text-align:center}"
-                + ".nt-clock{font-size:56px;font-weight:300;letter-spacing:3px}"
-                + ".nt-date{color:var(--muted);font-size:13px;margin-top:6px}"
+                + ".newtab{max-width:760px;margin:10vh auto 0;padding:0 8px;text-align:center}"
+                + ".nt-brand{display:flex;flex-direction:column;align-items:center;gap:12px;margin-bottom:30px}"
+                + ".nt-logo{width:104px;height:104px}"
+                + ".nt-logo svg{width:100%;height:100%;display:block}"
+                + ".nt-wordmark{font-size:30px;font-weight:700;letter-spacing:.5px;color:var(--fg)}"
                 + ".nt-search{display:flex;align-items:center;gap:6px;max-width:600px;margin:30px auto 0;"
                 + "padding:6px 8px 6px 12px;border:1px solid var(--border);border-radius:12px;background:var(--input)}"
                 + ".nt-search:focus-within{border-color:var(--link)}"
@@ -1463,6 +1462,45 @@ snapshotTree();
                 .Replace("\r", "\\r")
                 .Replace("\n", "\\n")
                 .Replace("\t", "\\t") + "\"";
+        }
+
+        private static string _logoMarkup;
+
+        /// <summary>
+        /// 读取嵌入的 SVG logo（与 Resources/vantage-logo.svg 同一份），供新标签页内联使用。
+        /// </summary>
+        private static string LogoMarkup()
+        {
+            if (_logoMarkup != null)
+            {
+                return _logoMarkup;
+            }
+
+            try
+            {
+                using (Stream stream = typeof(InternalPages).Assembly
+                    .GetManifestResourceStream("VantageLite.Logo.svg"))
+                {
+                    if (stream == null)
+                    {
+                        _logoMarkup = string.Empty;
+                        return _logoMarkup;
+                    }
+
+                    using (StreamReader reader = new StreamReader(stream, Encoding.UTF8))
+                    {
+                        string text = reader.ReadToEnd();
+                        int start = text.IndexOf("<svg", StringComparison.OrdinalIgnoreCase);
+                        _logoMarkup = start < 0 ? text : text.Substring(start);
+                    }
+                }
+            }
+            catch
+            {
+                _logoMarkup = string.Empty;
+            }
+
+            return _logoMarkup;
         }
     }
 }

@@ -50,7 +50,7 @@ namespace VantageLite.UI
             _manageButton.Cursor = Cursors.Default;
             _manageButton.Dock = DockStyle.Right;
             _manageButton.Click += delegate { Raise(ManageRequested); };
-            _toolTip.SetToolTip(_manageButton, "书签管理器 (Ctrl+Shift+O)");
+            _toolTip.SetToolTip(_manageButton, "书签管理器 (Ctrl+Alt+B)");
 
             Controls.Add(_panel);
             Controls.Add(_manageButton);
@@ -161,7 +161,23 @@ namespace VantageLite.UI
                 }
             }
 
-            menu.Closed += delegate { menu.Dispose(); };
+            // 立即 Dispose 会让 ToolStripManager 在菜单关闭流程里访问已释放对象。
+            menu.Closed += delegate
+            {
+                if (IsHandleCreated)
+                {
+                    try
+                    {
+                        BeginInvoke(new Action(menu.Dispose));
+                        return;
+                    }
+                    catch
+                    {
+                    }
+                }
+
+                menu.Dispose();
+            };
 
             Point location = button.PointToScreen(new Point(0, button.Height));
             menu.Show(location);

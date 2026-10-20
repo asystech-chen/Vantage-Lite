@@ -14,7 +14,7 @@ namespace VantageLite.UI
     /// 主窗口：创建 WebView2 环境、装配标签管理器、处理导航与快捷键。
     /// 依赖：Browser / Diagnostics / App。改动注意：布局在 MainForm.Layout.cs，事件在 MainForm.Events.cs。
     /// </summary>
-    public sealed partial class MainForm : Form
+    public sealed partial class MainForm : Form, IMessageFilter
     {
         private const string DefaultHomeUrl = "https://asystech.cn/start/index.html";
 
@@ -51,6 +51,8 @@ namespace VantageLite.UI
             _resizeSettleTimer = new Timer();
             _resizeSettleTimer.Interval = 250;
             _resizeSettleTimer.Tick += ResizeSettleTimer_Tick;
+
+            Application.AddMessageFilter(this);
 
             Load += MainForm_Load;
             FormClosed += MainForm_FormClosed;
@@ -129,6 +131,7 @@ namespace VantageLite.UI
         private void MainForm_FormClosed(object sender, FormClosedEventArgs e)
         {
             Log.Info("Main window closed.");
+            Application.RemoveMessageFilter(this);
             _resizeSettleTimer.Dispose();
             _history.Save();
             _bookmarks.Save();

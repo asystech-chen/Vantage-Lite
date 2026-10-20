@@ -80,7 +80,7 @@ namespace VantageLite.Storage
         {
             return url.StartsWith("about:", StringComparison.OrdinalIgnoreCase)
                 || url.StartsWith("vantage:", StringComparison.OrdinalIgnoreCase)
-                || url == "about:blank";
+                || url.StartsWith("data:", StringComparison.OrdinalIgnoreCase);
         }
     }
 }

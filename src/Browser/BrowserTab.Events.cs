@@ -86,8 +86,8 @@ namespace VantageLite.Browser
                 return;
             }
 
-            // NavigateToString 会把 Source 变成 about:blank，内置页面不覆盖地址栏。
-            if (_internalAddress != null && string.Equals(core.Source, "about:blank", StringComparison.OrdinalIgnoreCase))
+            // NavigateToString 会生成 data:text/html（或 about:blank），内置页面不覆盖地址栏。
+            if (_internalAddress != null && IsInternalPageUri(core.Source))
             {
                 return;
             }
@@ -131,9 +131,28 @@ namespace VantageLite.Browser
 
         private void Core_NavigationStarting(object sender, CoreWebView2NavigationStartingEventArgs e)
         {
+            CoreWebView2 core = sender as CoreWebView2;
+            if (core == null || !ReferenceEquals(core, _core))
+            {
+                return;
+            }
+
+            if (_internalAddress != null && IsInternalPageUri(e.Uri))
+            {
+                RaiseLoading(true);
+                return;
+            }
+
             _url = e.Uri;
             Log.Info("[tab " + _id + "] navigation starting: " + e.Uri);
             RaiseLoading(true);
+        }
+
+        private static bool IsInternalPageUri(string uri)
+        {
+            return string.IsNullOrEmpty(uri)
+                || string.Equals(uri, "about:blank", StringComparison.OrdinalIgnoreCase)
+                || uri.StartsWith("data:text/html", StringComparison.OrdinalIgnoreCase);
         }
 
         private void Core_NavigationCompleted(object sender, CoreWebView2NavigationCompletedEventArgs e)

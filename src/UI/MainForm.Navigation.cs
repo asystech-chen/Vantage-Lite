@@ -12,6 +12,11 @@ namespace VantageLite.UI
     /// </summary>
     public sealed partial class MainForm
     {
+        private string[] _autoFallbacks;
+        private bool[] _autoFallbackTried;
+        private int _autoFallbackIndex;
+        private int _autoFallbackTabId;
+
         private void CreateNewTab()
         {
             if (_tabManager == null)
@@ -211,6 +216,13 @@ namespace VantageLite.UI
 
         private void NavigateTo(string address)
         {
+            NavigateTo(address, false);
+        }
+
+        private void NavigateTo(string address, bool autoComplete)
+        {
+            ClearAutoFallback();
+
             BrowserTab tab = ActiveTab;
             if (tab == null)
             {
@@ -242,8 +254,34 @@ namespace VantageLite.UI
                 return;
             }
 
+            if (autoComplete && UrlHelper.IsAutoSchemeCandidate(address))
+            {
+                string[] candidates = UrlHelper.BuildFallbackChain(url);
+
+                if (candidates != null && candidates.Length > 1)
+                {
+                    _autoFallbacks = candidates;
+                    _autoFallbackTried = new bool[candidates.Length];
+                    _autoFallbackIndex = 0;
+                    _autoFallbackTried[0] = true;
+                    _autoFallbackTabId = tab.Id;
+
+                    Log.Info("Navigate (auto): " + candidates[0] + " candidates=" + candidates.Length);
+                    tab.Navigate(candidates[0]);
+                    return;
+                }
+            }
+
             Log.Info("Navigate: " + url);
             tab.Navigate(url);
+        }
+
+        private void ClearAutoFallback()
+        {
+            _autoFallbacks = null;
+            _autoFallbackTried = null;
+            _autoFallbackIndex = 0;
+            _autoFallbackTabId = 0;
         }
 
         private void GoBack()

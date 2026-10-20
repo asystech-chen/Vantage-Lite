@@ -24,6 +24,7 @@ namespace VantageLite.Theming
         public Color CaptionHover;
         public Color CaptionPressed;
         public Color Accent;
+        public Color Warning;
         public Color CloseHover;
         public Color WebViewBackground;
 
@@ -45,6 +46,7 @@ namespace VantageLite.Theming
             CaptionHover = Color.FromArgb(40, 45, 54),
             CaptionPressed = Color.FromArgb(52, 58, 69),
             Accent = Color.FromArgb(76, 154, 255),
+            Warning = Color.FromArgb(240, 173, 78),
             CloseHover = Color.FromArgb(196, 43, 28),
             WebViewBackground = Color.FromArgb(24, 27, 33)
         };
@@ -67,6 +69,7 @@ namespace VantageLite.Theming
             CaptionHover = Color.FromArgb(214, 221, 231),
             CaptionPressed = Color.FromArgb(199, 208, 220),
             Accent = Color.FromArgb(15, 108, 189),
+            Warning = Color.FromArgb(163, 80, 0),
             CloseHover = Color.FromArgb(196, 43, 28),
             WebViewBackground = Color.FromArgb(255, 255, 255)
         };

@@ -192,6 +192,7 @@ namespace VantageLite.Browser
         public event EventHandler<string> NewWindowRequested;
         public event EventHandler<string> ProcessFailed;
         public event EventHandler<NavigatedEventArgs> Navigated;
+        public event EventHandler<NavigationFailedEventArgs> NavigationFailed;
         public event EventHandler<string> WebMessage;
         public event EventHandler FaviconChanged;
         public event EventHandler<CoreWebView2DownloadStartingEventArgs> DownloadStarting;

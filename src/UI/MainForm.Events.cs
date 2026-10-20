@@ -1,5 +1,6 @@
 using System;
 using System.Windows.Forms;
+using Microsoft.Web.WebView2.Core;
 using VantageLite.Browser;
 using VantageLite.Diagnostics;
 
@@ -24,6 +25,14 @@ namespace VantageLite.UI
             AttachActiveTab();
             UpdateFromActiveTab();
             ApplyInternalPageTheme(ActiveTab);
+
+            BrowserTab active = ActiveTab;
+
+            if (_autoFallbacks != null &&
+                (active == null || active.Id != _autoFallbackTabId))
+            {
+                ClearAutoFallback();
+            }
         }
 
         private void TabStrip_TabSelected(object sender, int id)
@@ -91,6 +100,7 @@ namespace VantageLite.UI
             tab.NavigationStateChanged += Tab_NavigationStateChanged;
             tab.LoadingChanged += Tab_LoadingChanged;
             tab.ProcessFailed += Tab_ProcessFailed;
+            tab.NavigationFailed += Tab_NavigationFailed;
         }
 
         private void DetachTab(BrowserTab tab)
@@ -105,6 +115,7 @@ namespace VantageLite.UI
             tab.NavigationStateChanged -= Tab_NavigationStateChanged;
             tab.LoadingChanged -= Tab_LoadingChanged;
             tab.ProcessFailed -= Tab_ProcessFailed;
+            tab.NavigationFailed -= Tab_NavigationFailed;
         }
 
         private void Tab_TitleChanged(object sender, string title)
@@ -122,6 +133,102 @@ namespace VantageLite.UI
                 _navigationBar.SetAddress(url);
                 UpdateBookmarkState();
             }
+        }
+
+        /// <summary>
+        /// 地址栏自动补全：HTTPS 失败后按候选序列尝试 www / http。
+        /// </summary>
+        private void Tab_NavigationFailed(object sender, NavigationFailedEventArgs e)
+        {
+            BrowserTab tab = sender as BrowserTab;
+
+            if (tab == null || _autoFallbacks == null || _autoFallbackTried == null)
+            {
+                return;
+            }
+
+            if (tab.Id != _autoFallbackTabId)
+            {
+                return;
+            }
+
+            if (_autoFallbackIndex < 0 || _autoFallbackIndex >= _autoFallbacks.Length)
+            {
+                ClearAutoFallback();
+                return;
+            }
+
+            if (!string.Equals(e.Url, _autoFallbacks[_autoFallbackIndex], StringComparison.OrdinalIgnoreCase))
+            {
+                ClearAutoFallback();
+                return;
+            }
+
+            int next = FindNextAutoFallback(e.Status);
+
+            if (next < 0)
+            {
+                ClearAutoFallback();
+                return;
+            }
+
+            _autoFallbackIndex = next;
+            _autoFallbackTried[next] = true;
+
+            Log.Info("[auto] " + e.Status + " -> " + _autoFallbacks[next]);
+            tab.Navigate(_autoFallbacks[next]);
+        }
+
+        /// <summary>
+        /// 解析失败类型：DNS 失败尝试同协议的 www 变体，连接失败尝试 http 变体。
+        /// 证书错误不降级、不绕过。
+        /// </summary>
+        private int FindNextAutoFallback(CoreWebView2WebErrorStatus status)
+        {
+            if (_autoFallbacks == null || _autoFallbackTried == null)
+            {
+                return -1;
+            }
+
+            bool dnsFailure = status == CoreWebView2WebErrorStatus.HostNameNotResolved;
+            bool connectFailure =
+                status == CoreWebView2WebErrorStatus.CannotConnect ||
+                status == CoreWebView2WebErrorStatus.Timeout ||
+                status == CoreWebView2WebErrorStatus.ServerUnreachable;
+
+            if (!dnsFailure && !connectFailure)
+            {
+                return -1;
+            }
+
+            for (int i = 0; i < _autoFallbacks.Length; i++)
+            {
+                if (_autoFallbackTried[i])
+                {
+                    continue;
+                }
+
+                Uri uri;
+                if (!Uri.TryCreate(_autoFallbacks[i], UriKind.Absolute, out uri))
+                {
+                    continue;
+                }
+
+                if (dnsFailure)
+                {
+                    if (string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) &&
+                        uri.Host.StartsWith("www.", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return i;
+                    }
+                }
+                else if (string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase))
+                {
+                    return i;
+                }
+            }
+
+            return -1;
         }
 
         private void TabManager_Navigated(object sender, NavigatedEventArgs e)

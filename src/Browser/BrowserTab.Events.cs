@@ -221,6 +221,12 @@ namespace VantageLite.Browser
             }
 
             Log.Warn("[tab " + _id + "] navigation failed: " + e.WebErrorStatus + " url=" + _url);
+
+            EventHandler<NavigationFailedEventArgs> failed = NavigationFailed;
+            if (failed != null)
+            {
+                failed(this, new NavigationFailedEventArgs(_url, e.WebErrorStatus));
+            }
         }
 
         private void Core_NewWindowRequested(object sender, CoreWebView2NewWindowRequestedEventArgs e)

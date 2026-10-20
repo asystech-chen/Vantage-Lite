@@ -145,6 +145,30 @@ namespace VantageLite.UI
             base.Dispose(disposing);
         }
 
+        /// <summary>
+        /// 屏幕坐标是否落在标签或新建按钮上。
+        /// 供标题栏顶部命中测试使用：落在可交互控件上时不能把点击当成窗口拖动。
+        /// </summary>
+        public bool IsInteractiveAt(Point screenPoint)
+        {
+            if (_newTabButton != null && _newTabButton.Visible &&
+                _newTabButton.RectangleToScreen(_newTabButton.ClientRectangle).Contains(screenPoint))
+            {
+                return true;
+            }
+
+            foreach (TabViewItem item in _items.Values)
+            {
+                if (item != null && item.Visible &&
+                    item.RectangleToScreen(item.ClientRectangle).Contains(screenPoint))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         public void ApplyTheme()
         {
             ThemePalette palette = ThemeManager.Current;

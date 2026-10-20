@@ -28,6 +28,8 @@ namespace VantageLite.Theming
         public const string Pause = "\uE769";
         public const string Play = "\uE768";
         public const string Retry = "\uE72C";
+        public const string Lock = "\uE72E";
+        public const string Unlock = "\uE785";
 
         private static readonly string Family = DetectFamily();
 

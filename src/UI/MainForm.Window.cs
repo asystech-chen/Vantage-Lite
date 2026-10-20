@@ -19,6 +19,7 @@ namespace VantageLite.UI
         private const int WmNcPaint = 0x0085;
         private const int WmNcActivate = 0x0086;
         private const int HtClient = 1;
+        private const int HtCaption = 2;
 
         private bool _restoreMaximized;
 
@@ -117,6 +118,13 @@ namespace VantageLite.UI
                 int y = unchecked((short)((value >> 16) & 0xFFFF));
                 int captionHeight = Padding.Top + (_titleBar == null ? 0 : _titleBar.Height);
                 int hit = WindowChrome.HitTest(this, x, y, captionHeight);
+
+                // 顶边 5px 默认是 HTCAPTION；但如果压在标签或窗口按钮上，必须让点击落回子控件。
+                if (hit == HtCaption && _titleBar != null &&
+                    _titleBar.IsInteractiveAt(new Point(x, y)))
+                {
+                    hit = HtClient;
+                }
 
                 if (hit != HtClient)
                 {

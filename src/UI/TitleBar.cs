@@ -91,6 +91,15 @@ namespace VantageLite.UI
             get { return _tabs; }
         }
 
+        /// <summary>
+        /// 屏幕坐标是否落在标签、新建按钮或窗口控制按钮上。
+        /// </summary>
+        public bool IsInteractiveAt(Point screenPoint)
+        {
+            return (_tabs != null && _tabs.IsInteractiveAt(screenPoint)) ||
+                   HitButton(PointToClient(screenPoint)) != -1;
+        }
+
         public void ApplyTheme()
         {
             BackColor = WindowChrome.BackdropColor;

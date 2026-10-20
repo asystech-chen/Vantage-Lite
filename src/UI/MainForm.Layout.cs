@@ -51,7 +51,7 @@ namespace VantageLite.UI
         {
             _navigationBar.NavigateRequested += delegate (object sender, string address)
             {
-                NavigateTo(address);
+                NavigateTo(address, true);
             };
             _navigationBar.BackRequested += delegate { GoBack(); };
             _navigationBar.ForwardRequested += delegate { GoForward(); };

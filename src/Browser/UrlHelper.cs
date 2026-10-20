@@ -64,6 +64,95 @@ namespace VantageLite.Browser
             return BuildSearchUrl(input, searchEngine, customEngines);
         }
 
+        /// <summary>
+        /// 地址栏输入是否是没有写协议的域名（可自动补全 https/www/http）。
+        /// 含空格、显式协议、内部页都不算。
+        /// </summary>
+        public static bool IsAutoSchemeCandidate(string input)
+        {
+            if (string.IsNullOrWhiteSpace(input))
+            {
+                return false;
+            }
+
+            string value = input.Trim();
+
+            if (value.IndexOf(' ') >= 0)
+            {
+                return false;
+            }
+
+            if (value.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                value.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
+                value.StartsWith("about:", StringComparison.OrdinalIgnoreCase) ||
+                value.StartsWith("file:", StringComparison.OrdinalIgnoreCase) ||
+                value.StartsWith("data:", StringComparison.OrdinalIgnoreCase) ||
+                value.StartsWith("vantage:", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            return value.IndexOf('.') >= 0 || value.IndexOf(':') >= 0;
+        }
+
+        /// <summary>
+        /// 自动补全候选：https://host → https://www.host → http://host → http://www.host。
+        /// 只在原地址是自动补出的 https 时使用；IP、localhost 和不带 www 的显式地址不展开。
+        /// </summary>
+        public static string[] BuildFallbackChain(string url)
+        {
+            Uri uri;
+
+            if (!Uri.TryCreate(url, UriKind.Absolute, out uri) ||
+                !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            if (uri.HostNameType == UriHostNameType.IPv4 ||
+                uri.HostNameType == UriHostNameType.IPv6 ||
+                string.Equals(uri.Host, "localhost", StringComparison.OrdinalIgnoreCase))
+            {
+                return new[] { uri.AbsoluteUri };
+            }
+
+            bool hasWww = uri.Host.StartsWith("www.", StringComparison.OrdinalIgnoreCase);
+            string primary = uri.AbsoluteUri;
+            List<string> candidates = new List<string>();
+            candidates.Add(primary);
+
+            if (!hasWww)
+            {
+                candidates.Add(WithHost(primary, "www." + uri.Host, null));
+            }
+
+            candidates.Add(WithHost(primary, null, Uri.UriSchemeHttp));
+
+            if (!hasWww)
+            {
+                candidates.Add(WithHost(primary, "www." + uri.Host, Uri.UriSchemeHttp));
+            }
+
+            return candidates.ToArray();
+        }
+
+        private static string WithHost(string url, string host, string scheme)
+        {
+            UriBuilder builder = new UriBuilder(url);
+
+            if (!string.IsNullOrEmpty(host))
+            {
+                builder.Host = host;
+            }
+
+            if (!string.IsNullOrEmpty(scheme))
+            {
+                builder.Scheme = scheme;
+            }
+
+            return builder.Uri.AbsoluteUri;
+        }
+
         public static string BuildSearchUrl(string query, string searchEngine, IList<CustomSearchEngine> customEngines)
         {
             string escaped = Uri.EscapeDataString(query ?? string.Empty);

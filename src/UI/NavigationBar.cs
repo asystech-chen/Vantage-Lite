@@ -31,6 +31,10 @@ namespace VantageLite.UI
         private GlyphButton _menuButton;
         private Panel _addressHost;
         private TextBox _addressBox;
+        private Label _securityIcon;
+        private string _currentUrl;
+        private bool _settingAddress;
+        private bool _addressEdited;
         private FlowLayoutPanel _buttonsPanel;
         private FlowLayoutPanel _rightButtonsPanel;
         private bool _isLoading;
@@ -70,6 +74,13 @@ namespace VantageLite.UI
             _addressBox.BackColor = palette.AddressBackground;
             _addressBox.ForeColor = palette.TextPrimary;
 
+            if (_securityIcon != null)
+            {
+                _securityIcon.BackColor = palette.AddressBackground;
+            }
+
+            UpdateSecurityIcon();
+
             Button[] buttons = { _backButton, _forwardButton, _reloadButton, _homeButton, _bookmarkButton, _downloadButton, _menuButton };
             for (int i = 0; i < buttons.Length; i++)
             {
@@ -87,10 +98,17 @@ namespace VantageLite.UI
 
         public void SetAddress(string url)
         {
-            if (!_addressBox.Focused)
+            _currentUrl = url;
+
+            // 用户正在手工输入时不要覆盖；按回车后允许把补全后的完整 URL 写回来。
+            if (!_addressBox.Focused || !_addressEdited)
             {
+                _settingAddress = true;
                 _addressBox.Text = url ?? string.Empty;
+                _settingAddress = false;
             }
+
+            UpdateSecurityIcon();
         }
 
         public void FocusAddressBar()
@@ -191,7 +209,19 @@ namespace VantageLite.UI
             _addressBox.Dock = DockStyle.None;
             _addressBox.AutoSize = false;
             _addressBox.KeyDown += AddressBox_KeyDown;
-            _addressBox.GotFocus += delegate { _addressBox.SelectAll(); };
+            _addressBox.GotFocus += delegate
+            {
+                _addressEdited = false;
+                _addressBox.SelectAll();
+            };
+            _addressBox.LostFocus += delegate { _addressEdited = false; };
+            _addressBox.TextChanged += delegate
+            {
+                if (!_settingAddress)
+                {
+                    _addressEdited = true;
+                }
+            };
 
             _addressHost = new BufferedPanel();
             _addressHost.Dock = DockStyle.Fill;
@@ -199,6 +229,14 @@ namespace VantageLite.UI
             _addressHost.Paint += AddressHost_Paint;
             _addressHost.Resize += delegate { _addressHost.Invalidate(); };
             _addressHost.Controls.Add(_addressBox);
+
+            _securityIcon = new Label();
+            _securityIcon.AutoSize = false;
+            _securityIcon.TextAlign = ContentAlignment.MiddleCenter;
+            _securityIcon.Font = IconFont.CreatePx(13f);
+            _securityIcon.Visible = false;
+            _securityIcon.Cursor = Cursors.Default;
+            _addressHost.Controls.Add(_securityIcon);
             _addressHost.Resize += delegate
             {
                 LayoutAddressBox();
@@ -285,13 +323,62 @@ namespace VantageLite.UI
 
             int left = _addressHost.Padding.Left;
             int top = _addressHost.Padding.Top;
-            int width = Math.Max(0, _addressHost.ClientSize.Width - left - _addressHost.Padding.Right);
             int available = Math.Max(1, _addressHost.ClientSize.Height - top - _addressHost.Padding.Bottom);
             int textHeight = TextRenderer.MeasureText("国Ag", _addressBox.Font).Height;
             int boxHeight = Math.Min(available, textHeight + WindowChrome.Scale(this, 4));
             int y = top + Math.Max(0, (available - boxHeight) / 2);
 
+            if (_securityIcon != null && _securityIcon.Visible)
+            {
+                int iconWidth = WindowChrome.Scale(this, 18);
+                _securityIcon.SetBounds(left, y, iconWidth, boxHeight);
+                left += iconWidth + WindowChrome.Scale(this, 4);
+            }
+
+            int width = Math.Max(0, _addressHost.ClientSize.Width - left - _addressHost.Padding.Right);
             _addressBox.SetBounds(left, y, width, boxHeight);
+        }
+
+        /// <summary>
+        /// 地址栏左侧的加密状态：HTTPS 闭合锁，HTTP 打开锁，内部页/空地址不显示。
+        /// </summary>
+        private void UpdateSecurityIcon()
+        {
+            if (_securityIcon == null)
+            {
+                return;
+            }
+
+            string scheme = null;
+            Uri uri;
+
+            if (!string.IsNullOrEmpty(_currentUrl) &&
+                Uri.TryCreate(_currentUrl, UriKind.Absolute, out uri))
+            {
+                scheme = uri.Scheme;
+            }
+
+            if (string.Equals(scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+            {
+                _securityIcon.Text = IconFont.Lock;
+                _securityIcon.ForeColor = ThemeManager.Current.TextSecondary;
+                _toolTip.SetToolTip(_securityIcon, "连接已加密（HTTPS）");
+                _securityIcon.Visible = true;
+            }
+            else if (string.Equals(scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase))
+            {
+                _securityIcon.Text = IconFont.Unlock;
+                _securityIcon.ForeColor = ThemeManager.Current.Warning;
+                _toolTip.SetToolTip(_securityIcon, "此页面未加密（HTTP），信息可能被窃听或篡改");
+                _securityIcon.Visible = true;
+            }
+            else
+            {
+                _securityIcon.Visible = false;
+                _toolTip.SetToolTip(_securityIcon, null);
+            }
+
+            LayoutAddressBox();
         }
 
         private GlyphButton CreateButton(string glyph, string toolTip)
@@ -330,6 +417,8 @@ namespace VantageLite.UI
             }
 
             e.SuppressKeyPress = true;
+            _addressEdited = false;
+
             EventHandler<string> handler = NavigateRequested;
             if (handler != null)
             {

@@ -32,6 +32,7 @@ namespace VantageLite.Browser
         public event EventHandler ActiveTabChanged;
         public event EventHandler Empty;
         public event EventHandler<string> NewWindowRequested;
+        public event EventHandler<NavigatedEventArgs> Navigated;
 
         public TabManager(
             Control host,
@@ -73,6 +74,7 @@ namespace VantageLite.Browser
             BrowserTab tab = new BrowserTab(_nextId++, _environment, _enableDevTools, url);
             tab.TitleChanged += TabTitleChanged;
             tab.NewWindowRequested += TabNewWindowRequested;
+            tab.Navigated += TabNavigated;
             _tabs.Add(tab);
             _host.Controls.Add(tab);
             tab.Dock = DockStyle.Fill;

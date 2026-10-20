@@ -116,7 +116,18 @@ namespace VantageLite.UI
             if (sender == ActiveTab)
             {
                 _navigationBar.SetAddress(url);
+                UpdateBookmarkState();
             }
+        }
+
+        private void TabManager_Navigated(object sender, NavigatedEventArgs e)
+        {
+            if (e == null || string.IsNullOrEmpty(e.Url))
+            {
+                return;
+            }
+
+            _history.Add(e.Url, e.Title);
         }
 
         private void Tab_NavigationStateChanged(object sender, EventArgs e)

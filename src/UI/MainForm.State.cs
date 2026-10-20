@@ -23,6 +23,7 @@ namespace VantageLite.UI
 
             _navigationBar.SetAddress(tab.Url);
             _navigationBar.SetNavigationState(tab.CanGoBack, tab.CanGoForward);
+            UpdateBookmarkState();
             UpdateWindowTitle();
         }
 

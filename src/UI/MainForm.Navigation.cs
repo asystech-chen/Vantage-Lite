@@ -52,6 +52,13 @@ namespace VantageLite.UI
                 return;
             }
 
+            string internalPage = NormalizeInternalPage(address);
+            if (internalPage != null)
+            {
+                ShowInternalPage(internalPage);
+                return;
+            }
+
             string url = UrlHelper.Normalize(address);
             if (url == null)
             {

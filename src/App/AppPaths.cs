@@ -27,6 +27,14 @@ namespace VantageLite.App
             get { return Path.Combine(DataRoot, "UserData"); }
         }
 
+        /// <summary>
+        /// 持久化数据目录：书签、历史等。
+        /// </summary>
+        public static string DataDirectory
+        {
+            get { return Path.Combine(DataRoot, "data"); }
+        }
+
         public static string DefaultLogDir
         {
             get { return Path.Combine(DataRoot, "Logs"); }

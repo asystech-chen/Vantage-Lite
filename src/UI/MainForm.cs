@@ -1,10 +1,12 @@
 using System;
 using System.Diagnostics;
+using System.IO;
 using System.Windows.Forms;
 using Microsoft.Web.WebView2.Core;
 using VantageLite.App;
 using VantageLite.Browser;
 using VantageLite.Diagnostics;
+using VantageLite.Storage;
 
 namespace VantageLite.UI
 {
@@ -23,6 +25,8 @@ namespace VantageLite.UI
         private Panel _contentHost;
         private TabManager _tabManager;
         private BrowserTab _attachedTab;
+        private BookmarkStore _bookmarks;
+        private HistoryStore _history;
         private bool _minimized;
         private Timer _resizeSettleTimer;
 
@@ -34,6 +38,9 @@ namespace VantageLite.UI
         public MainForm(CommandLineOptions options)
         {
             _options = options ?? new CommandLineOptions();
+            _bookmarks = new BookmarkStore(Path.Combine(AppPaths.DataDirectory, "bookmarks.json"));
+            _history = new HistoryStore(Path.Combine(AppPaths.DataDirectory, "history.json"));
+
             BuildLayout();
             WireNavigationEvents();
             InitializeTheme();
@@ -95,6 +102,7 @@ namespace VantageLite.UI
                 _tabManager.ActiveTabChanged += TabManager_ActiveTabChanged;
                 _tabManager.Empty += TabManager_Empty;
                 _tabManager.NewWindowRequested += TabManager_NewWindowRequested;
+                _tabManager.Navigated += TabManager_Navigated;
 
                 _tabStrip.TabSelected += TabStrip_TabSelected;
                 _tabStrip.TabCloseRequested += TabStrip_TabCloseRequested;
@@ -120,6 +128,8 @@ namespace VantageLite.UI
         {
             Log.Info("Main window closed.");
             _resizeSettleTimer.Dispose();
+            _history.Save();
+            _bookmarks.Save();
             ShutdownTheme();
 
             if (_tabManager != null)

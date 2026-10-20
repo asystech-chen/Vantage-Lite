@@ -49,6 +49,7 @@ namespace VantageLite.UI
             _navigationBar.ReloadRequested += delegate { Reload(); };
             _navigationBar.StopRequested += delegate { StopLoading(); };
             _navigationBar.HomeRequested += delegate { NavigateTo(DefaultHomeUrl); };
+            _navigationBar.BookmarkRequested += delegate { ToggleBookmark(); };
         }
 
         private static Icon LoadApplicationIcon()

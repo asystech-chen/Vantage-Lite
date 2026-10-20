@@ -34,6 +34,30 @@ namespace VantageLite.UI
 
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
+            if (keyData == (Keys.Control | Keys.D))
+            {
+                ToggleBookmark();
+                return true;
+            }
+
+            if (keyData == (Keys.Control | Keys.H))
+            {
+                ShowInternalPage("about:history");
+                return true;
+            }
+
+            if (keyData == (Keys.Control | Keys.Shift | Keys.O))
+            {
+                ShowInternalPage("about:bookmarks");
+                return true;
+            }
+
+            if (keyData == (Keys.Control | Keys.Shift | Keys.Delete))
+            {
+                ClearHistory();
+                return true;
+            }
+
             if (keyData == (Keys.Control | Keys.L))
             {
                 _navigationBar.FocusAddressBar();

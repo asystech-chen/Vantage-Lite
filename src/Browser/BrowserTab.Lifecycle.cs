@@ -250,6 +250,13 @@ namespace VantageLite.Browser
                 return false;
             }
 
+            // 内置页面无法按 URL 重建，丢弃后回到空白页。
+            if (_internalAddress != null)
+            {
+                _url = "about:blank";
+                _internalAddress = null;
+            }
+
             _pendingUrl = _url;
             _restorePending = true;
             _stateVersion++;

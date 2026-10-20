@@ -17,12 +17,14 @@ namespace VantageLite.UI
         public event EventHandler ReloadRequested;
         public event EventHandler StopRequested;
         public event EventHandler HomeRequested;
+        public event EventHandler BookmarkRequested;
 
         private readonly ToolTip _toolTip;
         private Button _backButton;
         private Button _forwardButton;
         private Button _reloadButton;
         private Button _homeButton;
+        private Button _bookmarkButton;
         private Panel _addressHost;
         private TextBox _addressBox;
         private bool _isLoading;
@@ -61,7 +63,7 @@ namespace VantageLite.UI
             _addressBox.BackColor = palette.AddressBackground;
             _addressBox.ForeColor = palette.TextPrimary;
 
-            Button[] buttons = { _backButton, _forwardButton, _reloadButton, _homeButton };
+            Button[] buttons = { _backButton, _forwardButton, _reloadButton, _homeButton, _bookmarkButton };
             for (int i = 0; i < buttons.Length; i++)
             {
                 buttons[i].BackColor = palette.ChromeBackground;
@@ -93,6 +95,12 @@ namespace VantageLite.UI
             _forwardButton.Enabled = canGoForward;
         }
 
+        public void SetBookmarked(bool bookmarked)
+        {
+            _bookmarkButton.Text = bookmarked ? IconFont.StarFilled : IconFont.Star;
+            _toolTip.SetToolTip(_bookmarkButton, bookmarked ? "取消收藏 (Ctrl+D)" : "收藏当前页面 (Ctrl+D)");
+        }
+
         public void SetLoading(bool loading)
         {
             _isLoading = loading;
@@ -117,10 +125,12 @@ namespace VantageLite.UI
             _forwardButton = CreateButton(IconFont.Forward, "前进 (Alt+→)");
             _reloadButton = CreateButton(IconFont.Refresh, "刷新 (F5)");
             _homeButton = CreateButton(IconFont.Home, "主页");
+            _bookmarkButton = CreateButton(IconFont.Star, "收藏当前页面 (Ctrl+D)");
 
             _backButton.Click += delegate { Raise(BackRequested); };
             _forwardButton.Click += delegate { Raise(ForwardRequested); };
             _homeButton.Click += delegate { Raise(HomeRequested); };
+            _bookmarkButton.Click += delegate { Raise(BookmarkRequested); };
             _reloadButton.Click += delegate
             {
                 if (_isLoading)
@@ -138,6 +148,15 @@ namespace VantageLite.UI
             buttons.Controls.Add(_reloadButton);
             buttons.Controls.Add(_homeButton);
 
+            FlowLayoutPanel rightButtons = new FlowLayoutPanel();
+            rightButtons.Dock = DockStyle.Right;
+            rightButtons.Width = 36;
+            rightButtons.WrapContents = false;
+            rightButtons.FlowDirection = FlowDirection.RightToLeft;
+            rightButtons.Margin = Padding.Empty;
+            rightButtons.Padding = Padding.Empty;
+            rightButtons.Controls.Add(_bookmarkButton);
+
             _addressBox = new TextBox();
             _addressBox.BorderStyle = BorderStyle.None;
             _addressBox.Font = ThemeFonts.Ui(10.5F);
@@ -153,6 +172,7 @@ namespace VantageLite.UI
             _addressHost.Controls.Add(_addressBox);
 
             Controls.Add(_addressHost);
+            Controls.Add(rightButtons);
             Controls.Add(buttons);
 
             SetNavigationState(false, false);

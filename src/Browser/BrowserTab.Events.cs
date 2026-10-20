@@ -86,6 +86,13 @@ namespace VantageLite.Browser
                 return;
             }
 
+            // NavigateToString 会把 Source 变成 about:blank，内置页面不覆盖地址栏。
+            if (_internalAddress != null && string.Equals(core.Source, "about:blank", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            _internalAddress = null;
             _url = core.Source;
             Log.Debug("[tab " + _id + "] source: " + _url);
 
@@ -131,11 +138,27 @@ namespace VantageLite.Browser
 
         private void Core_NavigationCompleted(object sender, CoreWebView2NavigationCompletedEventArgs e)
         {
+            CoreWebView2 core = sender as CoreWebView2;
+            if (core == null || !ReferenceEquals(core, _core))
+            {
+                return;
+            }
+
             RaiseLoading(false);
 
             if (e.IsSuccess)
             {
                 RestorePendingScroll();
+
+                if (_internalAddress == null)
+                {
+                    EventHandler<NavigatedEventArgs> handler = Navigated;
+                    if (handler != null)
+                    {
+                        handler(this, new NavigatedEventArgs(core.Source, DisplayTitle));
+                    }
+                }
+
                 return;
             }
 

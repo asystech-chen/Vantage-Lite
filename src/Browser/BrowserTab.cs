@@ -2,6 +2,7 @@ using System;
 using System.Windows.Forms;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
+using VantageLite.Diagnostics;
 using VantageLite.Theming;
 
 namespace VantageLite.Browser
@@ -31,6 +32,7 @@ namespace VantageLite.Browser
         private int _stateVersion;
         private bool _isThrottled;
         private bool _statusBarSuppressed;
+        private string _internalAddress;
 
         public int Id
         {
@@ -144,6 +146,7 @@ namespace VantageLite.Browser
         public event EventHandler<bool> LoadingChanged;
         public event EventHandler<string> NewWindowRequested;
         public event EventHandler<string> ProcessFailed;
+        public event EventHandler<NavigatedEventArgs> Navigated;
 
         public BrowserTab(
             int id,
@@ -163,8 +166,40 @@ namespace VantageLite.Browser
             BackColor = ThemeManager.Current.WebViewBackground;
         }
 
+        /// <summary>
+        /// 显示内置页面（历史/书签）。地址栏保留 about: 地址，不计入浏览历史。
+        /// </summary>
+        public void ShowInternalPage(string address, string html)
+        {
+            _internalAddress = address;
+            _url = address;
+
+            EventHandler<string> handler = AddressChanged;
+            if (handler != null)
+            {
+                handler(this, _url);
+            }
+
+            if (_core == null)
+            {
+                Log.Debug("[tab " + _id + "] internal page skipped (not live): " + address);
+                return;
+            }
+
+            try
+            {
+                _core.NavigateToString(html ?? string.Empty);
+            }
+            catch (Exception ex)
+            {
+                Log.Warn("[tab " + _id + "] internal page failed: " + ex.Message);
+            }
+        }
+
         public void Navigate(string url)
         {
+            _internalAddress = null;
+
             if (_core == null)
             {
                 _pendingUrl = url;

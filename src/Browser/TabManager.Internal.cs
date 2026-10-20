@@ -69,6 +69,15 @@ namespace VantageLite.Browser
             RaiseTabsChanged();
         }
 
+        private void TabNavigated(object sender, NavigatedEventArgs e)
+        {
+            EventHandler<NavigatedEventArgs> handler = Navigated;
+            if (handler != null)
+            {
+                handler(this, e);
+            }
+        }
+
         private void TabNewWindowRequested(object sender, string url)
         {
             EventHandler<string> handler = NewWindowRequested;

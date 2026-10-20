@@ -34,6 +34,7 @@ namespace VantageLite.Browser
         public event EventHandler<NavigatedEventArgs> Navigated;
         public event EventHandler<string> WebMessage;
         public event EventHandler LastTabClosed;
+        public event EventHandler<CoreWebView2DownloadStartingEventArgs> DownloadStarting;
 
         public TabManager(
             Control host,
@@ -120,6 +121,7 @@ namespace VantageLite.Browser
             tab.NewWindowRequested += TabNewWindowRequested;
             tab.Navigated += TabNavigated;
             tab.WebMessage += TabWebMessage;
+            tab.DownloadStarting += TabDownloadStarting;
             _tabs.Add(tab);
             _host.Controls.Add(tab);
             tab.Dock = DockStyle.Fill;

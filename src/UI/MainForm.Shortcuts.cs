@@ -87,6 +87,12 @@ namespace VantageLite.UI
                 return true;
             }
 
+            if (keyData == (Keys.Control | Keys.J))
+            {
+                ToggleDownloadsPanel();
+                return true;
+            }
+
             // Ctrl+Shift+O 被 AMD Software 占用，主快捷键改为 Ctrl+Alt+B，两者都保留。
             if (keyData == (Keys.Control | Keys.Alt | Keys.B) ||
                 keyData == (Keys.Control | Keys.Shift | Keys.O))

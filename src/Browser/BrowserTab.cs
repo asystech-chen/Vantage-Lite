@@ -194,6 +194,7 @@ namespace VantageLite.Browser
         public event EventHandler<NavigatedEventArgs> Navigated;
         public event EventHandler<string> WebMessage;
         public event EventHandler FaviconChanged;
+        public event EventHandler<CoreWebView2DownloadStartingEventArgs> DownloadStarting;
 
         public BrowserTab(
             int id,

@@ -18,6 +18,7 @@ namespace VantageLite.UI
         public event EventHandler StopRequested;
         public event EventHandler HomeRequested;
         public event EventHandler BookmarkRequested;
+        public event EventHandler DownloadsRequested;
         public event EventHandler MenuRequested;
 
         private readonly ToolTip _toolTip;
@@ -26,6 +27,7 @@ namespace VantageLite.UI
         private GlyphButton _reloadButton;
         private GlyphButton _homeButton;
         private GlyphButton _bookmarkButton;
+        private GlyphButton _downloadButton;
         private GlyphButton _menuButton;
         private Panel _addressHost;
         private TextBox _addressBox;
@@ -66,7 +68,7 @@ namespace VantageLite.UI
             _addressBox.BackColor = palette.AddressBackground;
             _addressBox.ForeColor = palette.TextPrimary;
 
-            Button[] buttons = { _backButton, _forwardButton, _reloadButton, _homeButton, _bookmarkButton, _menuButton };
+            Button[] buttons = { _backButton, _forwardButton, _reloadButton, _homeButton, _bookmarkButton, _downloadButton, _menuButton };
             for (int i = 0; i < buttons.Length; i++)
             {
                 buttons[i].UseVisualStyleBackColor = false;
@@ -93,6 +95,15 @@ namespace VantageLite.UI
         {
             _addressBox.Focus();
             _addressBox.SelectAll();
+        }
+
+        /// <summary>
+        /// 下载按钮右下角的屏幕坐标，用于把下载面板贴在按钮下方弹出。
+        /// </summary>
+        public Point GetDownloadsAnchor()
+        {
+            return _downloadButton.PointToScreen(
+                new Point(_downloadButton.Width, _downloadButton.Height));
         }
 
         public void SetNavigationState(bool canGoBack, bool canGoForward)
@@ -133,12 +144,14 @@ namespace VantageLite.UI
             _reloadButton = CreateButton(IconFont.Refresh, "刷新 (F5)");
             _homeButton = CreateButton(IconFont.Home, "主页");
             _bookmarkButton = CreateButton(IconFont.Star, "收藏当前页面 (Ctrl+D)");
+            _downloadButton = CreateButton(IconFont.Download, "下载内容");
             _menuButton = CreateButton(IconFont.Menu, "菜单");
 
             _backButton.Click += delegate { Raise(BackRequested); };
             _forwardButton.Click += delegate { Raise(ForwardRequested); };
             _homeButton.Click += delegate { Raise(HomeRequested); };
             _bookmarkButton.Click += delegate { Raise(BookmarkRequested); };
+            _downloadButton.Click += delegate { Raise(DownloadsRequested); };
             _menuButton.Click += delegate { Raise(MenuRequested); };
             _reloadButton.Click += delegate
             {
@@ -159,12 +172,13 @@ namespace VantageLite.UI
 
             FlowLayoutPanel rightButtons = new FlowLayoutPanel();
             rightButtons.Dock = DockStyle.Right;
-            rightButtons.Width = 72;
+            rightButtons.Width = 108;
             rightButtons.WrapContents = false;
             rightButtons.FlowDirection = FlowDirection.RightToLeft;
             rightButtons.Margin = Padding.Empty;
             rightButtons.Padding = Padding.Empty;
             rightButtons.Controls.Add(_menuButton);
+            rightButtons.Controls.Add(_downloadButton);
             rightButtons.Controls.Add(_bookmarkButton);
 
             _addressBox = new TextBox();

@@ -84,6 +84,7 @@ namespace VantageLite.UI
         {
             return string.Equals(url, NewTabAddress, StringComparison.OrdinalIgnoreCase)
                 || string.Equals(url, HistoryAddress, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(url, DownloadsAddress, StringComparison.OrdinalIgnoreCase)
                 || string.Equals(url, BookmarksAddress, StringComparison.OrdinalIgnoreCase)
                 || string.Equals(url, AboutAddress, StringComparison.OrdinalIgnoreCase)
                 || string.Equals(url, PreferencesAddress, StringComparison.OrdinalIgnoreCase);

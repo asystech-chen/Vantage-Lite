@@ -33,6 +33,17 @@ namespace VantageLite.Browser
             core.ProcessFailed += Core_ProcessFailed;
             core.WebMessageReceived += Core_WebMessageReceived;
             core.FaviconChanged += Core_FaviconChanged;
+            core.DownloadStarting += Core_DownloadStarting;
+        }
+
+        private void Core_DownloadStarting(object sender, CoreWebView2DownloadStartingEventArgs e)
+        {
+            EventHandler<CoreWebView2DownloadStartingEventArgs> handler = DownloadStarting;
+
+            if (handler != null)
+            {
+                handler(this, e);
+            }
         }
 
         /// <summary>

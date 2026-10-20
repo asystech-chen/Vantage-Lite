@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using VantageLite.App;
 using VantageLite.Browser;
+using VantageLite.Downloads;
 using VantageLite.Storage;
 using VantageLite.Theming;
 
@@ -77,6 +78,188 @@ namespace VantageLite.UI
 
             return Page("历史", "共 " + total + " 条", body.ToString());
         }
+
+        public static string Downloads(IList<DownloadItem> items)
+        {
+            StringBuilder body = new StringBuilder();
+            int total = items == null ? 0 : items.Count;
+
+            body.Append("<style>")
+                .Append(".dl-list li{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)}")
+                .Append(".dl-main{min-width:0;flex:1}")
+                .Append(".dl-name{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}")
+                .Append(".dl-actions{display:flex;gap:4px;flex:0 0 auto}")
+                .Append(".icon-btn{width:30px;height:30px;padding:0;display:flex;align-items:center;justify-content:center;")
+                .Append("border:none;background:transparent;color:var(--muted);border-radius:6px;cursor:pointer}")
+                .Append(".icon-btn:hover{background:var(--btn);color:var(--fg)}")
+                .Append(".icon-btn.danger:hover{color:#d9534f}")
+                .Append(".icon-btn svg{width:16px;height:16px}")
+                .Append(".dl-status{color:var(--muted);font-size:12px;margin-top:2px}")
+                .Append(".dl-bar{height:4px;background:var(--btn);border-radius:2px;margin-top:6px;overflow:hidden}")
+                .Append(".dl-bar i{display:block;height:100%;background:var(--link);width:0}")
+                .Append("</style>");
+
+            body.Append("<div class=\"bar\"><span class=\"status\">共 ").Append(total).Append(" 条</span></div>");
+            body.Append("<ul class=\"dl-list\">");
+
+            for (int i = 0; i < total; i++)
+            {
+                DownloadItem item = items[i];
+                string id = Escape(item.Id);
+
+                body.Append("<li data-id=\"").Append(id).Append("\"><div class=\"dl-main\"><div class=\"dl-name\">")
+                    .Append(Escape(item.DisplayName)).Append("</div><div class=\"url\">")
+                    .Append(Escape(item.Url)).Append("</div><div class=\"dl-status\">")
+                    .Append(Escape(DescribeDownload(item))).Append("</div>");
+
+                // 只有进行中/暂停的任务显示进度条；完成、取消、失败不显示。
+                if (item.IsActive)
+                {
+                    body.Append("<div class=\"dl-bar\"><i style=\"width:")
+                        .Append(DownloadPercent(item)).Append("%\"></i></div>");
+                }
+
+                body.Append("</div><div class=\"dl-actions\">");
+
+                if (item.IsActive)
+                {
+                    if (item.Paused)
+                    {
+                        AppendDownloadIcon(body, "pause", id, "继续", IconPlay);
+                    }
+                    else
+                    {
+                        AppendDownloadIcon(body, "pause", id, "暂停", IconPause);
+                    }
+
+                    AppendDownloadIcon(body, "cancel", id, "取消下载", IconCancel);
+                }
+                else if (item.IsCompleted)
+                {
+                    AppendDownloadIcon(body, "open", id, "打开文件", IconOpen);
+                    AppendDownloadIcon(body, "folder", id, "打开所在文件夹", IconFolder);
+                    AppendDownloadIcon(body, "delete", id, "删除记录", IconDelete);
+                }
+                else
+                {
+                    AppendDownloadIcon(body, "retry", id, "重试", IconRetry);
+                    AppendDownloadIcon(body, "delete", id, "删除记录", IconDelete);
+                }
+
+                body.Append("</div></li>");
+            }
+
+            body.Append("</ul>");
+
+            if (total == 0)
+            {
+                body.Append("<p class=\"empty\">暂无下载记录。</p>");
+            }
+
+            body.Append("<script>");
+            body.Append("function post(o){try{window.chrome.webview.postMessage(JSON.stringify(o));}catch(e){}}");
+            body.Append("function act(a,id){post({cmd:'downloadAction',name:a,id:id});}");
+            body.Append("document.addEventListener('click',function(e){"
+                + "var b=e.target&&e.target.closest?e.target.closest('.icon-btn'):null;"
+                + "if(b){act(b.getAttribute('data-action'),b.getAttribute('data-id'));}});");
+            body.Append("function applyStatus(items){var map={};"
+                + "for(var i=0;i<items.length;i++){map[items[i].id]=items[i];}"
+                + "var rows=document.querySelectorAll('.dl-list li[data-id]');"
+                + "for(var j=0;j<rows.length;j++){var row=rows[j];var it=map[row.getAttribute('data-id')];"
+                + "if(!it){continue;}var s=row.querySelector('.dl-status');if(s){s.textContent=it.text;}"
+                + "var b=row.querySelector('.dl-bar i');if(b){b.style.width=(it.percent>0?it.percent:0)+'%';}}}");
+            body.Append("setInterval(function(){post({cmd:'downloadProgress'});},700);");
+            body.Append("if(window.chrome&&window.chrome.webview){window.chrome.webview.addEventListener('message',function(e){"
+                + "var d=e.data;if(typeof d!=='string'||d.charAt(0)!=='{'){return;}"
+                + "try{var o=JSON.parse(d);if(o&&o.items){applyStatus(o.items);}}catch(x){}});}");
+            body.Append("</script>");
+
+            return Page("下载", "共 " + total + " 条", body.ToString());
+        }
+
+        private static void AppendDownloadIcon(StringBuilder sb, string action, string id, string title, string svg)
+        {
+            sb.Append("<button type=\"button\" class=\"icon-btn\" title=\"").Append(Escape(title))
+                .Append("\" data-action=\"").Append(Escape(action))
+                .Append("\" data-id=\"").Append(id).Append("\">")
+                .Append(svg).Append("</button>");
+        }
+
+        internal static string DescribeDownload(DownloadItem item)
+        {
+            if (item.IsCompleted)
+            {
+                return "已完成 · " + FormatBytes(item.TotalBytes > 0 ? item.TotalBytes : item.BytesReceived);
+            }
+
+            if (string.Equals(item.State, DownloadItem.StatePaused, StringComparison.Ordinal))
+            {
+                return "已暂停 · " + FormatProgress(item);
+            }
+
+            if (string.Equals(item.State, DownloadItem.StateCancelled, StringComparison.Ordinal))
+            {
+                return "已取消";
+            }
+
+            if (item.IsFailed)
+            {
+                return string.IsNullOrEmpty(item.Error) ? "已中断" : "已中断 · " + item.Error;
+            }
+
+            return "下载中 · " + FormatProgress(item);
+        }
+
+        private static int DownloadPercent(DownloadItem item)
+        {
+            if (item.TotalBytes > 0)
+            {
+                return (int)Math.Round(item.Progress * 100);
+            }
+
+            return item.IsCompleted ? 100 : 0;
+        }
+
+        private static string FormatProgress(DownloadItem item)
+        {
+            if (item.TotalBytes > 0)
+            {
+                int percent = (int)Math.Round(item.Progress * 100);
+                return FormatBytes(item.BytesReceived) + " / " + FormatBytes(item.TotalBytes) + " (" + percent + "%)";
+            }
+
+            return FormatBytes(item.BytesReceived);
+        }
+
+        private static string FormatBytes(long bytes)
+        {
+            if (bytes <= 0)
+            {
+                return "0 B";
+            }
+
+            string[] units = { "B", "KB", "MB", "GB" };
+            double value = bytes;
+            int unit = 0;
+
+            while (value >= 1024 && unit < units.Length - 1)
+            {
+                value /= 1024;
+                unit++;
+            }
+
+            return unit == 0
+                ? ((long)value) + " " + units[unit]
+                : value.ToString("0.0") + " " + units[unit];
+        }
+
+        private const string IconOpen = "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linejoin=\"round\"><path d=\"M5 3h7l4 4v14H5z\"/><path d=\"M12 3v4h4\"/></svg>";
+        private const string IconFolder = "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linejoin=\"round\"><path d=\"M3 6a1 1 0 0 1 1-1h5l2 2h8a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z\"/></svg>";
+        private const string IconDelete = "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\"><path d=\"M4 7h16\"/><path d=\"M9 7V4h6v3\"/><path d=\"M6 7l1 13h10l1-13\"/><path d=\"M10 11v6M14 11v6\"/></svg>";
+        private const string IconPause = "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.2\" stroke-linecap=\"round\"><path d=\"M9 5v14M15 5v14\"/></svg>";
+        private const string IconPlay = "<svg viewBox=\"0 0 24 24\" fill=\"currentColor\"><path d=\"M8 5l11 7-11 7z\"/></svg>";
+        private const string IconCancel = "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"><path d=\"M6 6l12 12M18 6L6 18\"/></svg>";
+        private const string IconRetry = "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M20 12a8 8 0 1 1-2.34-5.66\"/><path d=\"M20 4v5h-5\"/></svg>";
 
         private static void AppendHistoryFilter(StringBuilder sb, string key, string label)
         {
@@ -1020,6 +1203,7 @@ function clearDrop(){
                 + "a{color:var(--link);text-decoration:none}"
                 + "a:hover{text-decoration:underline}"
                 + ".url{color:var(--muted);font-size:12px;word-break:break-all}"
+                + ".name,.url,.dl-name{overflow-wrap:anywhere}"
                 + ".empty{color:var(--muted);padding:24px 0}"
                 + ".tree .tree{padding-left:20px}"
                 + ".row{display:flex;align-items:center;gap:8px}"
@@ -1081,7 +1265,8 @@ function clearDrop(){
                 + "span.sc-icon{display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--muted)}"
                 + "@media (max-width:640px){.shortcuts{grid-template-columns:repeat(2,minmax(0,1fr))}}"
                 + ".filters{display:flex;align-items:center;gap:6px;margin-bottom:14px;flex-wrap:wrap}"
-                + ".settings{max-width:780px}"
+                + ".settings{max-width:780px;margin:0 auto}"
+                + ".page{max-width:900px;width:100%;margin:0 auto;box-sizing:border-box}"
                 + ".card{border:1px solid var(--border);border-radius:10px;background:var(--card);margin-bottom:14px}"
                 + ".card-head{padding:14px 18px 0}"
                 + ".card-head h2{font-size:15px;font-weight:600;margin:0}"
@@ -1114,11 +1299,11 @@ function clearDrop(){
                 + "s.setProperty('--bg',t.bg);s.setProperty('--fg',t.fg);s.setProperty('--muted',t.muted);"
                 + "s.setProperty('--border',t.border);s.setProperty('--link',t.link);s.setProperty('--btn',t.btn);"
                 + "s.setProperty('--card',t.card);s.setProperty('--input',t.input);}"
-                + "</script></head><body>"
+                + "</script></head><body><div class=\"page\">"
                 + (hideHeader
                     ? string.Empty
                     : "<h1>" + Escape(title) + "</h1><div class=\"sub\">" + Escape(subtitle) + "</div>")
-                + body + "</body></html>";
+                + body + "</div></body></html>";
         }
 
         /// <summary>

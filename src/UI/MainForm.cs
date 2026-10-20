@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Drawing;
 using System.IO;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -8,6 +9,7 @@ using Microsoft.Web.WebView2.Core;
 using VantageLite.App;
 using VantageLite.Browser;
 using VantageLite.Diagnostics;
+using VantageLite.Downloads;
 using VantageLite.Storage;
 
 namespace VantageLite.UI
@@ -31,6 +33,9 @@ namespace VantageLite.UI
         private BookmarkStore _bookmarks;
         private readonly HashSet<string> _expandedBookmarks = new HashSet<string>(StringComparer.Ordinal);
         private HistoryStore _history;
+        private DownloadManager _downloads;
+        private DownloadsForm _downloadsForm;
+        private DateTime _downloadsClosedUtc;
         private AppSettings _settings;
         private bool _minimized;
         private Timer _resizeSettleTimer;
@@ -48,6 +53,22 @@ namespace VantageLite.UI
             _options = options ?? new CommandLineOptions();
             _bookmarks = new BookmarkStore(Path.Combine(AppPaths.DataDirectory, "bookmarks.json"));
             _history = new HistoryStore(Path.Combine(AppPaths.DataDirectory, "history.json"));
+            _downloads = new DownloadManager(Path.Combine(AppPaths.DataDirectory, "downloads.json"));
+            _downloads.Started += Downloads_Started;
+            _downloads.Changed += delegate
+            {
+                // 下载事件可能来自页面消息处理，延后重绘，避免在 WebMessage 回调里导航页面。
+                if (IsHandleCreated)
+                {
+                    try
+                    {
+                        BeginInvoke(new Action(RenderDownloadsPage));
+                    }
+                    catch
+                    {
+                    }
+                }
+            };
             _settings = JsonFile.Load<AppSettings>(Path.Combine(AppPaths.DataDirectory, "settings.json"), null)
                 ?? AppSettings.CreateDefault();
 
@@ -205,6 +226,10 @@ namespace VantageLite.UI
                 _tabManager.Navigated += TabManager_Navigated;
                 _tabManager.WebMessage += TabManager_WebMessage;
                 _tabManager.LastTabClosed += delegate { CreateNewTab(); };
+                _tabManager.DownloadStarting += delegate(object downloadSender, CoreWebView2DownloadStartingEventArgs downloadArgs)
+                {
+                    _downloads.Begin(downloadArgs);
+                };
                 _tabManager.InternalHtmlProvider = BuildInternalPageHtml;
 
                 _tabManager.SetDownloadDirectory(_settings.DownloadDirectory);
@@ -251,6 +276,11 @@ namespace VantageLite.UI
 
         private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
         {
+            if (_downloads != null)
+            {
+                _downloads.MarkActiveInterrupted();
+            }
+
             if (_settings == null || !_settings.ClearOnExit)
             {
                 return;
@@ -276,6 +306,87 @@ namespace VantageLite.UI
             Log.Info("History cleared on exit");
         }
 
+        private void Downloads_Started(object sender, DownloadItem item)
+        {
+            if (WindowState == FormWindowState.Minimized)
+            {
+                return;
+            }
+
+            // 下载事件来自 WebView2 回调，延后到消息循环再开面板，避免重入。
+            if (IsHandleCreated)
+            {
+                try
+                {
+                    BeginInvoke(new Action(ShowDownloadsPanel));
+                }
+                catch
+                {
+                }
+
+                return;
+            }
+
+            ShowDownloadsPanel();
+        }
+
+        private void ShowDownloadsPanel()
+        {
+            if (_downloadsForm != null && !_downloadsForm.IsDisposed)
+            {
+                _downloadsForm.RefreshItems();
+                _downloadsForm.Activate();
+                return;
+            }
+
+            _downloadsForm = new DownloadsForm(_downloads);
+            _downloadsForm.FormClosed += delegate
+            {
+                _downloadsForm = null;
+                _downloadsClosedUtc = DateTime.UtcNow;
+            };
+            _downloadsForm.ViewAllRequested += delegate
+            {
+                _downloadsForm.Close();
+                OpenInternalPage(DownloadsAddress);
+            };
+            _downloadsForm.RetryRequested += delegate(object sender, DownloadItem item)
+            {
+                RetryDownload(item);
+            };
+
+            // 弹出在下载按钮下方，而不是屏幕角落。
+            Point anchor = _navigationBar.GetDownloadsAnchor();
+            Rectangle area = Screen.FromControl(this).WorkingArea;
+            int x = anchor.X - _downloadsForm.Width;
+            int y = anchor.Y + 4;
+            x = Math.Max(area.Left + 8, Math.Min(x, area.Right - _downloadsForm.Width - 8));
+            y = Math.Max(area.Top + 8, Math.Min(y, area.Bottom - _downloadsForm.Height - 8));
+
+            _downloadsForm.Location = new Point(x, y);
+            _downloadsForm.Show(this);
+        }
+
+        /// <summary>
+        /// 按钮/菜单/快捷键切换面板。面板因点到外面自动收起后，短时间内不再重开，
+        /// 避免“点按钮关闭又被同一次点击打开”。
+        /// </summary>
+        private void ToggleDownloadsPanel()
+        {
+            if (_downloadsForm != null && !_downloadsForm.IsDisposed)
+            {
+                _downloadsForm.Close();
+                return;
+            }
+
+            if ((DateTime.UtcNow - _downloadsClosedUtc).TotalMilliseconds < 250)
+            {
+                return;
+            }
+
+            ShowDownloadsPanel();
+        }
+
         private void MainForm_FormClosed(object sender, FormClosedEventArgs e)
         {
             Log.Info("Main window closed.");
@@ -284,6 +395,12 @@ namespace VantageLite.UI
             _faviconRefreshTimer.Dispose();
             _history.Save();
             _bookmarks.Save();
+
+            if (_downloads != null)
+            {
+                _downloads.Dispose();
+            }
+
             ShutdownTheme();
 
             if (_tabManager != null)

@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using Microsoft.Web.WebView2.Core;
 using VantageLite.Diagnostics;
 
 namespace VantageLite.Browser
@@ -28,6 +29,19 @@ namespace VantageLite.Browser
             for (int i = _tabs.Count - 1; i >= 0; i--)
             {
                 _tabs[i].Dispose();
+            }
+
+            if (_downloadWorker != null)
+            {
+                try
+                {
+                    _downloadWorker.Dispose();
+                }
+                catch
+                {
+                }
+
+                _downloadWorker = null;
             }
 
             _tabs.Clear();
@@ -93,6 +107,15 @@ namespace VantageLite.Browser
             if (handler != null)
             {
                 handler(this, url);
+            }
+        }
+
+        private void TabDownloadStarting(object sender, CoreWebView2DownloadStartingEventArgs e)
+        {
+            EventHandler<CoreWebView2DownloadStartingEventArgs> handler = DownloadStarting;
+            if (handler != null)
+            {
+                handler(this, e);
             }
         }
 

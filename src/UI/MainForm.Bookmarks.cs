@@ -8,6 +8,7 @@ using Microsoft.Web.WebView2.Core;
 using VantageLite.App;
 using VantageLite.Browser;
 using VantageLite.Diagnostics;
+using VantageLite.Downloads;
 using VantageLite.Storage;
 
 namespace VantageLite.UI
@@ -20,6 +21,7 @@ namespace VantageLite.UI
     {
         private const string NewTabAddress = "about:newtab";
         private const string HistoryAddress = "about:history";
+        private const string DownloadsAddress = "about:downloads";
         private const string BookmarksAddress = "about:bookmarks";
         private const string AboutAddress = "about:about";
         private const string PreferencesAddress = "about:preferences";
@@ -109,6 +111,11 @@ namespace VantageLite.UI
             if (string.Equals(address, HistoryAddress, StringComparison.OrdinalIgnoreCase))
             {
                 return InternalPages.History(_history.Items);
+            }
+
+            if (string.Equals(address, DownloadsAddress, StringComparison.OrdinalIgnoreCase))
+            {
+                return InternalPages.Downloads(_downloads.Items);
             }
 
             if (string.Equals(address, AboutAddress, StringComparison.OrdinalIgnoreCase))
@@ -266,6 +273,149 @@ namespace VantageLite.UI
             }
         }
 
+        /// <summary>
+        /// 下载页重绘：下载状态变化后让 about:downloads 与数据保持一致。
+        /// </summary>
+        private void RenderDownloadsPage()
+        {
+            if (_tabManager == null || _downloads == null)
+            {
+                return;
+            }
+
+            string html = InternalPages.Downloads(_downloads.Items);
+
+            for (int i = 0; i < _tabManager.Tabs.Count; i++)
+            {
+                BrowserTab tab = _tabManager.Tabs[i];
+
+                if (tab.IsLive &&
+                    string.Equals(tab.Url, DownloadsAddress, StringComparison.OrdinalIgnoreCase))
+                {
+                    tab.ShowInternalPage(DownloadsAddress, html);
+                }
+            }
+        }
+
+        /// <summary>
+        /// 下载页轮询响应：只回传状态文本和百分比，页面原地更新，不重载页面。
+        /// </summary>
+        private void PostDownloadProgress()
+        {
+            BrowserTab page = ActiveTab;
+
+            if (page == null ||
+                !string.Equals(page.Url, DownloadsAddress, StringComparison.OrdinalIgnoreCase) ||
+                _downloads == null)
+            {
+                return;
+            }
+
+            StringBuilder json = new StringBuilder();
+            json.Append("{\"items\":[");
+
+            for (int i = 0; i < _downloads.Items.Count; i++)
+            {
+                DownloadItem item = _downloads.Items[i];
+
+                if (i > 0)
+                {
+                    json.Append(',');
+                }
+
+                int percent = item.TotalBytes > 0
+                    ? (int)Math.Round(item.Progress * 100)
+                    : (item.IsCompleted ? 100 : 0);
+
+                json.Append("{\"id\":\"").Append(EscapeJson(item.Id))
+                    .Append("\",\"text\":\"").Append(EscapeJson(InternalPages.DescribeDownload(item)))
+                    .Append("\",\"percent\":").Append(percent).Append('}');
+            }
+
+            json.Append("]}");
+            page.PostWebMessage(json.ToString());
+        }
+
+        private void HandleDownloadAction(BookmarkCommand command)
+        {
+            DownloadItem item = null;
+
+            for (int i = 0; i < _downloads.Items.Count; i++)
+            {
+                if (string.Equals(_downloads.Items[i].Id, command.Id, StringComparison.Ordinal))
+                {
+                    item = _downloads.Items[i];
+                    break;
+                }
+            }
+
+            if (item == null)
+            {
+                Log.Warn("[download] action item missing: " + command.Id);
+                return;
+            }
+
+            string action = (command.Name ?? string.Empty).Trim().ToLowerInvariant();
+            Log.Info("[download] action " + action + " id=" + command.Id);
+
+            switch (action)
+            {
+                case "open":
+                    _downloads.OpenFile(item);
+                    break;
+                case "folder":
+                    _downloads.OpenFolder(item);
+                    break;
+                case "delete":
+                    _downloads.Delete(item);
+                    break;
+                case "pause":
+                    if (item.Paused)
+                    {
+                        _downloads.Resume(item);
+                    }
+                    else
+                    {
+                        _downloads.Pause(item);
+                    }
+                    break;
+                case "cancel":
+                    _downloads.Cancel(item);
+                    break;
+                case "retry":
+                    RetryDownload(item);
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// 重试：用新标签重新访问下载地址，让 WebView2 再次触发 DownloadStarting。
+        /// </summary>
+        private async void RetryDownload(DownloadItem item)
+        {
+            if (item == null || string.IsNullOrWhiteSpace(item.Url) || _tabManager == null)
+            {
+                return;
+            }
+
+            try
+            {
+                // 复用原记录：先把任务标记为“正在重试”，隐藏工作标签触发下载后接管它。
+                _downloads.QueueRetry(item);
+
+                bool started = await _tabManager.NavigateDownloadWorkerAsync(item.Url);
+
+                if (!started)
+                {
+                    _downloads.FailRetry(item, "无法启动下载");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Retry download failed: " + item.Url, ex);
+            }
+        }
+
         private async void TabManager_WebMessage(object sender, string message)
         {
             if (message != null && message.IndexOf("dismissMenus", StringComparison.Ordinal) >= 0)
@@ -274,14 +424,21 @@ namespace VantageLite.UI
                 return;
             }
 
-            Log.Info("[bookmarks] message: " + message);
-
             BookmarkCommand command = JsonFile.Parse<BookmarkCommand>(message);
             if (command == null || string.IsNullOrEmpty(command.Cmd))
             {
                 Log.Warn("[bookmarks] unparsed message: " + message);
                 return;
             }
+
+            // 下载页每 700ms 轮询一次进度，不能进日志，否则日志会被刷爆。
+            if (string.Equals(command.Cmd, "downloadProgress", StringComparison.OrdinalIgnoreCase))
+            {
+                PostDownloadProgress();
+                return;
+            }
+
+            Log.Info("[bookmarks] message: " + message);
 
             if (string.Equals(command.Cmd, "ping", StringComparison.OrdinalIgnoreCase))
             {
@@ -311,6 +468,12 @@ namespace VantageLite.UI
                     ShowBookmarkManager();
                 }
 
+                return;
+            }
+
+            if (string.Equals(command.Cmd, "downloadAction", StringComparison.OrdinalIgnoreCase))
+            {
+                HandleDownloadAction(command);
                 return;
             }
 
@@ -929,6 +1092,11 @@ namespace VantageLite.UI
                 return HistoryAddress;
             }
 
+            if (value == DownloadsAddress || value == "vantage:downloads")
+            {
+                return DownloadsAddress;
+            }
+
             if (value == BookmarksAddress || value == "vantage:bookmarks")
             {
                 return BookmarksAddress;
@@ -974,6 +1142,7 @@ namespace VantageLite.UI
 
             menu.Items.Add(AddMenuItem("新建标签页", delegate { CreateNewTab(); }));
             menu.Items.Add(AddMenuItem("历史", delegate { OpenInternalPage(HistoryAddress); }));
+            menu.Items.Add(AddMenuItem("下载内容", delegate { ToggleDownloadsPanel(); }));
             menu.Items.Add(AddMenuItem("书签管理器", delegate { ShowBookmarkManager(); }));
             menu.Items.Add(AddMenuItem(
                 _bookmarksBar.Visible ? "隐藏书签栏" : "显示书签栏",

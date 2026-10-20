@@ -1,6 +1,9 @@
 using System;
 using System.IO;
+using System.Threading.Tasks;
+using System.Windows.Forms;
 using Microsoft.Web.WebView2.Core;
+using VantageLite.App;
 using VantageLite.Diagnostics;
 
 namespace VantageLite.Browser
@@ -14,6 +17,61 @@ namespace VantageLite.Browser
     {
         private string _downloadDirectory;
         private bool _downloadDirectoryApplied;
+        private BrowserTab _downloadWorker;
+
+        /// <summary>
+        /// 用一个隐藏标签在后台重新发起下载，避免重试时弹出可见标签。
+        /// </summary>
+        public async Task<bool> NavigateDownloadWorkerAsync(string url)
+        {
+            if (_disposed || string.IsNullOrWhiteSpace(url))
+            {
+                return false;
+            }
+
+            BrowserTab worker = _downloadWorker;
+
+            try
+            {
+                if (worker == null || worker.IsDisposed || !worker.IsLive)
+                {
+                    worker = new BrowserTab(_nextId++, _environment, false, url);
+                    worker.DownloadStarting += TabDownloadStarting;
+                    _host.Controls.Add(worker);
+                    worker.Dock = DockStyle.Fill;
+                    worker.SendToBack();
+                    // 初始化期间保持可见，WebView2 才能在隐藏前建立 CoreWebView2。
+                    worker.SetContentVisibility(true);
+                    await worker.EnsureLiveAsync();
+                    worker.SetContentVisibility(false);
+                    _downloadWorker = worker;
+                    Log.Info("[download] worker created");
+                    return true;
+                }
+
+                worker.Navigate(url);
+                Log.Info("[download] worker navigate: " + url);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log.Warn("[download] worker failed: " + Log.Describe(ex));
+
+                try
+                {
+                    if (worker != null)
+                    {
+                        worker.Dispose();
+                    }
+                }
+                catch
+                {
+                }
+
+                _downloadWorker = null;
+                return false;
+            }
+        }
 
         /// <summary>
         /// 设置下载目录；null/空字符串表示恢复 WebView2 默认目录。
@@ -72,20 +130,7 @@ namespace VantageLite.Browser
 
         private static string DefaultDownloadDirectory()
         {
-            try
-            {
-                string profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-
-                if (!string.IsNullOrEmpty(profile))
-                {
-                    return Path.Combine(profile, "Downloads");
-                }
-            }
-            catch
-            {
-            }
-
-            return null;
+            return KnownFolders.DownloadsPath();
         }
     }
 }

@@ -21,6 +21,13 @@ namespace VantageLite.Theming
         public const string More = "\uE712";
         public const string Folder = "\uE8B7";
         public const string Menu = "\uE700";
+        public const string Download = "\uE896";
+        public const string OpenFile = "\uE8E5";
+        public const string OpenFolder = "\uE838";
+        public const string Delete = "\uE74D";
+        public const string Pause = "\uE769";
+        public const string Play = "\uE768";
+        public const string Retry = "\uE72C";
 
         private static readonly string Family = DetectFamily();
 

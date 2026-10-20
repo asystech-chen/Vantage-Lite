@@ -81,6 +81,17 @@ namespace VantageLite.UI
             body.Append("<div class=\"panel-buttons\"><button onclick=\"confirmMove()\">确定</button>");
             body.Append("<button onclick=\"hideMove()\">取消</button></div></div></div>");
 
+            body.Append("<div id=\"askBox\" class=\"modal\"><div class=\"panel\">");
+            body.Append("<div class=\"panel-title\" id=\"askTitle\"></div>");
+            body.Append("<input id=\"askInput\" type=\"text\">");
+            body.Append("<div class=\"panel-buttons\"><button onclick=\"askOk()\">确定</button>");
+            body.Append("<button onclick=\"askCancel()\">取消</button></div></div></div>");
+
+            body.Append("<div id=\"confirmBox\" class=\"modal\"><div class=\"panel\">");
+            body.Append("<div class=\"panel-title\" id=\"confirmText\"></div>");
+            body.Append("<div class=\"panel-buttons\"><button class=\"danger\" onclick=\"confirmOk()\">删除</button>");
+            body.Append("<button onclick=\"confirmCancel()\">取消</button></div></div></div>");
+
             body.Append(BuildScript(store));
 
             return Page("书签", "共 " + total + " 个书签 · 点行尾 ⋯ 管理", body.ToString());
@@ -141,9 +152,16 @@ namespace VantageLite.UI
             sb.Append("try{window.chrome.webview.postMessage(JSON.stringify({cmd:'ping'}));}catch(e){}");
             sb.Append(@"
 function post(o){try{window.chrome.webview.postMessage(JSON.stringify(o));}catch(e){}}
-function newFolder(parent){var n=prompt('文件夹名称','新建文件夹');if(n&&n.trim()){post({cmd:'newFolder',parent:parent,name:n.trim()});}}
-function rename(id){var n=prompt('新名称',(nodes[id]||{}).title||'');if(n&&n.trim()){post({cmd:'rename',id:id,name:n.trim()});}}
-function del(id){if(confirm('删除「'+((nodes[id]||{}).title||'')+'」？')){post({cmd:'delete',id:id});}}
+var askCb=null,confirmCb=null;
+function ask(title,value,cb){askCb=cb;document.getElementById('askTitle').textContent=title;var i=document.getElementById('askInput');i.value=value||'';document.getElementById('askBox').style.display='flex';setTimeout(function(){i.focus();i.select();},0);}
+function askOk(){var i=document.getElementById('askInput');var v=i.value.trim();if(!v){return;}var cb=askCb;askCb=null;document.getElementById('askBox').style.display='none';if(cb){cb(v);}}
+function askCancel(){askCb=null;document.getElementById('askBox').style.display='none';}
+function newFolder(parent){ask('新建文件夹','新建文件夹',function(n){post({cmd:'newFolder',parent:parent,name:n});});}
+function rename(id){ask('重命名',(nodes[id]||{}).title||'',function(n){post({cmd:'rename',id:id,name:n});});}
+function del(id){confirmCb=function(){post({cmd:'delete',id:id});};document.getElementById('confirmText').textContent='删除「'+((nodes[id]||{}).title||'')+'」？';document.getElementById('confirmBox').style.display='flex';}
+function confirmOk(){var cb=confirmCb;confirmCb=null;document.getElementById('confirmBox').style.display='none';if(cb){cb();}}
+function confirmCancel(){confirmCb=null;document.getElementById('confirmBox').style.display='none';}
+if(!window.chrome||!window.chrome.webview){document.body.insertAdjacentHTML('afterbegin','<div class=""warn"">页面无法与浏览器通信，书签操作不会生效。</div>');}
 function cut(id){post({cmd:'cut',id:id});}
 function copy(id){post({cmd:'copy',id:id});}
 function pasteTo(id){if(hasClip){post({cmd:'paste',parent:id});}}
@@ -346,6 +364,8 @@ function confirmMove(){if(moving){post({cmd:'move',id:moving,parent:document.get
                 + ".panel{background:" + background + ";padding:20px;border-radius:8px;min-width:320px;box-shadow:0 10px 30px rgba(0,0,0,.3)}"
                 + ".panel-title{font-weight:600;margin-bottom:10px}"
                 + "select{width:100%;padding:6px;font:14px \"Segoe UI\",\"Microsoft YaHei\",sans-serif}"
+                + "input[type=text]{width:100%;padding:6px;font:14px \"Segoe UI\",\"Microsoft YaHei\",sans-serif;box-sizing:border-box;margin-top:6px}"
+                + ".warn{background:#c0392b;color:#fff;padding:8px 12px;border-radius:4px;margin-bottom:12px}"
                 + ".panel-buttons{margin-top:14px;display:flex;gap:8px;justify-content:flex-end}"
                 + "</style></head><body><h1>" + Escape(title) + "</h1>"
                 + "<div class=\"sub\">" + Escape(subtitle) + "</div>"

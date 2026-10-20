@@ -52,6 +52,7 @@ namespace VantageLite.UI
             body.Append("<button onclick=\"newFolder('").Append(BookmarkStore.ToolbarId).Append("')\">＋ 文件夹</button>");
             body.Append("<button onclick=\"toggleBar()\">书签栏</button>");
             body.Append("<span class=\"clip\">").Append(Escape(ClipboardText(store))).Append("</span>");
+            body.Append("<span id=\"status\" class=\"status\">连接中…</span>");
             body.Append("</div>");
 
             if (total == 0)
@@ -76,7 +77,9 @@ namespace VantageLite.UI
 
             body.Append("<div id=\"moveBox\" class=\"modal\"><div class=\"panel\">");
             body.Append("<div class=\"panel-title\">移动到文件夹</div>");
-            body.Append("<select id=\"moveSelect\"></select>");
+            body.Append("<select id=\"moveSelect\">");
+            AppendFolderOptions(root, body, 0);
+            body.Append("</select>");
             body.Append("<div class=\"panel-buttons\"><button onclick=\"confirmMove()\">确定</button>");
             body.Append("<button onclick=\"hideMove()\">取消</button></div></div></div>");
 
@@ -109,10 +112,13 @@ namespace VantageLite.UI
 
                 if (child.IsFolder)
                 {
-                    sb.Append("<li class=\"folder\"><div class=\"row\"><span class=\"name\">📁 ")
+                    sb.Append("<li class=\"folder\"><div class=\"folder-head\" onclick=\"toggleFolder('")
+                        .Append(child.Id).Append("',event)\"><span class=\"tri\" id=\"tri_")
+                        .Append(child.Id).Append("\">▸</span><span class=\"name\">")
                         .Append(Escape(child.Title)).Append("</span>")
                         .Append(MoreButton(child.Id))
-                        .Append("</div><ul class=\"tree\">");
+                        .Append("</div><ul class=\"tree\" id=\"ul_").Append(child.Id)
+                        .Append("\" style=\"display:none\">");
 
                     AppendChildren(child, sb, rendered);
                     sb.Append("</ul></li>");
@@ -144,7 +150,6 @@ namespace VantageLite.UI
         {
             StringBuilder sb = new StringBuilder();
             sb.Append("<script>");
-            sb.Append("var folders=").Append(FoldersJson(store)).Append(";");
             sb.Append("var nodes=").Append(NodesJson(store == null ? null : store.Root)).Append(";");
             sb.Append("var hasClip=").Append(store != null && store.ClipboardId != null ? "true" : "false").Append(";");
             sb.Append("var moving=null;var menuFor=null;");
@@ -160,7 +165,14 @@ function rename(id){ask('重命名',(nodes[id]||{}).title||'',function(n){post({
 function del(id){confirmCb=function(){post({cmd:'delete',id:id});};document.getElementById('confirmText').textContent='删除「'+((nodes[id]||{}).title||'')+'」？';document.getElementById('confirmBox').style.display='flex';}
 function confirmOk(){var cb=confirmCb;confirmCb=null;document.getElementById('confirmBox').style.display='none';if(cb){cb();}}
 function confirmCancel(){confirmCb=null;document.getElementById('confirmBox').style.display='none';}
-if(!window.chrome||!window.chrome.webview){document.body.insertAdjacentHTML('afterbegin','<div class=""warn"">页面无法与浏览器通信，书签操作不会生效。</div>');}
+if(!window.chrome||!window.chrome.webview){
+  document.body.insertAdjacentHTML('afterbegin','<div class=""warn"">页面无法与浏览器通信，书签操作不会生效。</div>');
+}else{
+  window.chrome.webview.addEventListener('message',function(e){
+    var s=document.getElementById('status');
+    if(s){s.textContent=e.data||'已连接';}
+  });
+}
 function cut(id){post({cmd:'cut',id:id});}
 function copy(id){post({cmd:'copy',id:id});}
 function pasteTo(id){if(hasClip){post({cmd:'paste',parent:id});}}
@@ -193,24 +205,48 @@ function menuAction(a){
   else if(a==='move'){move(id);}else if(a==='rename'){rename(id);}
   else if(a==='delete'){del(id);}
 }
-function move(id){
-  moving=id;
-  var s=document.getElementById('moveSelect');
-  s.innerHTML='';
-  for(var i=0;i<folders.length;i++){
-    var f=folders[i];
-    var o=document.createElement('option');
-    o.value=f.id;
-    o.textContent=new Array(f.depth+1).join('  ')+f.title;
-    s.appendChild(o);
-  }
-  document.getElementById('moveBox').style.display='flex';
+function toggleFolder(id,ev){
+  if(ev){ev.stopPropagation();}
+  var ul=document.getElementById('ul_'+id);
+  var tri=document.getElementById('tri_'+id);
+  if(!ul){return;}
+  var open=ul.style.display!=='none';
+  ul.style.display=open?'none':'block';
+  if(tri){tri.textContent=open?'▸':'▾';}
 }
+function move(id){moving=id;document.getElementById('moveBox').style.display='flex';}
 function hideMove(){document.getElementById('moveBox').style.display='none';}
 function confirmMove(){if(moving){post({cmd:'move',id:moving,parent:document.getElementById('moveSelect').value});}hideMove();}
 ");
             sb.Append("</script>");
             return sb.ToString();
+        }
+
+        private static void AppendFolderOptions(BookmarkNode node, StringBuilder sb, int depth)
+        {
+            if (node == null || node.Children == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < node.Children.Count; i++)
+            {
+                BookmarkNode child = node.Children[i];
+
+                if (!child.IsFolder)
+                {
+                    continue;
+                }
+
+                sb.Append("<option value=\"").Append(Escape(child.Id)).Append("\">");
+                for (int d = 0; d < depth; d++)
+                {
+                    sb.Append("&#160;&#160;");
+                }
+
+                sb.Append(Escape(child.Title)).Append("</option>");
+                AppendFolderOptions(child, sb, depth + 1);
+            }
         }
 
         private static string FoldersJson(BookmarkStore store)
@@ -361,6 +397,9 @@ function confirmMove(){if(moving){post({cmd:'move',id:moving,parent:document.get
                 + ".more:hover{background:" + buttonBg + ";border-radius:4px}"
                 + ".bar{display:flex;align-items:center;gap:8px;margin-bottom:12px}"
                 + ".clip{color:" + muted + ";font-size:12px;margin-left:4px}"
+                + ".status{color:" + muted + ";font-size:12px;margin-left:auto}"
+                + ".folder-head{display:flex;align-items:center;gap:6px;cursor:pointer}"
+                + ".tri{width:14px;color:" + muted + ";font-size:10px}"
                 + ".menu{position:absolute;display:none;background:" + background + ";border:1px solid " + border
                 + ";border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,.35);padding:4px;z-index:10;min-width:160px}"
                 + ".menu div{padding:6px 10px;border-radius:4px;cursor:pointer;font-size:13px}"

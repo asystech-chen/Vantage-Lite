@@ -152,7 +152,7 @@ namespace VantageLite.UI
                 }
             }
 
-            ShowMenu(button, menu);
+            ShowMenuAtButton(button, menu);
         }
 
         private ToolStripMenuItem CreateMenuItem(BookmarkNode node)
@@ -346,6 +346,18 @@ namespace VantageLite.UI
 
         private void ShowMenu(Control owner, ContextMenuStrip menu)
         {
+            PrepareMenu(menu);
+            menu.Show(Cursor.Position);
+        }
+
+        private void ShowMenuAtButton(Control button, ContextMenuStrip menu)
+        {
+            PrepareMenu(menu);
+            menu.Show(button, new Point(0, button.Height));
+        }
+
+        private void PrepareMenu(ContextMenuStrip menu)
+        {
             menu.Closed += delegate
             {
                 if (IsHandleCreated)
@@ -362,8 +374,6 @@ namespace VantageLite.UI
 
                 menu.Dispose();
             };
-
-            menu.Show(Cursor.Position);
         }
 
         private ToolStripMenuItem MenuItem(string text, Action action)

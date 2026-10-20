@@ -202,6 +202,24 @@ namespace VantageLite.Browser
             }
         }
 
+        public void PostWebMessage(string text)
+        {
+            CoreWebView2 core = _core;
+
+            if (core == null || _disposed)
+            {
+                return;
+            }
+
+            try
+            {
+                core.PostWebMessageAsString(text ?? string.Empty);
+            }
+            catch
+            {
+            }
+        }
+
         public void Navigate(string url)
         {
             _internalAddress = null;

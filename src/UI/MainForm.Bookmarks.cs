@@ -114,6 +114,13 @@ namespace VantageLite.UI
             if (string.Equals(command.Cmd, "ping", StringComparison.OrdinalIgnoreCase))
             {
                 Log.Info("[bookmarks] page ready");
+
+                BrowserTab page = ActiveTab;
+                if (page != null)
+                {
+                    page.PostWebMessage("已连接");
+                }
+
                 return;
             }
 
@@ -169,6 +176,12 @@ namespace VantageLite.UI
 
             if (!changed)
             {
+                BrowserTab page = ActiveTab;
+                if (page != null)
+                {
+                    page.PostWebMessage("操作未完成：" + command.Cmd);
+                }
+
                 return;
             }
 

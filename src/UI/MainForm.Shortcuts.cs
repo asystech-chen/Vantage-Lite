@@ -48,7 +48,7 @@ namespace VantageLite.UI
 
             if (keyData == (Keys.Control | Keys.Shift | Keys.O))
             {
-                ShowInternalPage("about:bookmarks");
+                ShowBookmarkManager();
                 return true;
             }
 

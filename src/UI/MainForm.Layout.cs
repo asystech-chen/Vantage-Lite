@@ -30,8 +30,12 @@ namespace VantageLite.UI
             _navigationBar = new NavigationBar();
             _navigationBar.Dock = DockStyle.Top;
 
+            _bookmarksBar = new BookmarksBar();
+            _bookmarksBar.Dock = DockStyle.Top;
+
             // 添加顺序决定停靠优先级：最后添加的 Top 最靠上。标签条在上，地址栏在下。
             Controls.Add(_contentHost);
+            Controls.Add(_bookmarksBar);
             Controls.Add(_navigationBar);
             Controls.Add(_tabStrip);
 
@@ -50,6 +54,8 @@ namespace VantageLite.UI
             _navigationBar.StopRequested += delegate { StopLoading(); };
             _navigationBar.HomeRequested += delegate { NavigateTo(DefaultHomeUrl); };
             _navigationBar.BookmarkRequested += delegate { ToggleBookmark(); };
+            _bookmarksBar.OpenRequested += delegate (object sender, string url) { NavigateTo(url); };
+            _bookmarksBar.ManageRequested += delegate { ShowBookmarkManager(); };
         }
 
         private static Icon LoadApplicationIcon()

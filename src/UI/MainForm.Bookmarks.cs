@@ -31,6 +31,7 @@ namespace VantageLite.UI
 
             bool added = _bookmarks.Toggle(tab.DisplayTitle, url);
             Log.Info((added ? "Bookmark added: " : "Bookmark removed: ") + url);
+            _bookmarksBar.Refresh(_bookmarks.ToolbarFolder);
             UpdateBookmarkState();
         }
 
@@ -50,11 +51,30 @@ namespace VantageLite.UI
 
             string html = string.Equals(address, HistoryAddress, StringComparison.OrdinalIgnoreCase)
                 ? InternalPages.History(_history.Items)
-                : InternalPages.Bookmarks(_bookmarks.Items);
+                : InternalPages.Bookmarks(_bookmarks.Root);
 
             tab.ShowInternalPage(address, html);
             _navigationBar.SetAddress(address);
             UpdateBookmarkState();
+        }
+
+        private void ShowBookmarkManager()
+        {
+            string openUrl = null;
+
+            using (BookmarkManagerForm form = new BookmarkManagerForm(_bookmarks))
+            {
+                form.OpenRequested += delegate (object sender, string url) { openUrl = url; };
+                form.ShowDialog(this);
+            }
+
+            _bookmarksBar.Refresh(_bookmarks.ToolbarFolder);
+            UpdateBookmarkState();
+
+            if (!string.IsNullOrEmpty(openUrl))
+            {
+                NavigateTo(openUrl);
+            }
         }
 
         private static string NormalizeInternalPage(string address)

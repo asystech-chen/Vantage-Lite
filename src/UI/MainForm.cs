@@ -21,6 +21,7 @@ namespace VantageLite.UI
         private readonly CommandLineOptions _options;
 
         private NavigationBar _navigationBar;
+        private BookmarksBar _bookmarksBar;
         private TabStrip _tabStrip;
         private Panel _contentHost;
         private TabManager _tabManager;
@@ -44,6 +45,8 @@ namespace VantageLite.UI
             BuildLayout();
             WireNavigationEvents();
             InitializeTheme();
+
+            _bookmarksBar.Refresh(_bookmarks.ToolbarFolder);
 
             _resizeSettleTimer = new Timer();
             _resizeSettleTimer.Interval = 250;

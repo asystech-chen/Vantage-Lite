@@ -18,6 +18,7 @@ namespace VantageLite.Theming
         public const string Close = "\uE8BB";
         public const string Star = "\uE734";
         public const string StarFilled = "\uE735";
+        public const string More = "\uE712";
 
         private static readonly string Family = DetectFamily();
 

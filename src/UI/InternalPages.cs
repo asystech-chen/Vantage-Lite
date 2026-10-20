@@ -42,31 +42,84 @@ namespace VantageLite.UI
             return Page("历史", "共 " + (items == null ? 0 : items.Count) + " 条", body.ToString());
         }
 
-        public static string Bookmarks(IList<Bookmark> items)
+        public static string Bookmarks(BookmarkNode root)
         {
+            int total = CountBookmarks(root, 0);
             StringBuilder body = new StringBuilder();
 
-            if (items == null || items.Count == 0)
+            if (total == 0)
             {
-                body.Append("<p class=\"empty\">还没有书签。打开页面后按 Ctrl+D 添加。</p>");
+                body.Append("<p class=\"empty\">还没有书签。打开页面后按 Ctrl+D 添加到书签工具栏。</p>");
             }
             else
             {
-                body.Append("<ul>");
-
-                for (int i = 0; i < items.Count; i++)
-                {
-                    Bookmark item = items[i];
-                    body.Append("<li><a href=\"").Append(Escape(item.Url)).Append("\">")
-                        .Append(Escape(DisplayTitle(item.Title, item.Url))).Append("</a>")
-                        .Append("<div class=\"url\">").Append(Escape(item.Url))
-                        .Append(" · ").Append(FormatTime(item.CreatedUtc)).Append("</div></li>");
-                }
-
-                body.Append("</ul>");
+                int[] rendered = new int[1];
+                AppendFolder(root, body, 0, rendered);
             }
 
-            return Page("书签", "共 " + (items == null ? 0 : items.Count) + " 条", body.ToString());
+            return Page("书签", "共 " + total + " 个书签", body.ToString());
+        }
+
+        private static void AppendFolder(BookmarkNode node, StringBuilder sb, int depth, int[] rendered)
+        {
+            if (node == null || node.Children == null)
+            {
+                return;
+            }
+
+            sb.Append("<ul class=\"tree\">");
+
+            for (int i = 0; i < node.Children.Count; i++)
+            {
+                BookmarkNode child = node.Children[i];
+
+                if (child.IsFolder)
+                {
+                    sb.Append("<li class=\"folder\"><div class=\"folder-title\">")
+                        .Append(Escape(child.Title)).Append("</div>");
+                    AppendFolder(child, sb, depth + 1, rendered);
+                    sb.Append("</li>");
+                }
+                else
+                {
+                    if (rendered[0] >= MaxRows)
+                    {
+                        continue;
+                    }
+
+                    rendered[0]++;
+                    sb.Append("<li><a href=\"").Append(Escape(child.Url)).Append("\">")
+                        .Append(Escape(DisplayTitle(child.Title, child.Url))).Append("</a>")
+                        .Append("<div class=\"url\">").Append(Escape(child.Url))
+                        .Append(" · ").Append(FormatTime(child.CreatedUtc)).Append("</div></li>");
+                }
+            }
+
+            sb.Append("</ul>");
+        }
+
+        private static int CountBookmarks(BookmarkNode node, int count)
+        {
+            if (node == null || node.Children == null)
+            {
+                return count;
+            }
+
+            for (int i = 0; i < node.Children.Count; i++)
+            {
+                BookmarkNode child = node.Children[i];
+
+                if (child.IsFolder)
+                {
+                    count = CountBookmarks(child, count);
+                }
+                else
+                {
+                    count++;
+                }
+            }
+
+            return count;
         }
 
         private static string Page(string title, string subtitle, string body)
@@ -91,6 +144,10 @@ namespace VantageLite.UI
                 + "a:hover{text-decoration:underline}"
                 + ".url{color:" + muted + ";font-size:12px;word-break:break-all}"
                 + ".empty{color:" + muted + ";padding:24px 0}"
+                + ".tree{list-style:none;padding-left:0;margin:0}"
+                + ".tree .tree{padding-left:18px;margin:2px 0 6px}"
+                + ".folder{margin-top:12px}"
+                + ".folder-title{color:" + muted + ";font-weight:600;margin:0 0 4px}"
                 + "</style></head><body><h1>" + Escape(title) + "</h1>"
                 + "<div class=\"sub\">" + Escape(subtitle) + "</div>"
                 + body + "</body></html>";

@@ -72,5 +72,8 @@ namespace VantageLite.Storage
 
         [DataMember(Name = "downloadDir", Order = 21, EmitDefaultValue = false)]
         public string DownloadDirectory { get; set; }
+
+        [DataMember(Name = "restoreSession", Order = 22, EmitDefaultValue = false)]
+        public bool? RestoreSession { get; set; }
     }
 }

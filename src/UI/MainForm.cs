@@ -112,6 +112,11 @@ namespace VantageLite.UI
                 _settings.DownloadDirectory = string.Empty;
             }
 
+            if (_settings.ClearOnExit)
+            {
+                _settings.RestoreSession = false;
+            }
+
             if (string.IsNullOrWhiteSpace(_settings.ThemeMode))
             {
                 _settings.ThemeMode = AppSettings.DefaultThemeMode;
@@ -170,6 +175,11 @@ namespace VantageLite.UI
                     ? _settings.HomeUrl
                     : AppSettings.DefaultHomeUrl;
             }
+        }
+
+        private string SessionPath
+        {
+            get { return Path.Combine(AppPaths.DataDirectory, "session.json"); }
         }
 
         private async void MainForm_Load(object sender, EventArgs e)
@@ -239,7 +249,22 @@ namespace VantageLite.UI
                 _tabStrip.NewTabRequested += TabStrip_NewTabRequested;
 
                 Log.Info("WebView2 environment ready. max live tabs = " + maxLiveTabs);
-                await OpenInitialTabAsync();
+
+                SessionData session = null;
+
+                if (_settings.RestoreSession && !_settings.ClearOnExit)
+                {
+                    session = SessionStore.Load(SessionPath);
+                }
+
+                if (session != null && session.Tabs != null && session.Tabs.Count > 0)
+                {
+                    await RestoreSessionAsync(session);
+                }
+                else
+                {
+                    await OpenInitialTabAsync();
+                }
             }
             catch (Exception ex)
             {
@@ -274,12 +299,123 @@ namespace VantageLite.UI
             await CreateTabForTargetAsync(target);
         }
 
+        /// <summary>
+        /// 恢复上次会话：先全部以丢弃态占位，只拉起活动标签的 WebView2。
+        /// </summary>
+        private async Task RestoreSessionAsync(SessionData session)
+        {
+            List<BrowserTab> restored = new List<BrowserTab>();
+
+            for (int i = 0; i < session.Tabs.Count; i++)
+            {
+                SessionTab saved = session.Tabs[i];
+
+                if (saved == null || string.IsNullOrWhiteSpace(saved.Url))
+                {
+                    continue;
+                }
+
+                string url = saved.Url.Trim();
+
+                if (string.Equals(url, "about:blank", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                string internalAddress = url.StartsWith("about:", StringComparison.OrdinalIgnoreCase)
+                    ? url
+                    : null;
+
+                restored.Add(_tabManager.AddPlaceholderTab(url, internalAddress, saved.Title));
+            }
+
+            if (restored.Count == 0)
+            {
+                await OpenInitialTabAsync();
+                return;
+            }
+
+            int activeIndex = Math.Max(0, Math.Min(session.ActiveIndex, restored.Count - 1));
+            Log.Info("Restoring session: " + restored.Count + " tabs, active=" + activeIndex);
+
+            try
+            {
+                await _tabManager.ActivateTabAsync(restored[activeIndex].Id);
+                // 恢复的标签不是走 CreateTabAsync 创建的，需要补一次下载目录设置。
+                _tabManager.SetDownloadDirectory(_settings.DownloadDirectory);
+            }
+            catch (Exception ex)
+            {
+                Log.Warn("Restore active tab failed: " + Log.Describe(ex));
+            }
+
+            if (_tabManager.ActiveTab == null || !_tabManager.ActiveTab.IsLive)
+            {
+                await OpenInitialTabAsync();
+            }
+        }
+
+        /// <summary>
+        /// 保存当前会话；开启关闭时清空或未启用会话恢复时删除会话文件。
+        /// </summary>
+        private void SaveSession()
+        {
+            string path = SessionPath;
+
+            if (_settings == null || _tabManager == null ||
+                !_settings.RestoreSession || _settings.ClearOnExit)
+            {
+                SessionStore.Clear(path);
+                return;
+            }
+
+            List<SessionTab> tabs = new List<SessionTab>();
+            int activeIndex = 0;
+
+            for (int i = 0; i < _tabManager.Tabs.Count; i++)
+            {
+                BrowserTab tab = _tabManager.Tabs[i];
+                string url = tab.Url;
+
+                if (string.IsNullOrWhiteSpace(url) ||
+                    string.Equals(url, "about:blank", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                if (ReferenceEquals(tab, _tabManager.ActiveTab))
+                {
+                    activeIndex = tabs.Count;
+                }
+
+                tabs.Add(new SessionTab
+                {
+                    Url = url,
+                    Title = tab.DisplayTitle
+                });
+            }
+
+            if (tabs.Count == 0)
+            {
+                SessionStore.Clear(path);
+                return;
+            }
+
+            SessionStore.Save(path, new SessionData
+            {
+                Tabs = tabs,
+                ActiveIndex = Math.Min(activeIndex, tabs.Count - 1)
+            });
+        }
+
         private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
         {
             if (_downloads != null)
             {
                 _downloads.MarkActiveInterrupted();
             }
+
+            SaveSession();
 
             if (_settings == null || !_settings.ClearOnExit)
             {

@@ -229,6 +229,20 @@ namespace VantageLite.Browser
         }
 
         /// <summary>
+        /// 会话恢复时先写入标题，避免占位标签只显示 URL。
+        /// </summary>
+        public void SetPlaceholderTitle(string title)
+        {
+            _title = title;
+
+            EventHandler<string> handler = TitleChanged;
+            if (handler != null)
+            {
+                handler(this, DisplayTitle);
+            }
+        }
+
+        /// <summary>
         /// 按地址重新生成内置页 HTML（丢弃/自愈后恢复用）。
         /// </summary>
         public Func<string, string> InternalHtmlProvider { get; set; }

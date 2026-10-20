@@ -3,9 +3,11 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Net;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Windows.Forms;
+using VantageLite.App;
 using VantageLite.Storage;
 using VantageLite.Theming;
 
@@ -34,6 +36,22 @@ namespace VantageLite.UI
         private BookmarkNode _dropTarget;
         private string _dropMode;
         private Button _dropHighlight;
+        private ToolStripMenuItem _menuDropItem;
+        private BookmarkNode _menuDropTarget;
+        private string _menuDropMode;
+        private readonly List<BookmarkDropPopup> _dropPopups = new List<BookmarkDropPopup>();
+        private readonly System.Windows.Forms.Timer _dragTimer;
+        private bool _manualDrag;
+        private BookmarkNode _manualNode;
+        private Button _manualButton;
+        private BookmarkNode _manualTarget;
+        private string _manualMode;
+        private BookmarkDropPopup _manualPopup;
+        private DragGhostForm _dragGhost;
+        private bool _suppressClick;
+        private bool _menuDragArmed;
+        private BookmarkNode _menuDragNode;
+        private Point _menuDragStart;
         private Point _dragStart;
         private bool _dragArmed;
 
@@ -48,6 +66,9 @@ namespace VantageLite.UI
             _buttons = new List<Button>();
             _childNodes = new List<BookmarkNode>();
             _hiddenNodes = new List<BookmarkNode>();
+            _dragTimer = new System.Windows.Forms.Timer();
+            _dragTimer.Interval = 40;
+            _dragTimer.Tick += DragTimer_Tick;
             _toolTip = new ToolTip();
             ThemeManager.ApplyToolTip(_toolTip);
 
@@ -76,6 +97,16 @@ namespace VantageLite.UI
             _overflowButton.Cursor = Cursors.Default;
             _overflowButton.Visible = false;
             _overflowButton.Click += delegate { ShowOverflowMenu(); };
+            _overflowButton.AllowDrop = true;
+            _overflowButton.DragEnter += Overflow_DragEnter;
+            _overflowButton.DragOver += delegate(object sender, DragEventArgs e)
+            {
+                if (_dragNode != null)
+                {
+                    e.Effect = DragDropEffects.Move;
+                }
+            };
+            _overflowButton.DragDrop += Overflow_DragDrop;
             _toolTip.SetToolTip(_overflowButton, "显示放不下的书签");
 
             _dropLine = new Panel();
@@ -97,6 +128,10 @@ namespace VantageLite.UI
         {
             if (disposing)
             {
+                _dragTimer.Stop();
+                _dragTimer.Dispose();
+                CloseDragGhost();
+                CloseDropPopups();
                 ThemeManager.ThemeChanged -= ThemeManager_ThemeChanged;
                 _toolTip.Dispose();
                 ClearButtons();
@@ -252,13 +287,21 @@ namespace VantageLite.UI
 
             if (node.IsFolder)
             {
-                button.Click += delegate { ShowFolderMenu(button, node); };
+                button.Click += delegate
+                {
+                    if (_suppressClick) { _suppressClick = false; return; }
+                    ShowFolderMenu(button, node);
+                };
                 _toolTip.SetToolTip(button, string.Empty);
             }
             else
             {
                 string url = node.Url;
-                button.Click += delegate { RaiseOpen(url); };
+                button.Click += delegate
+                {
+                    if (_suppressClick) { _suppressClick = false; return; }
+                    RaiseOpen(url);
+                };
                 _toolTip.SetToolTip(button, node.Title + "\n" + url);
             }
 
@@ -266,8 +309,15 @@ namespace VantageLite.UI
             {
                 if (e.Button == MouseButtons.Left)
                 {
-                    _dragArmed = false;
-                    _dragNode = null;
+                    if (_manualDrag)
+                    {
+                        FinishManualDrag();
+                    }
+                    else
+                    {
+                        _dragArmed = false;
+                        _dragNode = null;
+                    }
                 }
                 else if (e.Button == MouseButtons.Right)
                 {
@@ -280,6 +330,7 @@ namespace VantageLite.UI
             {
                 if (e.Button == MouseButtons.Left)
                 {
+                    _suppressClick = false;
                     _dragNode = node;
                     _dragStart = e.Location;
                     _dragArmed = true;
@@ -297,10 +348,7 @@ namespace VantageLite.UI
                     return;
                 }
 
-                _dragArmed = false;
-                button.DoDragDrop(node, DragDropEffects.Move);
-                _dragNode = null;
-                ClearDropVisual();
+                StartManualDrag(button, node);
             };
             button.DragEnter += delegate (object sender, DragEventArgs e)
             {
@@ -442,6 +490,41 @@ namespace VantageLite.UI
                     ApplyFavicon(item, url, ownerMenu);
                 }
             }
+
+            // 菜单里的项目也能拖回书签栏：菜单不支持 OLE 拖放，用鼠标移动手动接管。
+            item.MouseDown += delegate(object sender, MouseEventArgs e)
+            {
+                if (e.Button == MouseButtons.Left)
+                {
+                    _menuDragArmed = true;
+                    _menuDragNode = node;
+                    _menuDragStart = Cursor.Position;
+                }
+            };
+            item.MouseMove += delegate
+            {
+                if (!_menuDragArmed || (Control.MouseButtons & MouseButtons.Left) == 0)
+                {
+                    return;
+                }
+
+                Point point = Cursor.Position;
+
+                if (Math.Abs(point.X - _menuDragStart.X) < 4 &&
+                    Math.Abs(point.Y - _menuDragStart.Y) < 4)
+                {
+                    return;
+                }
+
+                _menuDragArmed = false;
+                MenuPositioner.CloseOpenMenus();
+                StartManualDrag(null, _menuDragNode);
+            };
+            item.MouseUp += delegate
+            {
+                _menuDragArmed = false;
+                _menuDragNode = null;
+            };
 
             return item;
         }
@@ -830,7 +913,919 @@ namespace VantageLite.UI
                 menu.Items.Add(CreateMenuItem(_hiddenNodes[i], true, menu));
             }
 
+            AttachMenuDrop(menu);
             ShowMenuAtButton(_overflowButton, menu);
+        }
+
+        /// <summary>
+        /// 拖拽时用普通浮层代替 ContextMenuStrip：菜单不接收拖放，普通控件可以。
+        /// </summary>
+        private void ShowDropPopupsForOverflow()
+        {
+            CloseDropPopups();
+
+            if (_hiddenNodes.Count == 0)
+            {
+                return;
+            }
+
+            BookmarkDropPopup popup = new BookmarkDropPopup(this, _hiddenNodes, BookmarkStore.ToolbarId, null);
+            popup.ShowRightAligned(_overflowButton, FindForm());
+            _dropPopups.Add(popup);
+        }
+
+        private void StartManualDrag(Button button, BookmarkNode node)
+        {
+            _dragArmed = false;
+            _manualDrag = true;
+            _manualNode = node;
+            _manualButton = button;
+            _dragNode = node;
+            _suppressClick = true;
+
+            if (button != null)
+            {
+                try
+                {
+                    button.Capture = true;
+                }
+                catch
+                {
+                }
+            }
+
+            _dragTimer.Start();
+
+            if (button != null && !button.IsDisposed)
+            {
+                button.BackColor = ThemeManager.Current.ButtonHover;
+            }
+
+            ShowDragGhost(node.Title);
+            Cursor = Cursors.SizeAll;
+        }
+
+        private void DragTimer_Tick(object sender, EventArgs e)
+        {
+            if (!_manualDrag)
+            {
+                _dragTimer.Stop();
+                return;
+            }
+
+            if ((Control.MouseButtons & MouseButtons.Left) == 0)
+            {
+                FinishManualDrag();
+                return;
+            }
+
+            UpdateDragGhost(Cursor.Position);
+            UpdateManualHover(Cursor.Position);
+        }
+
+        private void FinishManualDrag()
+        {
+            if (!_manualDrag)
+            {
+                return;
+            }
+
+            _manualDrag = false;
+            _dragTimer.Stop();
+
+            if (_manualButton != null)
+            {
+                try
+                {
+                    _manualButton.Capture = false;
+                }
+                catch
+                {
+                }
+            }
+
+            BookmarkNode target = _manualTarget;
+            string mode = _manualMode;
+
+            if (_manualButton != null && !_manualButton.IsDisposed)
+            {
+                ApplyButtonTheme(_manualButton);
+            }
+
+            CloseDragGhost();
+            Cursor = Cursors.Default;
+
+            if (target != null && _dragNode != null && _store != null)
+            {
+                PerformMenuDrop(target, mode);
+            }
+
+            _dragNode = null;
+            _manualNode = null;
+            _manualButton = null;
+            _manualTarget = null;
+            _manualMode = null;
+            _manualPopup = null;
+            HideHighlight();
+            HideDropLine();
+            CloseDropPopups();
+            ClearDropVisual();
+            _suppressClick = true;
+        }
+
+        private void ShowDragGhost(string title)
+        {
+            CloseDragGhost();
+            _dragGhost = new DragGhostForm(title);
+            Form owner = FindForm();
+
+            if (owner != null)
+            {
+                _dragGhost.Show(owner);
+            }
+            else
+            {
+                _dragGhost.Show();
+            }
+
+            UpdateDragGhost(Cursor.Position);
+        }
+
+        private void UpdateDragGhost(Point screen)
+        {
+            if (_dragGhost == null || _dragGhost.IsDisposed)
+            {
+                return;
+            }
+
+            Form owner = FindForm();
+            Rectangle area = owner != null
+                ? owner.RectangleToScreen(owner.ClientRectangle)
+                : Screen.FromPoint(screen).WorkingArea;
+
+            _dragGhost.KeepInside(screen, area);
+        }
+
+        private void CloseDragGhost()
+        {
+            if (_dragGhost != null)
+            {
+                try
+                {
+                    _dragGhost.Close();
+                }
+                catch
+                {
+                }
+
+                _dragGhost = null;
+            }
+        }
+
+        private void UpdateManualHover(Point screen)
+        {
+            if (_manualNode == null)
+            {
+                return;
+            }
+
+            // 悬停「…」：弹出可接收鼠标定位的自定义浮层。
+            if (_overflowButton.Visible &&
+                _overflowButton.RectangleToScreen(_overflowButton.ClientRectangle).Contains(screen))
+            {
+                if (_manualPopup == null || _manualPopup.IsDisposed)
+                {
+                    ShowDropPopupsForOverflow();
+                    _manualPopup = _dropPopups.Count > 0 ? _dropPopups[0] : null;
+                }
+
+                _manualTarget = null;
+                _manualMode = null;
+                HideHighlight();
+                HideDropLine();
+                return;
+            }
+
+            if (_manualPopup != null && !_manualPopup.IsDisposed)
+            {
+                for (int i = _dropPopups.Count - 1; i >= 0; i--)
+                {
+                    BookmarkDropPopup popup = _dropPopups[i];
+
+                    if (popup.IsDisposed)
+                    {
+                        continue;
+                    }
+
+                    BookmarkDropPopup.DropRow row = popup.RowAt(screen);
+
+                    if (row != null)
+                    {
+                        if (string.Equals(row.Node.Id, _manualNode.Id, StringComparison.Ordinal))
+                        {
+                            _manualTarget = null;
+                            _manualMode = null;
+                            popup.ClearHover();
+                            HideHighlight();
+                            HideDropLine();
+                            return;
+                        }
+
+                        string mode = popup.ModeAt(row, screen);
+                        _manualTarget = row.Node;
+                        _manualMode = mode;
+                        popup.SetHover(row, mode);
+                        HideHighlight();
+                        HideDropLine();
+
+                        if (mode == "into" && row.Node.IsFolder)
+                        {
+                            popup.OpenChildManual(row.Node, row);
+                        }
+
+                        return;
+                    }
+                }
+
+                _manualTarget = null;
+                _manualMode = null;
+                _manualPopup.ClearHover();
+            }
+
+            // 书签栏本身。
+            for (int i = 0; i < _buttons.Count; i++)
+            {
+                Button button = _buttons[i];
+
+                if (!button.Visible)
+                {
+                    continue;
+                }
+
+                Rectangle rect = button.RectangleToScreen(button.ClientRectangle);
+
+                if (!rect.Contains(screen))
+                {
+                    continue;
+                }
+
+                BookmarkNode node = i < _childNodes.Count ? _childNodes[i] : null;
+
+                if (node == null || string.Equals(node.Id, _manualNode.Id, StringComparison.Ordinal))
+                {
+                    _manualTarget = null;
+                    _manualMode = null;
+                    HideHighlight();
+                    HideDropLine();
+                    return;
+                }
+
+                double ratio = rect.Width <= 0 ? 0.5 : (double)(screen.X - rect.Left) / rect.Width;
+                string mode = node.IsFolder && ratio > 0.3 && ratio < 0.7
+                    ? "into"
+                    : (ratio < 0.5 ? "before" : "after");
+
+                _manualTarget = node;
+                _manualMode = mode;
+
+                if (mode == "into")
+                {
+                    ShowHighlight(button);
+                }
+                else
+                {
+                    HideHighlight();
+                    ShowDropLine(button, mode == "before");
+                }
+
+                return;
+            }
+
+            _manualTarget = null;
+            _manualMode = null;
+            HideHighlight();
+            HideDropLine();
+        }
+
+        private void ShowChildDropPopup(BookmarkDropPopup parent, BookmarkNode folder, Control anchor)
+        {
+            for (int i = _dropPopups.Count - 1; i >= 0; i--)
+            {
+                if (ReferenceEquals(_dropPopups[i].ParentPopup, parent))
+                {
+                    _dropPopups[i].Close();
+                    _dropPopups.RemoveAt(i);
+                }
+            }
+
+            IList<BookmarkNode> children = folder.GetChildren();
+
+            if (children.Count == 0)
+            {
+                return;
+            }
+
+            BookmarkDropPopup child = new BookmarkDropPopup(this, children, folder.Id, parent);
+            child.ShowLeftOf(parent, anchor, FindForm());
+            _dropPopups.Add(child);
+        }
+
+        private void CloseDropPopups()
+        {
+            for (int i = _dropPopups.Count - 1; i >= 0; i--)
+            {
+                try
+                {
+                    _dropPopups[i].Close();
+                }
+                catch
+                {
+                }
+            }
+
+            _dropPopups.Clear();
+        }
+
+        private void PerformMenuDrop(BookmarkNode target, string mode)
+        {
+            if (_dragNode == null || _store == null || target == null)
+            {
+                return;
+            }
+
+            string id = _dragNode.Id;
+            _dragNode = null;
+            CloseDropPopups();
+            ClearDropVisual();
+
+            if (mode == "into")
+            {
+                _store.Move(id, target.Id);
+            }
+            else
+            {
+                BookmarkNode parent = _store.ParentOf(target.Id);
+
+                if (parent == null)
+                {
+                    return;
+                }
+
+                string before = mode == "before"
+                    ? target.Id
+                    : NextSiblingId(parent, target.Id);
+
+                _store.Move(id, parent.Id, before);
+            }
+
+            NotifyChanged();
+        }
+
+        /// <summary>
+        /// 拖拽浮层：普通 Form + 普通按钮，能接收 DragEnter/Over/Drop；
+        /// 文件夹行悬停时再弹一个同样结构的子浮层。
+        /// </summary>
+        /// <summary>
+        /// 拖拽时跟随光标的标题小浮标，给用户明确的“已经拖起来了”反馈。
+        /// </summary>
+        internal sealed class DragGhostForm : Form
+        {
+            public DragGhostForm(string text)
+            {
+                FormBorderStyle = FormBorderStyle.None;
+                ShowInTaskbar = false;
+                StartPosition = FormStartPosition.Manual;
+                BackColor = ThemeManager.Current.Accent;
+                ForeColor = Color.White;
+                Font = ThemeFonts.Ui(9F);
+
+                int width = TextRenderer.MeasureText(text ?? string.Empty, Font).Width + 24;
+                Width = Math.Max(80, Math.Min(280, width));
+                Height = 26;
+                Opacity = 0.92;
+
+                Label label = new Label();
+                label.Text = text ?? string.Empty;
+                label.AutoSize = false;
+                label.Dock = DockStyle.Fill;
+                label.TextAlign = ContentAlignment.MiddleLeft;
+                label.Padding = new Padding(8, 0, 8, 0);
+                label.BackColor = Color.Transparent;
+                label.ForeColor = Color.White;
+                label.AutoEllipsis = true;
+                Controls.Add(label);
+            }
+
+            protected override bool ShowWithoutActivation
+            {
+                get { return true; }
+            }
+
+            public void KeepInside(Point cursor, Rectangle area)
+            {
+                int x = cursor.X + 14;
+                int y = cursor.Y + 14;
+
+                if (x + Width > area.Right)
+                {
+                    x = cursor.X - Width - 10;
+                }
+
+                if (y + Height > area.Bottom)
+                {
+                    y = cursor.Y - Height - 10;
+                }
+
+                Left = Math.Max(area.Left, x);
+                Top = Math.Max(area.Top, y);
+            }
+        }
+
+        internal sealed class BookmarkDropPopup : Form
+        {
+            private readonly BookmarksBar _owner;
+            private readonly FlowLayoutPanel _list;
+            private BookmarkNode _openChildNode;
+
+            internal BookmarkDropPopup(BookmarksBar owner, IList<BookmarkNode> nodes,
+                string parentId, BookmarkDropPopup parentPopup)
+            {
+                _owner = owner;
+                ParentPopup = parentPopup;
+
+                FormBorderStyle = FormBorderStyle.None;
+                ShowInTaskbar = false;
+                StartPosition = FormStartPosition.Manual;
+                Width = 240;
+                BackColor = ThemeManager.Current.WindowBackground;
+                Height = Math.Min(360, 10 + nodes.Count * 30);
+
+                _list = new FlowLayoutPanel();
+                _list.Dock = DockStyle.Fill;
+                _list.FlowDirection = FlowDirection.TopDown;
+                _list.WrapContents = false;
+                _list.AutoScroll = true;
+                _list.Padding = new Padding(4);
+                _list.BackColor = ThemeManager.Current.WindowBackground;
+                Controls.Add(_list);
+
+                for (int i = 0; i < nodes.Count; i++)
+                {
+                    _list.Controls.Add(new DropRow(this, nodes[i]));
+                }
+            }
+
+            public BookmarkDropPopup ParentPopup { get; private set; }
+
+            protected override bool ShowWithoutActivation
+            {
+                get { return true; }
+            }
+
+            public void ShowRightAligned(Control anchor, Form owner)
+            {
+                Rectangle area = GetArea(anchor, owner);
+
+                // 右侧钉死到主窗口右边缘，垂直方向以按钮下方为锚点，放不下就翻到上方。
+                Left = Math.Max(area.Left + 4, area.Right - Width - 4);
+
+                Point anchorScreen = anchor.PointToScreen(Point.Empty);
+                int top = anchorScreen.Y + anchor.Height;
+
+                if (top + Height > area.Bottom - 4)
+                {
+                    top = anchorScreen.Y - Height;
+                }
+
+                Top = Math.Max(area.Top + 4, Math.Min(top, area.Bottom - Height - 4));
+                ShowOwned(owner);
+            }
+
+            public void ShowLeftOf(BookmarkDropPopup parent, Control anchor, Form owner)
+            {
+                Rectangle area = GetArea(anchor, owner);
+
+                // 二级菜单只向左展开。
+                Left = Math.Max(area.Left + 4, parent.Left - Width - 4);
+
+                int top = anchor.PointToScreen(Point.Empty).Y;
+                Top = Math.Max(area.Top + 4, Math.Min(top, area.Bottom - Height - 4));
+                ShowOwned(owner);
+            }
+
+            private static Rectangle GetArea(Control anchor, Form owner)
+            {
+                return owner != null
+                    ? owner.RectangleToScreen(owner.ClientRectangle)
+                    : Screen.FromControl(anchor).WorkingArea;
+            }
+
+            private void ShowOwned(Form owner)
+            {
+                if (owner != null)
+                {
+                    Show(owner);
+                }
+                else
+                {
+                    Show();
+                }
+            }
+
+            protected override void OnPaint(PaintEventArgs e)
+            {
+                base.OnPaint(e);
+
+                using (Pen pen = new Pen(ThemeManager.Current.AddressBorder))
+                {
+                    e.Graphics.DrawRectangle(pen, 0, 0, Width - 1, Height - 1);
+                }
+            }
+
+            public void OpenChildManual(BookmarkNode folder, Control anchor)
+            {
+                OpenChild(folder, anchor);
+            }
+
+            public DropRow RowAt(Point screen)
+            {
+                for (int i = 0; i < _list.Controls.Count; i++)
+                {
+                    DropRow row = _list.Controls[i] as DropRow;
+
+                    if (row != null && row.RectangleToScreen(row.ClientRectangle).Contains(screen))
+                    {
+                        return row;
+                    }
+                }
+
+                return null;
+            }
+
+            public string ModeAt(DropRow row, Point screen)
+            {
+                Rectangle rect = row.RectangleToScreen(row.ClientRectangle);
+                double ratio = rect.Height <= 0 ? 0.5 : (double)(screen.Y - rect.Top) / rect.Height;
+
+                return row.Node.IsFolder && ratio > 0.3 && ratio < 0.7
+                    ? "into"
+                    : (ratio < 0.5 ? "before" : "after");
+            }
+
+            public void SetHover(DropRow row, string mode)
+            {
+                for (int i = 0; i < _list.Controls.Count; i++)
+                {
+                    DropRow current = _list.Controls[i] as DropRow;
+
+                    if (current != null)
+                    {
+                        current.SetHover(ReferenceEquals(current, row) ? mode : null);
+                    }
+                }
+            }
+
+            public void ClearHover()
+            {
+                for (int i = 0; i < _list.Controls.Count; i++)
+                {
+                    DropRow row = _list.Controls[i] as DropRow;
+
+                    if (row != null)
+                    {
+                        row.SetHover(null);
+                    }
+                }
+            }
+
+            private void OpenChild(BookmarkNode folder, Control anchor)
+            {
+                if (ReferenceEquals(_openChildNode, folder))
+                {
+                    return;
+                }
+
+                _openChildNode = folder;
+                _owner.ShowChildDropPopup(this, folder, anchor);
+            }
+
+            private void Drop(BookmarkNode target, string mode)
+            {
+                _owner.PerformMenuDrop(target, mode);
+            }
+
+            private bool IsDragging
+            {
+                get { return _owner._dragNode != null; }
+            }
+
+            internal sealed class DropRow : FlatButton
+            {
+                private readonly BookmarkDropPopup _popup;
+
+                internal DropRow(BookmarkDropPopup popup, BookmarkNode node)
+                {
+                    _popup = popup;
+                    Node = node;
+
+                    Text = node.Title + (node.IsFolder ? "  ▸" : string.Empty);
+                    TextAlign = ContentAlignment.MiddleLeft;
+                    Height = 26;
+                    Width = popup.Width - 16;
+                    Margin = new Padding(0, 0, 0, 2);
+                    FlatStyle = FlatStyle.Flat;
+                    FlatAppearance.BorderSize = 0;
+                    Font = ThemeFonts.Ui(9.5F);
+                    TabStop = false;
+                    Cursor = Cursors.Default;
+                    AllowDrop = true;
+                    ImageAlign = ContentAlignment.MiddleLeft;
+                    TextImageRelation = TextImageRelation.ImageBeforeText;
+
+                    if (node.IsFolder)
+                    {
+                        Image = BookmarksBar.FolderIcon();
+                    }
+                    else
+                    {
+                        Image = FaviconCache.GetOrLoad(node.Url, null) ?? BookmarksBar.GlobeIcon();
+                    }
+
+                    ApplyRowTheme();
+
+                    DragEnter += delegate(object sender, DragEventArgs e)
+                    {
+                        e.Effect = _popup.IsDragging ? DragDropEffects.Move : DragDropEffects.None;
+                    };
+                    DragOver += Row_DragOver;
+                    DragLeave += delegate { ApplyRowTheme(); };
+                    DragDrop += delegate(object sender, DragEventArgs e)
+                    {
+                        e.Effect = DragDropEffects.Move;
+                        ApplyRowTheme();
+                        _popup.Drop(Node, Mode);
+                    };
+                }
+
+                public BookmarkNode Node { get; private set; }
+
+                public string Mode { get; private set; }
+
+                private string _lineMode;
+
+                public void SetHover(string mode)
+                {
+                    _lineMode = (mode == "before" || mode == "after") ? mode : null;
+
+                    if (mode == "into")
+                    {
+                        BackColor = ThemeManager.Current.ButtonHover;
+                    }
+                    else
+                    {
+                        ApplyRowTheme();
+                    }
+
+                    Invalidate();
+                }
+
+                protected override void OnPaint(PaintEventArgs e)
+                {
+                    base.OnPaint(e);
+
+                    if (string.IsNullOrEmpty(_lineMode))
+                    {
+                        return;
+                    }
+
+                    using (Pen pen = new Pen(ThemeManager.Current.Accent, 2F))
+                    {
+                        int y = _lineMode == "before" ? 1 : Height - 2;
+                        e.Graphics.DrawLine(pen, 2, y, Width - 2, y);
+                    }
+                }
+
+                private void Row_DragOver(object sender, DragEventArgs e)
+                {
+                    if (!_popup.IsDragging ||
+                        string.Equals(_popup._owner._dragNode.Id, Node.Id, StringComparison.Ordinal))
+                    {
+                        e.Effect = DragDropEffects.None;
+                        ApplyRowTheme();
+                        return;
+                    }
+
+                    Point client = PointToClient(new Point(e.X, e.Y));
+                    double ratio = Height <= 0 ? 0.5 : (double)client.Y / Height;
+                    Mode = Node.IsFolder && ratio > 0.3 && ratio < 0.7
+                        ? "into"
+                        : (ratio < 0.5 ? "before" : "after");
+
+                    e.Effect = DragDropEffects.Move;
+                    BackColor = ThemeManager.Current.ButtonHover;
+
+                    if (Mode == "into")
+                    {
+                        _popup.OpenChild(Node, this);
+                    }
+                }
+
+                private void ApplyRowTheme()
+                {
+                    ThemePalette palette = ThemeManager.Current;
+                    BackColor = palette.WindowBackground;
+                    ForeColor = palette.TextPrimary;
+                    FlatAppearance.MouseOverBackColor = palette.ButtonHover;
+                    FlatAppearance.MouseDownBackColor = palette.ButtonPressed;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 拖拽到「…」按钮时打开溢出菜单，并把菜单及所有子菜单做成放置目标。
+        /// </summary>
+        private void Overflow_DragEnter(object sender, DragEventArgs e)
+        {
+            if (_dragNode == null)
+            {
+                e.Effect = DragDropEffects.None;
+                return;
+            }
+
+            e.Effect = DragDropEffects.Move;
+            ShowDropPopupsForOverflow();
+        }
+
+        private void Overflow_DragDrop(object sender, DragEventArgs e)
+        {
+            if (_dragNode == null || _store == null)
+            {
+                ClearDropVisual();
+                return;
+            }
+
+            string id = _dragNode.Id;
+            _dragNode = null;
+            _menuDropTarget = null;
+            _menuDropMode = null;
+            ClearDropVisual();
+            _store.Move(id, BookmarkStore.ToolbarId);
+            NotifyChanged();
+        }
+
+        private void AttachMenuDrop(ToolStripDropDown dropDown)
+        {
+            dropDown.AllowDrop = true;
+            dropDown.DragEnter += Menu_DragEnter;
+            dropDown.DragOver += Menu_DragOver;
+            dropDown.DragLeave += Menu_DragLeave;
+            dropDown.DragDrop += Menu_DragDrop;
+
+            for (int i = 0; i < dropDown.Items.Count; i++)
+            {
+                ToolStripMenuItem item = dropDown.Items[i] as ToolStripMenuItem;
+
+                if (item != null && item.DropDownItems.Count > 0)
+                {
+                    AttachMenuDrop(item.DropDown);
+                }
+            }
+        }
+
+        private void Menu_DragEnter(object sender, DragEventArgs e)
+        {
+            e.Effect = _dragNode == null ? DragDropEffects.None : DragDropEffects.Move;
+        }
+
+        private void Menu_DragOver(object sender, DragEventArgs e)
+        {
+            if (_dragNode == null)
+            {
+                e.Effect = DragDropEffects.None;
+                return;
+            }
+
+            ToolStripDropDown dropDown = sender as ToolStripDropDown;
+            ToolStripMenuItem item = MenuItemAt(sender, e);
+            BookmarkNode node = item == null ? null : item.Tag as BookmarkNode;
+
+            if (node == null || string.Equals(node.Id, _dragNode.Id, StringComparison.Ordinal))
+            {
+                e.Effect = DragDropEffects.None;
+                SetMenuDropHighlight(null);
+                return;
+            }
+
+            Point client = dropDown == null
+                ? Point.Empty
+                : dropDown.PointToClient(new Point(e.X, e.Y));
+            double ratio = item.Height <= 0
+                ? 0.5
+                : (double)(client.Y - item.Bounds.Top) / item.Height;
+
+            // 文件夹中间 = 放入；其余位置 = 插到目标前/后，用于自定义菜单内顺序。
+            string mode = node.IsFolder && ratio > 0.3 && ratio < 0.7
+                ? "into"
+                : (ratio < 0.5 ? "before" : "after");
+
+            e.Effect = DragDropEffects.Move;
+            _menuDropTarget = node;
+            _menuDropMode = mode;
+            SetMenuDropHighlight(item);
+
+            if (mode == "into" && !item.DropDown.Visible)
+            {
+                try
+                {
+                    item.ShowDropDown();
+                }
+                catch
+                {
+                }
+            }
+        }
+
+        private void Menu_DragLeave(object sender, EventArgs e)
+        {
+            _menuDropTarget = null;
+            _menuDropMode = null;
+            SetMenuDropHighlight(null);
+        }
+
+        private void Menu_DragDrop(object sender, DragEventArgs e)
+        {
+            BookmarkNode target = _menuDropTarget;
+            string mode = _menuDropMode;
+
+            if (_dragNode == null || _store == null || target == null)
+            {
+                SetMenuDropHighlight(null);
+                return;
+            }
+
+            string id = _dragNode.Id;
+            _dragNode = null;
+            _menuDropTarget = null;
+            _menuDropMode = null;
+            ClearDropVisual();
+            SetMenuDropHighlight(null);
+            MenuPositioner.CloseOpenMenus();
+
+            if (mode == "into")
+            {
+                _store.Move(id, target.Id);
+            }
+            else
+            {
+                BookmarkNode parent = _store.ParentOf(target.Id);
+
+                if (parent == null)
+                {
+                    return;
+                }
+
+                string before = mode == "before"
+                    ? target.Id
+                    : NextSiblingId(parent, target.Id);
+
+                _store.Move(id, parent.Id, before);
+            }
+
+            NotifyChanged();
+        }
+
+        private static ToolStripMenuItem MenuItemAt(object sender, DragEventArgs e)
+        {
+            ToolStripDropDown dropDown = sender as ToolStripDropDown;
+
+            if (dropDown == null)
+            {
+                return null;
+            }
+
+            return dropDown.GetItemAt(dropDown.PointToClient(new Point(e.X, e.Y))) as ToolStripMenuItem;
+        }
+
+        private void SetMenuDropHighlight(ToolStripMenuItem item)
+        {
+            if (ReferenceEquals(_menuDropItem, item))
+            {
+                return;
+            }
+
+            if (_menuDropItem != null)
+            {
+                _menuDropItem.BackColor = Color.Empty;
+                _menuDropItem.ForeColor = ThemeManager.Current.TextPrimary;
+            }
+
+            _menuDropItem = item;
+
+            if (item != null)
+            {
+                item.BackColor = ThemeManager.Current.ButtonHover;
+                item.ForeColor = ThemeManager.Current.TextPrimary;
+            }
         }
 
         private void Panel_DragOver(object sender, DragEventArgs e)
@@ -1104,12 +2099,24 @@ namespace VantageLite.UI
                 x = bounds.Right - size.Width;
             }
 
-            // 垂直方向交给 WinForms 自己处理（放不下会自动向上/加滚动），
-            // 手动夹取会把菜单推离锚点，造成和工具栏间距异常。
+            // 垂直方向也限制在主窗口客户区内；放不下时上移，避免菜单跑到窗口外。
+            int maxY = Math.Max(bounds.Top, bounds.Bottom - size.Height);
+
+            if (y > maxY)
+            {
+                y = maxY;
+            }
+
+            if (y < bounds.Top)
+            {
+                y = bounds.Top;
+            }
+
             x = Math.Max(bounds.Left, x);
 
             Track(menu);
             menu.Closed += delegate { Untrack(menu); };
+            menu.Opened += delegate { ClampDropDown(menu, boundsOwner); };
             StartMouseWatch();
             menu.Show(new Point(x, y));
         }
@@ -1215,6 +2222,8 @@ namespace VantageLite.UI
             new Dictionary<string, List<Action<Image>>>(StringComparer.OrdinalIgnoreCase);
         private static readonly Dictionary<string, string> DataUris =
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        private static readonly string CacheDirectory =
+            Path.Combine(AppPaths.DataDirectory, "favicons");
 
         public static int Version { get; private set; }
 
@@ -1229,8 +2238,39 @@ namespace VantageLite.UI
             lock (Gate)
             {
                 string data;
-                return DataUris.TryGetValue(key, out data) ? data : null;
+                if (DataUris.TryGetValue(key, out data))
+                {
+                    return data;
+                }
             }
+
+            Image image;
+            string diskDataUri;
+
+            if (TryLoadFromDisk(key, out image, out diskDataUri))
+            {
+                lock (Gate)
+                {
+                    if (!DataUris.ContainsKey(key))
+                    {
+                        DataUris[key] = diskDataUri;
+                        Version++;
+                    }
+
+                    if (!Cache.ContainsKey(key))
+                    {
+                        Cache[key] = image;
+                    }
+                    else
+                    {
+                        image.Dispose();
+                    }
+
+                    return DataUris[key];
+                }
+            }
+
+            return null;
         }
 
         public static Image GetOrLoad(string url, Action<Image> onLoaded)
@@ -1239,6 +2279,53 @@ namespace VantageLite.UI
             if (key == null)
             {
                 return null;
+            }
+
+            lock (Gate)
+            {
+                Image cached;
+                if (Cache.TryGetValue(key, out cached))
+                {
+                    return cached;
+                }
+
+                List<Action<Image>> pending;
+                if (Pending.TryGetValue(key, out pending))
+                {
+                    if (onLoaded != null)
+                    {
+                        pending.Add(onLoaded);
+                    }
+
+                    return null;
+                }
+            }
+
+            // 先读磁盘缓存；命中就不用再联网。
+            Image diskImage;
+            string diskDataUri;
+
+            if (TryLoadFromDisk(key, out diskImage, out diskDataUri))
+            {
+                lock (Gate)
+                {
+                    Image cached;
+                    if (Cache.TryGetValue(key, out cached))
+                    {
+                        diskImage.Dispose();
+                        return cached;
+                    }
+
+                    Cache[key] = diskImage;
+
+                    if (diskDataUri != null)
+                    {
+                        DataUris[key] = diskDataUri;
+                        Version++;
+                    }
+
+                    return diskImage;
+                }
             }
 
             lock (Gate)
@@ -1288,6 +2375,7 @@ namespace VantageLite.UI
             }
 
             string dataUri = null;
+            byte[] png = null;
 
             if (image != null)
             {
@@ -1296,13 +2384,17 @@ namespace VantageLite.UI
                     using (MemoryStream buffer = new MemoryStream())
                     {
                         image.Save(buffer, System.Drawing.Imaging.ImageFormat.Png);
-                        dataUri = "data:image/png;base64," + Convert.ToBase64String(buffer.ToArray());
+                        png = buffer.ToArray();
+                        dataUri = "data:image/png;base64," + Convert.ToBase64String(png);
                     }
                 }
                 catch
                 {
                 }
             }
+
+            // 永久缓存到 data/favicons，下次启动直接读盘，不再联网。
+            SaveToDisk(key, png);
 
             List<Action<Image>> callbacks;
 
@@ -1471,6 +2563,88 @@ namespace VantageLite.UI
             }
 
             return stop > start ? tag.Substring(start, stop - start) : null;
+        }
+
+        private static bool TryLoadFromDisk(string key, out Image image, out string dataUri)
+        {
+            image = null;
+            dataUri = null;
+
+            try
+            {
+                string path = FileFor(key);
+
+                if (!File.Exists(path))
+                {
+                    return false;
+                }
+
+                byte[] bytes = File.ReadAllBytes(path);
+
+                using (MemoryStream stream = new MemoryStream(bytes))
+                {
+                    using (Image decoded = Image.FromStream(stream))
+                    {
+                        image = Resize(decoded, 16, 16);
+                    }
+                }
+
+                dataUri = "data:image/png;base64," + Convert.ToBase64String(bytes);
+                return true;
+            }
+            catch
+            {
+                if (image != null)
+                {
+                    image.Dispose();
+                    image = null;
+                }
+
+                dataUri = null;
+                return false;
+            }
+        }
+
+        private static void SaveToDisk(string key, byte[] png)
+        {
+            if (png == null || png.Length == 0)
+            {
+                return;
+            }
+
+            try
+            {
+                Directory.CreateDirectory(CacheDirectory);
+                string path = FileFor(key);
+                string temp = path + ".tmp";
+                File.WriteAllBytes(temp, png);
+                File.Copy(temp, path, true);
+                File.Delete(temp);
+            }
+            catch
+            {
+            }
+        }
+
+        private static string FileFor(string key)
+        {
+            return Path.Combine(CacheDirectory, HashKey(key) + ".png");
+        }
+
+        private static string HashKey(string value)
+        {
+            using (SHA1 sha = SHA1.Create())
+            {
+                byte[] hash = sha.ComputeHash(Encoding.UTF8.GetBytes(value));
+                StringBuilder builder = new StringBuilder(hash.Length * 2);
+
+                for (int i = 0; i < hash.Length; i++)
+                {
+                    builder.Append(hash[i].ToString("x2"));
+                }
+
+                return builder.ToString();
+            }
         }
 
         private static string KeyFor(string url)

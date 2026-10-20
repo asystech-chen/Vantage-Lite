@@ -117,11 +117,7 @@ namespace VantageLite.Browser
         {
             BrowserTab tab = new BrowserTab(_nextId++, _environment, _enableDevTools, url, internalAddress, internalHtml);
             tab.InternalHtmlProvider = InternalHtmlProvider;
-            tab.TitleChanged += TabTitleChanged;
-            tab.NewWindowRequested += TabNewWindowRequested;
-            tab.Navigated += TabNavigated;
-            tab.WebMessage += TabWebMessage;
-            tab.DownloadStarting += TabDownloadStarting;
+            WireTab(tab);
             _tabs.Add(tab);
             _host.Controls.Add(tab);
             tab.Dock = DockStyle.Fill;
@@ -183,6 +179,36 @@ namespace VantageLite.Browser
             {
                 _maintenanceBusy = false;
             }
+        }
+
+        /// <summary>
+        /// 会话恢复用：只占位、不创建 WebView2；激活时再由 EnsureLiveAsync 拉起。
+        /// </summary>
+        public BrowserTab AddPlaceholderTab(string url, string internalAddress, string title)
+        {
+            BrowserTab tab = new BrowserTab(_nextId++, _environment, _enableDevTools, url, internalAddress, null);
+            tab.InternalHtmlProvider = InternalHtmlProvider;
+
+            if (!string.IsNullOrWhiteSpace(title))
+            {
+                tab.SetPlaceholderTitle(title);
+            }
+
+            WireTab(tab);
+            _tabs.Add(tab);
+            _host.Controls.Add(tab);
+            tab.Dock = DockStyle.Fill;
+            tab.SetContentVisibility(false);
+            return tab;
+        }
+
+        private void WireTab(BrowserTab tab)
+        {
+            tab.TitleChanged += TabTitleChanged;
+            tab.NewWindowRequested += TabNewWindowRequested;
+            tab.Navigated += TabNavigated;
+            tab.WebMessage += TabWebMessage;
+            tab.DownloadStarting += TabDownloadStarting;
         }
 
         public async Task ActivateTabAsync(int id)

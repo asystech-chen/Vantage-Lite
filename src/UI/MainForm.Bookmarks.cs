@@ -665,6 +665,17 @@ namespace VantageLite.UI
                 _settings.ClearOnExit = command.ClearOnExit.Value;
             }
 
+            if (command.RestoreSession.HasValue)
+            {
+                _settings.RestoreSession = command.RestoreSession.Value;
+            }
+
+            // 隐私优先：开启关闭时清空后不允许恢复会话。
+            if (_settings.ClearOnExit)
+            {
+                _settings.RestoreSession = false;
+            }
+
             if (!string.IsNullOrWhiteSpace(command.HomeMode))
             {
                 _settings.HomeMode = command.HomeMode.Trim().ToLowerInvariant();

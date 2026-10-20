@@ -29,6 +29,7 @@ namespace VantageLite.UI
             AppendHistoryFilter(body, "d180", "最近半年");
             AppendHistoryFilter(body, "d365", "最近一年");
             AppendHistoryFilter(body, "all", "全部");
+            body.Append("<input id=\"histQuery\" class=\"search\" type=\"text\" placeholder=\"搜索历史\" oninput=\"applyFilter()\">");
             body.Append("<span id=\"shown\" class=\"status\"></span>");
             body.Append("<button class=\"danger\" onclick=\"askClear()\">清空历史</button>");
             body.Append("</div>");
@@ -57,17 +58,21 @@ namespace VantageLite.UI
             body.Append("<script>");
             body.Append("function post(o){try{window.chrome.webview.postMessage(JSON.stringify(o));}catch(e){}}");
             body.Append("var RANGE_DAYS={today:0,d7:7,d30:30,d180:180,d365:365,all:-1};");
-            body.Append("function setRange(key){"
+            body.Append("var currentRange='all';");
+            body.Append("function setRange(key){currentRange=key;applyFilter();}");
+            body.Append("function applyFilter(){"
+                + "var q=(document.getElementById('histQuery').value||'').trim().toLowerCase();"
                 + "var now=Date.now();var from=0;"
-                + "if(key==='today'){var d=new Date();d.setHours(0,0,0,0);from=d.getTime();}"
-                + "else if(key!=='all'){from=now-RANGE_DAYS[key]*86400000;}"
+                + "if(currentRange==='today'){var d=new Date();d.setHours(0,0,0,0);from=d.getTime();}"
+                + "else if(currentRange!=='all'){from=now-RANGE_DAYS[currentRange]*86400000;}"
                 + "var items=document.querySelectorAll('#histList li');var n=0;"
                 + "for(var i=0;i<items.length;i++){"
                 + "var ts=parseInt(items[i].getAttribute('data-ts'),10)*1000;"
-                + "var show=(key==='all'||ts>=from);"
+                + "var show=(currentRange==='all'||ts>=from);"
+                + "if(show&&q){show=items[i].textContent.toLowerCase().indexOf(q)>=0;}"
                 + "items[i].style.display=show?'':'none';if(show){n++;}}"
                 + "var bs=document.querySelectorAll('.filter');"
-                + "for(var j=0;j<bs.length;j++){bs[j].className='filter'+(bs[j].getAttribute('data-range')===key?' active':'');}"
+                + "for(var j=0;j<bs.length;j++){bs[j].className='filter'+(bs[j].getAttribute('data-range')===currentRange?' active':'');}"
                 + "document.getElementById('shown').textContent='显示 '+n+' 条';"
                 + "document.getElementById('histEmpty').style.display=n===0?'block':'none';}");
             body.Append("function askClear(){document.getElementById('clearBox').style.display='flex';}");
@@ -488,6 +493,10 @@ namespace VantageLite.UI
                 .Append("<span class=\"control\"><input id=\"home\" type=\"text\" value=\"")
                 .Append(Escape(settings.HomeUrl)).Append("\">")
                 .Append("<span class=\"hint\">仅“自定义页面”时使用</span></span></div>");
+            body.Append("<label class=\"check\"><input id=\"restoreSession\" type=\"checkbox\"")
+                .Append(settings.RestoreSession ? " checked" : string.Empty)
+                .Append("> 启动时恢复上次标签页</label>");
+            body.Append("<span class=\"hint\">与「关闭时清空」互斥；开启清空后不会恢复会话</span>");
             body.Append("</div></section>");
 
             body.Append("<section class=\"card\"><div class=\"card-head\"><h2>新标签页</h2>")
@@ -637,6 +646,10 @@ namespace VantageLite.UI
                 + "if(el.id==='themeMode'){continue;}"
                 + "el.addEventListener('change',saveSettings);"
                 + "if((el.type==='text'||el.type==='number')&&el.id!=='downloadDir'){el.addEventListener('input',scheduleSave);}}})();");
+            body.Append("var restoreBox=document.getElementById('restoreSession');"
+                + "var clearBox=document.getElementById('clearOnExit');"
+                + "restoreBox.addEventListener('change',function(){if(this.checked){clearBox.checked=false;}saveSettings();});"
+                + "clearBox.addEventListener('change',function(){if(this.checked){restoreBox.checked=false;}saveSettings();});");
             body.Append("function saveSettings(){"
                 + "var homeMode=document.getElementById('homeMode').value;"
                 + "var home=document.getElementById('home').value.trim();"
@@ -649,6 +662,7 @@ namespace VantageLite.UI
                 + "var search=document.getElementById('search').value;"
                 + "var themeMode=document.getElementById('themeMode').value;"
                 + "var clearOnExit=document.getElementById('clearOnExit').checked;"
+                + "var restoreSession=document.getElementById('restoreSession').checked;"
                 + "var newTabMode=document.getElementById('newTabMode').value;"
                 + "var newTabUrl=document.getElementById('newTabUrl').value.trim();"
                 + "var ntShortcuts=document.getElementById('ntShortcuts').checked;"
@@ -657,7 +671,7 @@ namespace VantageLite.UI
                 + "var engines=[];var rows=document.querySelectorAll('#customEngines .engine-row');"
                 + "for(var i=0;i<rows.length;i++){var n=rows[i].querySelector('.ce-name').value.trim();"
                 + "var u=rows[i].querySelector('.ce-url').value.trim();if(n&&u){engines.push({name:n,url:u});}}"
-                + "post({cmd:'settings',homeMode:homeMode,home:home,customEngines:engines,maxTabs:maxTabs,suspendSeconds:suspend,discardMinutes:discard,search:search,theme:themeMode,clearOnExit:clearOnExit,newTabMode:newTabMode,newTabUrl:newTabUrl,newTabShortcuts:ntShortcuts,bookmarksBar:bar,downloadDir:downloadDir});"
+                + "post({cmd:'settings',homeMode:homeMode,home:home,customEngines:engines,maxTabs:maxTabs,suspendSeconds:suspend,discardMinutes:discard,search:search,theme:themeMode,clearOnExit:clearOnExit,restoreSession:restoreSession,newTabMode:newTabMode,newTabUrl:newTabUrl,newTabShortcuts:ntShortcuts,bookmarksBar:bar,downloadDir:downloadDir});"
                 + "}");
             body.Append("if(window.chrome&&window.chrome.webview){"
                 + "window.chrome.webview.addEventListener('message',function(e){"
@@ -728,6 +742,7 @@ namespace VantageLite.UI
             body.Append("<div class=\"bar\">");
             body.Append("<button onclick=\"newFolder('").Append(BookmarkStore.ToolbarId).Append("')\">＋ 文件夹</button>");
             body.Append("<button onclick=\"toggleBar()\">书签栏</button>");
+            body.Append("<input id=\"bmQuery\" class=\"search\" type=\"text\" placeholder=\"搜索书签\" oninput=\"applyBookmarkSearch()\">");
             body.Append("<span class=\"clip\">").Append(Escape(ClipboardText(store))).Append("</span>");
             body.Append("<span id=\"status\" class=\"status\">连接中…</span>");
             body.Append("</div>");
@@ -910,6 +925,7 @@ function toggleFolder(id,ev){
   if(!ul){return;}
   var open=ul.style.display!=='none';
   ul.style.display=open?'none':'block';
+  ul.setAttribute('data-open',open?'0':'1');
   if(tri){tri.textContent=open?'▸':'▾';}
   post({cmd:'expanded',id:id,open:!open});
 }
@@ -958,6 +974,63 @@ function clearDrop(){
   if(dropEl){dropEl.classList.remove('drop-into','drop-before','drop-after');dropEl=null;}
   dropTarget=null;dropMode=null;
 }
+");
+            sb.Append(@"
+function childTree(li){
+  for(var i=0;i<li.children.length;i++){if(li.children[i].tagName==='UL'){return li.children[i];}}
+  return null;
+}
+function snapshotTree(){
+  var uls=document.querySelectorAll('ul.tree');
+  for(var i=0;i<uls.length;i++){uls[i].setAttribute('data-open',uls[i].style.display==='none'?'0':'1');}
+}
+function applyBookmarkSearch(){
+  var input=document.getElementById('bmQuery');
+  if(!input){return;}
+  var top=document.querySelector('ul.tree');
+  if(!top){return;}
+  var q=input.value.trim().toLowerCase();
+  if(!q){restoreTree();return;}
+  filterTree(top,q);
+}
+function filterTree(ul,q){
+  var any=false;
+  for(var i=0;i<ul.children.length;i++){
+    var li=ul.children[i];
+    if(li.tagName!=='LI'){continue;}
+    var childUl=childTree(li);
+    var head=li.querySelector('.row')||li.querySelector('.folder-head');
+    var text=head?head.textContent.toLowerCase():'';
+    if(!childUl){
+      var u=li.querySelector('.url');
+      if(u){text+=u.textContent.toLowerCase();}
+    }
+    var own=text.indexOf(q)>=0;
+    var child=childUl?filterTree(childUl,q):false;
+    var show=own||child;
+    li.style.display=show?'':'none';
+    if(childUl){
+      childUl.style.display=child?'block':'none';
+      var tri=li.querySelector('.tri');
+      if(tri){tri.textContent=child?'▾':'▸';}
+    }
+    if(show){any=true;}
+  }
+  return any;
+}
+function restoreTree(){
+  var uls=document.querySelectorAll('ul.tree');
+  for(var i=0;i<uls.length;i++){uls[i].style.display=uls[i].getAttribute('data-open')==='0'?'none':'block';}
+  var lis=document.querySelectorAll('ul.tree li');
+  for(var j=0;j<lis.length;j++){lis[j].style.display='';}
+  var tris=document.querySelectorAll('li.folder .tri');
+  for(var k=0;k<tris.length;k++){
+    var li=tris[k].closest('li.folder');
+    var ul=li?childTree(li):null;
+    if(ul){tris[k].textContent=ul.style.display==='none'?'▸':'▾';}
+  }
+}
+snapshotTree();
 ");
             sb.Append("</script>");
             return sb.ToString();
@@ -1240,7 +1313,8 @@ function clearDrop(){
                 + ".panel{background:var(--bg);padding:20px;border-radius:8px;min-width:320px;box-shadow:0 10px 30px rgba(0,0,0,.3)}"
                 + ".panel-title{font-weight:600;margin-bottom:10px}"
                 + "select{width:100%;padding:6px;font:14px \"Segoe UI\",\"Microsoft YaHei\",sans-serif;"
-                + "background:var(--btn);color:var(--fg);border:1px solid var(--border);border-radius:4px}"
+                + "background:var(--btn);color:var(--fg);border:1px solid var(--border);border-radius:4px;color-scheme:inherit}"
+                + "select option{background:var(--bg);color:var(--fg)}"
                 + ".warn{background:#c0392b;color:#fff;padding:8px 12px;border-radius:4px;margin-bottom:12px}"
                 + ".panel-buttons{margin-top:14px;display:flex;gap:8px;justify-content:flex-end}"
                 + ".newtab{max-width:760px;margin:12vh auto 0;padding:0 8px;text-align:center}"
@@ -1265,6 +1339,7 @@ function clearDrop(){
                 + "span.sc-icon{display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--muted)}"
                 + "@media (max-width:640px){.shortcuts{grid-template-columns:repeat(2,minmax(0,1fr))}}"
                 + ".filters{display:flex;align-items:center;gap:6px;margin-bottom:14px;flex-wrap:wrap}"
+                + ".search{width:220px;flex:0 0 auto}"
                 + ".settings{max-width:780px;margin:0 auto}"
                 + ".page{max-width:900px;width:100%;margin:0 auto;box-sizing:border-box}"
                 + ".card{border:1px solid var(--border);border-radius:10px;background:var(--card);margin-bottom:14px}"

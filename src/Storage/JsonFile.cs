@@ -79,6 +79,9 @@ namespace VantageLite.Storage
         [DataMember(Name = "downloadDir", Order = 14)]
         public string DownloadDirectory { get; set; }
 
+        [DataMember(Name = "restoreSession", Order = 15)]
+        public bool RestoreSession { get; set; }
+
         [OnDeserializing]
         private void OnDeserializing(StreamingContext context)
         {
@@ -93,6 +96,7 @@ namespace VantageLite.Storage
             ClearOnExit = false;
             CustomSearchEngines = new List<CustomSearchEngine>();
             DownloadDirectory = string.Empty;
+            RestoreSession = true;
             // HomeMode 故意不填：旧配置由 MainForm 按 HomeUrl 推断。
         }
 
@@ -113,7 +117,8 @@ namespace VantageLite.Storage
                 ClearOnExit = false,
                 HomeMode = DefaultHomeMode,
                 CustomSearchEngines = new List<CustomSearchEngine>(),
-                DownloadDirectory = string.Empty
+                DownloadDirectory = string.Empty,
+                RestoreSession = true
             };
         }
     }

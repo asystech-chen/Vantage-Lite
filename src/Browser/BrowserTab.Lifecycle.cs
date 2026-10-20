@@ -310,6 +310,12 @@ namespace VantageLite.Browser
                 _favicon = null;
             }
 
+            if (_overrideFavicon != null)
+            {
+                _overrideFavicon.Dispose();
+                _overrideFavicon = null;
+            }
+
             if (disposing && _webView != null)
             {
                 Controls.Remove(_webView);

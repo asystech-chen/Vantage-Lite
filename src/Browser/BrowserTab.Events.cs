@@ -296,6 +296,8 @@ namespace VantageLite.Browser
 
         private void ResetFavicon()
         {
+            SetFaviconOverride(null);
+
             if (_favicon != null)
             {
                 _favicon.Dispose();

@@ -36,6 +36,7 @@ namespace VantageLite.Browser
         private bool _isLoading;
         private string _internalAddress;
         private Image _favicon;
+        private Image _overrideFavicon;
 
         public int Id
         {
@@ -79,7 +80,31 @@ namespace VantageLite.Browser
 
         public Image Favicon
         {
-            get { return _favicon; }
+            get { return _overrideFavicon ?? _favicon; }
+        }
+
+        /// <summary>
+        /// 内置页使用 Vantage 自己的图标；传 null 清除。
+        /// </summary>
+        public void SetFaviconOverride(Image image)
+        {
+            if (ReferenceEquals(_overrideFavicon, image))
+            {
+                return;
+            }
+
+            if (_overrideFavicon != null)
+            {
+                _overrideFavicon.Dispose();
+            }
+
+            _overrideFavicon = image;
+
+            EventHandler handler = FaviconChanged;
+            if (handler != null)
+            {
+                handler(this, EventArgs.Empty);
+            }
         }
 
         /// <summary>
@@ -192,6 +217,7 @@ namespace VantageLite.Browser
         public void ShowInternalPage(string address, string html)
         {
             _internalAddress = address;
+            SetFaviconOverride(AppIcon.Create16());
             _url = address;
 
             EventHandler<string> handler = AddressChanged;

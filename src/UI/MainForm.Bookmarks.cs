@@ -339,5 +339,50 @@ namespace VantageLite.UI
                 ShowInternalPage(HistoryAddress);
             }
         }
-    }
+    
+        private void ShowMainMenu()
+        {
+            ContextMenuStrip menu = new ContextMenuStrip();
+            menu.ShowImageMargin = false;
+            menu.Font = VantageLite.Theming.ThemeFonts.Ui(9.5F);
+
+            menu.Items.Add(AddMenuItem("新建标签页", delegate { CreateNewTab(); }));
+            menu.Items.Add(AddMenuItem("历史", delegate { ShowInternalPage(HistoryAddress); }));
+            menu.Items.Add(AddMenuItem("书签管理器", delegate { ShowBookmarkManager(); }));
+            menu.Items.Add(AddMenuItem(
+                _bookmarksBar.Visible ? "隐藏书签栏" : "显示书签栏",
+                delegate { ToggleBookmarksBar(); }));
+
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add(AddMenuItem("关于 Vantage Lite", delegate { ShowInternalPage(AboutAddress); }));
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add(AddMenuItem("退出", delegate { Close(); }));
+
+            menu.Closed += delegate
+            {
+                if (IsHandleCreated)
+                {
+                    try
+                    {
+                        BeginInvoke(new Action(menu.Dispose));
+                        return;
+                    }
+                    catch
+                    {
+                    }
+                }
+
+                menu.Dispose();
+            };
+
+            menu.Show(Cursor.Position);
+        }
+
+        private static ToolStripMenuItem AddMenuItem(string text, Action action)
+        {
+            ToolStripMenuItem item = new ToolStripMenuItem(text);
+            item.Click += delegate { action(); };
+            return item;
+        }
+}
 }

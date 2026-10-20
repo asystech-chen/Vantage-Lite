@@ -454,9 +454,7 @@ namespace VantageLite.Theming
 
         protected override void OnRenderArrow(ToolStripArrowRenderEventArgs e)
         {
-            ThemePalette palette = ThemeManager.Current;
-            e.ArrowColor = e.Item.Enabled ? palette.TextPrimary : palette.TextDisabled;
-            base.OnRenderArrow(e);
+            // 菜单项的子菜单三角一律不画。
         }
     }
 

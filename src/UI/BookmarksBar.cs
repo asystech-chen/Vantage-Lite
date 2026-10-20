@@ -234,7 +234,7 @@ namespace VantageLite.UI
 
         private Button CreateItemButton(BookmarkNode node)
         {
-            string text = node.IsFolder ? node.Title + " ▾" : node.Title;
+            string text = node.Title;
             Button button = new FlatButton();
             button.TextAlign = ContentAlignment.MiddleLeft;
             button.Padding = new Padding(4, 0, 4, 0);
@@ -252,8 +252,8 @@ namespace VantageLite.UI
 
             int iconSpace = 22;
 
-            // 宽度上限至少能完整放下「新建文件夹 ▾」，高 DPI 下也不会被截成「11…」。
-            int folderReference = TextRenderer.MeasureText("新建文件夹 ▾", button.Font).Width + 24 + iconSpace;
+            // 宽度上限至少能完整放下「新建文件夹」，高 DPI 下也不会被截成「11…」。
+            int folderReference = TextRenderer.MeasureText("新建文件夹", button.Font).Width + 24 + iconSpace;
             int maxWidth = Math.Max(242, folderReference);
 
             // AutoEllipsis 会额外弹出“完整文本”系统提示，和自定义 ToolTip 重叠；
@@ -1556,7 +1556,7 @@ namespace VantageLite.UI
                     _popup = popup;
                     Node = node;
 
-                    Text = node.Title + (node.IsFolder ? "  ▸" : string.Empty);
+                    Text = node.Title;
                     TextAlign = ContentAlignment.MiddleLeft;
                     Height = 26;
                     Width = popup.Width - 16;

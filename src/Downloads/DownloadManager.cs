@@ -33,6 +33,7 @@ namespace VantageLite.Downloads
         private readonly List<DownloadItem> _items = new List<DownloadItem>();
         private readonly List<RetryRequest> _retryQueue = new List<RetryRequest>();
         private readonly string _historyPath;
+        private readonly bool _persist;
         private readonly System.Windows.Forms.Timer _retryTimer;
 
         private sealed class RetryRequest
@@ -45,12 +46,22 @@ namespace VantageLite.Downloads
         public event EventHandler<DownloadItem> Started;
 
         public DownloadManager(string historyPath)
+            : this(historyPath, true)
+        {
+        }
+
+        public DownloadManager(string historyPath, bool persist)
         {
             _historyPath = historyPath;
+            _persist = persist;
             _retryTimer = new System.Windows.Forms.Timer();
             _retryTimer.Interval = 5000;
             _retryTimer.Tick += RetryTimer_Tick;
-            Load();
+
+            if (_persist)
+            {
+                Load();
+            }
         }
 
         public void Dispose()
@@ -635,6 +646,12 @@ namespace VantageLite.Downloads
 
             DownloadHistory history = new DownloadHistory();
             history.Items = _items;
+
+            if (!_persist)
+            {
+                return;
+            }
+
             JsonFile.Save(_historyPath, history);
         }
 

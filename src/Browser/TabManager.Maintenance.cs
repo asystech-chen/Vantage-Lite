@@ -38,6 +38,12 @@ namespace VantageLite.Browser
 
         private async Task RunMaintenanceAsync()
         {
+            // 工作区被隐私模式切走时不做挂起/丢弃，等恢复后再继续。
+            if (!_workspaceActive)
+            {
+                return;
+            }
+
             DateTime now = DateTime.UtcNow;
             bool changed = false;
 

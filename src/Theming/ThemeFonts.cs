@@ -18,5 +18,10 @@ namespace VantageLite.Theming
         {
             return new Font(SystemFonts.MessageBoxFont.FontFamily, size);
         }
+
+        public static Font Ui(float size, FontStyle style)
+        {
+            return new Font(SystemFonts.MessageBoxFont.FontFamily, size, style);
+        }
     }
 }

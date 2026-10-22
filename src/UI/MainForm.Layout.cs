@@ -38,10 +38,36 @@ namespace VantageLite.UI
             _bookmarksBar = new BookmarksBar();
             _bookmarksBar.Dock = DockStyle.Top;
 
+            _privacyBanner = new Panel();
+            _privacyBanner.Dock = DockStyle.Top;
+            _privacyBanner.Height = 30;
+            _privacyBanner.Visible = false;
+            _privacyBanner.Paint += PrivacyBanner_Paint;
+
+            _privacyLabel = new Label();
+            _privacyLabel.Visible = false;
+            _privacyLabel.Dock = DockStyle.Fill;
+            _privacyLabel.TextAlign = ContentAlignment.MiddleLeft;
+            _privacyLabel.Padding = new Padding(32, 0, 8, 0);
+            _privacyLabel.BackColor = Color.Transparent;
+            _privacyLabel.Font = VantageLite.Theming.ThemeFonts.Ui(9F, FontStyle.Bold);
+            _privacyLabel.Text = "隐私浏览模式 · 不保存历史、Cookie、缓存和下载记录";
+
+            _privacyExitButton = new FlatButton();
+            _privacyExitButton.Text = "退出并清除";
+            _privacyExitButton.Dock = DockStyle.Right;
+            _privacyExitButton.Width = 100;
+            _privacyExitButton.Font = VantageLite.Theming.ThemeFonts.Ui(8.5F);
+            _privacyExitButton.Click += delegate { _ = ExitPrivacyModeAsync(); };
+
+            _privacyBanner.Controls.Add(_privacyLabel);
+            _privacyBanner.Controls.Add(_privacyExitButton);
+
             // 添加顺序决定停靠优先级：最后添加的 Top 最靠上。标题栏（标签条）在最上面，地址栏在下。
             Controls.Add(_contentHost);
             Controls.Add(_bookmarksBar);
             Controls.Add(_navigationBar);
+            Controls.Add(_privacyBanner);
             Controls.Add(_titleBar);
 
             ResumeLayout(true);

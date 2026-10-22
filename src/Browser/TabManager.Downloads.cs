@@ -35,7 +35,7 @@ namespace VantageLite.Browser
             {
                 if (worker == null || worker.IsDisposed || !worker.IsLive)
                 {
-                    worker = new BrowserTab(_nextId++, _environment, false, url);
+                    worker = new BrowserTab(_nextId++, _environment, false, url, null, null, _privateMode);
                     worker.DownloadStarting += TabDownloadStarting;
                     _host.Controls.Add(worker);
                     worker.Dock = DockStyle.Fill;

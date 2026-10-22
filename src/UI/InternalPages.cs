@@ -276,17 +276,33 @@ namespace VantageLite.UI
 
         public static string NewTab(AppSettings settings, BookmarkStore store)
         {
+            return NewTab(settings, store, false);
+        }
+
+        public static string NewTab(AppSettings settings, BookmarkStore store, bool privateMode)
+        {
             if (settings == null)
             {
                 settings = AppSettings.CreateDefault();
             }
 
             StringBuilder body = new StringBuilder();
-            body.Append("<div class=\"newtab\">");
+            body.Append("<div class=\"newtab");
+            body.Append(privateMode ? " private" : string.Empty);
+            body.Append("\">");
+
             body.Append("<div class=\"nt-brand\">");
             body.Append("<div class=\"nt-logo\">").Append(LogoMarkup()).Append("</div>");
+            body.Append("<div class=\"nt-brand-text\">");
             body.Append("<div class=\"nt-wordmark\">Vantage Lite</div>");
-            body.Append("</div>");
+
+            if (privateMode)
+            {
+                body.Append("<div class=\"nt-private-badge\">隐私浏览模式</div>");
+            }
+
+            body.Append("</div></div>");
+
             body.Append("<form class=\"nt-search\" onsubmit=\"return ntSearch(event)\">");
             body.Append("<select id=\"ntEngine\" class=\"nt-engine\" onchange=\"ntEngineChanged()\" title=\"搜索引擎\">");
             AppendSearchOption(body, settings.SearchEngine, "bing", "必应");
@@ -295,12 +311,24 @@ namespace VantageLite.UI
             AppendSearchOption(body, settings.SearchEngine, "duckduckgo", "DuckDuckGo");
             AppendCustomEngineOptions(body, settings);
             body.Append("</select>");
-            body.Append("<input id=\"ntQuery\" type=\"text\" placeholder=\"搜索或输入网址\" autocomplete=\"off\" autofocus>");
+            body.Append("<input id=\"ntQuery\" type=\"text\" placeholder=\"")
+                .Append(privateMode ? "在隐私模式中搜索或输入网址" : "搜索或输入网址")
+                .Append("\" autocomplete=\"off\" autofocus>");
             body.Append("<button class=\"nt-go\" type=\"submit\" title=\"搜索\">")
                 .Append("<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" ")
                 .Append("stroke-linecap=\"round\"><circle cx=\"11\" cy=\"11\" r=\"7\"/>")
                 .Append("<line x1=\"16.5\" y1=\"16.5\" x2=\"21\" y2=\"21\"/></svg></button>");
             body.Append("</form>");
+
+            if (privateMode)
+            {
+                body.Append("<div class=\"nt-private-info\">");
+                body.Append("<div><b>不保存</b>：浏览历史、Cookie 与站点数据、缓存、会话恢复、下载记录</div>");
+                body.Append("<div><b>会保存</b>：书签、设置，以及你主动下载的文件</div>");
+                body.Append("<div>退出隐私浏览模式时，本次会话的临时数据会被清除</div>");
+                body.Append("<div>隐私浏览不会隐藏你的 IP：网络运营商、公司网络管理员和目标网站仍能看到你的访问</div>");
+                body.Append("</div>");
+            }
 
             if (settings.NewTabShortcuts)
             {
@@ -342,7 +370,7 @@ namespace VantageLite.UI
                 + "if(!q){return false;}post({cmd:'navigate',address:ntTarget(q)});return false;}");
             body.Append("</script>");
 
-            return Page("新标签页", string.Empty, body.ToString(), true);
+            return Page(privateMode ? "隐私浏览模式" : "新标签页", string.Empty, body.ToString(), true);
         }
 
         private static void AppendShortcuts(StringBuilder sb, BookmarkStore store)
@@ -1315,10 +1343,16 @@ snapshotTree();
                 + ".warn{background:#c0392b;color:#fff;padding:8px 12px;border-radius:4px;margin-bottom:12px}"
                 + ".panel-buttons{margin-top:14px;display:flex;gap:8px;justify-content:flex-end}"
                 + ".newtab{max-width:760px;margin:10vh auto 0;padding:0 8px;text-align:center}"
-                + ".nt-brand{display:flex;flex-direction:column;align-items:center;gap:12px;margin-bottom:30px}"
-                + ".nt-logo{width:104px;height:104px}"
+                + ".nt-brand{display:flex;flex-direction:row;align-items:center;justify-content:center;gap:14px;margin-bottom:30px}"
+                + ".nt-logo{width:64px;height:64px;flex:0 0 64px}"
                 + ".nt-logo svg{width:100%;height:100%;display:block}"
-                + ".nt-wordmark{font-size:30px;font-weight:700;letter-spacing:.5px;color:var(--fg)}"
+                + ".nt-brand-text{display:flex;flex-direction:column;align-items:flex-start;gap:5px}"
+                + ".nt-wordmark{font-size:28px;font-weight:700;letter-spacing:.5px;color:var(--fg)}"
+                + ".nt-private-badge{font-size:12px;font-weight:600;color:var(--link);border:1px solid var(--link);border-radius:999px;padding:1px 8px}"
+                + ".nt-private-info{max-width:560px;margin:26px auto 0;padding:13px 18px;text-align:left;"
+                + "border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--muted);font-size:12.5px;line-height:1.7}"
+                + ".nt-private-info b{color:var(--fg);font-weight:600}"
+                + ".nt-private-info div+div{margin-top:3px}"
                 + ".nt-search{display:flex;align-items:center;gap:6px;max-width:600px;margin:30px auto 0;"
                 + "padding:6px 8px 6px 12px;border:1px solid var(--border);border-radius:12px;background:var(--input)}"
                 + ".nt-search:focus-within{border-color:var(--link)}"

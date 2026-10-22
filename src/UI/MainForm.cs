@@ -34,12 +34,26 @@ namespace VantageLite.UI
         private readonly HashSet<string> _expandedBookmarks = new HashSet<string>(StringComparer.Ordinal);
         private HistoryStore _history;
         private DownloadManager _downloads;
+        private DownloadManager _normalDownloads;
+        private DownloadManager _privateDownloads;
         private DownloadsForm _downloadsForm;
         private DateTime _downloadsClosedUtc;
         private AppSettings _settings;
+        private CoreWebView2Environment _environment;
+        private TabManager _normalTabManager;
+        private TabManager _privateTabManager;
+        private bool _privacyMode;
+        private bool _privacyTransition;
+        private int _maxLiveTabs;
+        private int _suspendAfterSeconds;
+        private int _discardAfterMinutes;
+        private Panel _privacyBanner;
+        private Label _privacyLabel;
+        private Button _privacyExitButton;
         private bool _minimized;
         private Timer _resizeSettleTimer;
         private Timer _faviconRefreshTimer;
+        private Timer _privacyReclaimTimer;
         private string _faviconRefreshAddress;
         private int _faviconRefreshVersion;
 
@@ -54,21 +68,8 @@ namespace VantageLite.UI
             _bookmarks = new BookmarkStore(Path.Combine(AppPaths.DataDirectory, "bookmarks.json"));
             _history = new HistoryStore(Path.Combine(AppPaths.DataDirectory, "history.json"));
             _downloads = new DownloadManager(Path.Combine(AppPaths.DataDirectory, "downloads.json"));
-            _downloads.Started += Downloads_Started;
-            _downloads.Changed += delegate
-            {
-                // 下载事件可能来自页面消息处理，延后重绘，避免在 WebMessage 回调里导航页面。
-                if (IsHandleCreated)
-                {
-                    try
-                    {
-                        BeginInvoke(new Action(RenderDownloadsPage));
-                    }
-                    catch
-                    {
-                    }
-                }
-            };
+            _normalDownloads = _downloads;
+            WireDownloadManager(_downloads);
             _settings = JsonFile.Load<AppSettings>(Path.Combine(AppPaths.DataDirectory, "settings.json"), null)
                 ?? AppSettings.CreateDefault();
 
@@ -155,6 +156,10 @@ namespace VantageLite.UI
             _faviconRefreshTimer.Interval = 1500;
             _faviconRefreshTimer.Tick += FaviconRefreshTimer_Tick;
 
+            _privacyReclaimTimer = new Timer();
+            _privacyReclaimTimer.Interval = 5 * 60 * 1000;
+            _privacyReclaimTimer.Tick += PrivacyReclaimTimer_Tick;
+
             Application.AddMessageFilter(this);
 
             Load += MainForm_Load;
@@ -189,38 +194,30 @@ namespace VantageLite.UI
             {
                 Log.Info("Creating WebView2 environment...");
                 CoreWebView2Environment environment = await WebViewEnvironment.CreateAsync(_options);
+                _environment = environment;
 
-                int maxLiveTabs = _options.MaxLiveTabsSpecified
+                _maxLiveTabs = _options.MaxLiveTabsSpecified
                     ? _options.MaxLiveTabs
                     : _settings.MaxLiveTabs;
-                int suspendAfterSeconds = _options.SuspendSpecified
+                _suspendAfterSeconds = _options.SuspendSpecified
                     ? _options.SuspendAfterSeconds
                     : _settings.SuspendAfterSeconds;
-                int discardAfterMinutes = _options.DiscardSpecified
+                _discardAfterMinutes = _options.DiscardSpecified
                     ? _options.DiscardAfterMinutes
                     : _settings.DiscardAfterMinutes;
 
-                _tabManager = new TabManager(
+                _normalTabManager = new TabManager(
                     _contentHost,
                     environment,
                     _options.EnableDevTools,
-                    maxLiveTabs,
-                    suspendAfterSeconds,
-                    discardAfterMinutes);
-
-                _tabManager.TabsChanged += TabManager_TabsChanged;
-                _tabManager.ActiveTabChanged += TabManager_ActiveTabChanged;
-                _tabManager.NewWindowRequested += TabManager_NewWindowRequested;
-                _tabManager.Navigated += TabManager_Navigated;
-                _tabManager.WebMessage += TabManager_WebMessage;
-                _tabManager.LastTabClosed += delegate { CreateNewTab(); };
-                _tabManager.DownloadStarting += delegate(object downloadSender, CoreWebView2DownloadStartingEventArgs downloadArgs)
-                {
-                    _downloads.Begin(downloadArgs);
-                };
-                _tabManager.InternalHtmlProvider = BuildInternalPageHtml;
-
-                _tabManager.SetDownloadDirectory(_settings.DownloadDirectory);
+                    _maxLiveTabs,
+                    _suspendAfterSeconds,
+                    _discardAfterMinutes,
+                    false);
+                _tabManager = _normalTabManager;
+                WireTabManager(_normalTabManager);
+                _normalTabManager.InternalHtmlProvider = BuildInternalPageHtml;
+                _normalTabManager.SetDownloadDirectory(_settings.DownloadDirectory);
 
                 _tabStrip.TabSelected += TabStrip_TabSelected;
                 _tabStrip.TabCloseRequested += TabStrip_TabCloseRequested;
@@ -228,7 +225,7 @@ namespace VantageLite.UI
                 _tabStrip.ContextMenuRequested += TabStrip_ContextMenuRequested;
                 _tabStrip.TabReorderRequested += TabStrip_TabReorderRequested;
 
-                Log.Info("WebView2 environment ready. max live tabs = " + maxLiveTabs);
+                Log.Info("WebView2 environment ready. max live tabs = " + _maxLiveTabs);
 
                 SessionData session = null;
 
@@ -342,7 +339,7 @@ namespace VantageLite.UI
         {
             string path = SessionPath;
 
-            if (_settings == null || _tabManager == null ||
+            if (_settings == null || _normalTabManager == null ||
                 !_settings.RestoreSession || _settings.ClearOnExit)
             {
                 SessionStore.Clear(path);
@@ -352,9 +349,9 @@ namespace VantageLite.UI
             List<SessionTab> tabs = new List<SessionTab>();
             int activeIndex = 0;
 
-            for (int i = 0; i < _tabManager.Tabs.Count; i++)
+            for (int i = 0; i < _normalTabManager.Tabs.Count; i++)
             {
-                BrowserTab tab = _tabManager.Tabs[i];
+                BrowserTab tab = _normalTabManager.Tabs[i];
                 string url = tab.Url;
 
                 if (string.IsNullOrWhiteSpace(url) ||
@@ -363,7 +360,7 @@ namespace VantageLite.UI
                     continue;
                 }
 
-                if (ReferenceEquals(tab, _tabManager.ActiveTab))
+                if (ReferenceEquals(tab, _normalTabManager.ActiveTab))
                 {
                     activeIndex = tabs.Count;
                 }
@@ -397,6 +394,11 @@ namespace VantageLite.UI
                 _downloads.MarkActiveInterrupted();
             }
 
+            if (_normalDownloads != null && !ReferenceEquals(_normalDownloads, _downloads))
+            {
+                _normalDownloads.MarkActiveInterrupted();
+            }
+
             SaveSession();
 
             if (_settings == null || !_settings.ClearOnExit)
@@ -407,7 +409,7 @@ namespace VantageLite.UI
             try
             {
                 Microsoft.Web.WebView2.Core.CoreWebView2Profile profile =
-                    _tabManager == null ? null : _tabManager.GetProfile();
+                    _normalTabManager == null ? null : _normalTabManager.GetProfile();
 
                 if (profile != null)
                 {
@@ -426,6 +428,12 @@ namespace VantageLite.UI
 
         private void Downloads_Started(object sender, DownloadItem item)
         {
+            // 隐私模式下普通工作区后台完成的重试下载不弹面板，只记录到普通下载列表。
+            if (_privacyMode && ReferenceEquals(sender, _normalDownloads))
+            {
+                return;
+            }
+
             if (WindowState == FormWindowState.Minimized)
             {
                 return;
@@ -511,21 +519,46 @@ namespace VantageLite.UI
             Application.RemoveMessageFilter(this);
             _resizeSettleTimer.Dispose();
             _faviconRefreshTimer.Dispose();
+
+            if (_privacyReclaimTimer != null)
+            {
+                _privacyReclaimTimer.Stop();
+                _privacyReclaimTimer.Dispose();
+            }
             _history.Save();
             _bookmarks.Save();
 
-            if (_downloads != null)
+            if (_privateDownloads != null)
+            {
+                _privateDownloads.Dispose();
+                _privateDownloads = null;
+            }
+
+            if (_normalDownloads != null)
+            {
+                _normalDownloads.Dispose();
+                _normalDownloads = null;
+            }
+            else if (_downloads != null)
             {
                 _downloads.Dispose();
             }
 
             ShutdownTheme();
 
-            if (_tabManager != null)
+            if (_privateTabManager != null)
             {
-                _tabManager.Dispose();
-                _tabManager = null;
+                _privateTabManager.Dispose();
+                _privateTabManager = null;
             }
+
+            if (_normalTabManager != null)
+            {
+                _normalTabManager.Dispose();
+                _normalTabManager = null;
+            }
+
+            _tabManager = null;
         }
     }
 }

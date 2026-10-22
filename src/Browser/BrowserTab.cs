@@ -37,6 +37,7 @@ namespace VantageLite.Browser
         private string _internalAddress;
         private string _pendingInternalAddress;
         private string _pendingInternalHtml;
+        private readonly bool _privateMode;
         private Image _favicon;
         private Image _overrideFavicon;
 
@@ -58,6 +59,14 @@ namespace VantageLite.Browser
         public new bool IsDisposed
         {
             get { return _disposed; }
+        }
+
+        /// <summary>
+        /// 隐私工作区标签：WebView2 使用 InPrivate Profile，数据不落默认 Profile。
+        /// </summary>
+        public bool IsPrivate
+        {
+            get { return _privateMode; }
         }
 
         public bool IsSuspended
@@ -202,7 +211,7 @@ namespace VantageLite.Browser
             CoreWebView2Environment environment,
             bool enableDevTools,
             string initialUrl)
-            : this(id, environment, enableDevTools, initialUrl, null, null)
+            : this(id, environment, enableDevTools, initialUrl, null, null, false)
         {
         }
 
@@ -213,10 +222,23 @@ namespace VantageLite.Browser
             string initialUrl,
             string internalAddress,
             string internalHtml)
+            : this(id, environment, enableDevTools, initialUrl, internalAddress, internalHtml, false)
+        {
+        }
+
+        public BrowserTab(
+            int id,
+            CoreWebView2Environment environment,
+            bool enableDevTools,
+            string initialUrl,
+            string internalAddress,
+            string internalHtml,
+            bool privateMode)
         {
             _id = id;
             _environment = environment;
             _enableDevTools = enableDevTools;
+            _privateMode = privateMode;
             _pendingUrl = internalAddress == null ? initialUrl : null;
             _url = internalAddress ?? initialUrl;
             _internalAddress = internalAddress;

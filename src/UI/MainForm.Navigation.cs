@@ -97,7 +97,7 @@ namespace VantageLite.UI
                 await _tabManager.CreateTabAsync(
                     "about:blank",
                     NewTabAddress,
-                    InternalPages.NewTab(_settings, _bookmarks));
+                    InternalPages.NewTab(_settings, _bookmarks, _privacyMode));
                 return;
             }
 

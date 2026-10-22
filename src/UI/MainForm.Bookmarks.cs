@@ -105,7 +105,7 @@ namespace VantageLite.UI
         {
             if (string.Equals(address, NewTabAddress, StringComparison.OrdinalIgnoreCase))
             {
-                return InternalPages.NewTab(_settings, _bookmarks);
+                return InternalPages.NewTab(_settings, _bookmarks, _privacyMode);
             }
 
             if (string.Equals(address, HistoryAddress, StringComparison.OrdinalIgnoreCase))
@@ -416,8 +416,42 @@ namespace VantageLite.UI
             }
         }
 
+        private void TabManager_LastTabClosed(object sender, EventArgs e)
+        {
+            if (!ReferenceEquals(sender, _tabManager))
+            {
+                return;
+            }
+
+            // 关闭最后一个隐私标签：退出隐私工作区，不自动新建标签。
+            if (_privacyMode)
+            {
+                if (IsHandleCreated)
+                {
+                    try
+                    {
+                        BeginInvoke(new Action(delegate { _ = ExitPrivacyModeAsync(); }));
+                        return;
+                    }
+                    catch
+                    {
+                    }
+                }
+
+                _ = ExitPrivacyModeAsync();
+                return;
+            }
+
+            CreateNewTab();
+        }
+
         private async void TabManager_WebMessage(object sender, string message)
         {
+            if (!ReferenceEquals(sender, _tabManager))
+            {
+                return;
+            }
+
             if (message != null && message.IndexOf("dismissMenus", StringComparison.Ordinal) >= 0)
             {
                 MenuPositioner.CloseOpenMenus();
@@ -898,7 +932,7 @@ namespace VantageLite.UI
                 return;
             }
 
-            string html = InternalPages.NewTab(_settings, _bookmarks);
+            string html = InternalPages.NewTab(_settings, _bookmarks, _privacyMode);
 
             for (int i = 0; i < _tabManager.Tabs.Count; i++)
             {
@@ -1152,6 +1186,9 @@ namespace VantageLite.UI
             VantageLite.Theming.ThemeManager.ApplyMenuTheme(menu);
 
             menu.Items.Add(AddMenuItem("新建标签页", delegate { CreateNewTab(); }));
+            menu.Items.Add(AddMenuItem(
+                _privacyMode ? "退出隐私浏览模式" : "隐私浏览模式",
+                delegate { TogglePrivacyMode(); }));
             menu.Items.Add(AddMenuItem("历史", delegate { OpenInternalPage(HistoryAddress); }));
             menu.Items.Add(AddMenuItem("下载内容", delegate { ToggleDownloadsPanel(); }));
             menu.Items.Add(AddMenuItem("书签管理器", delegate { ShowBookmarkManager(); }));

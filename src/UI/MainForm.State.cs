@@ -18,6 +18,7 @@ namespace VantageLite.UI
                 Text = "Vantage Lite";
                 _navigationBar.SetAddress(string.Empty);
                 _navigationBar.SetNavigationState(false, false);
+                UpdateWindowTitle();
                 return;
             }
 
@@ -39,7 +40,11 @@ namespace VantageLite.UI
         private void UpdateWindowTitle()
         {
             BrowserTab tab = ActiveTab;
-            Text = tab == null ? "Vantage Lite" : tab.DisplayTitle + " - Vantage Lite";
+            string suffix = _privacyMode ? "隐私浏览模式 - Vantage Lite" : "Vantage Lite";
+
+            Text = tab == null
+                ? suffix
+                : tab.DisplayTitle + " - " + suffix;
         }
     }
 }

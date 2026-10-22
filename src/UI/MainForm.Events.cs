@@ -14,6 +14,11 @@ namespace VantageLite.UI
     {
         private void TabManager_TabsChanged(object sender, EventArgs e)
         {
+            if (!ReferenceEquals(sender, _tabManager))
+            {
+                return;
+            }
+
             if (_tabStrip != null && _tabManager != null)
             {
                 _tabStrip.Sync(_tabManager.Tabs, _tabManager.ActiveTab);
@@ -22,6 +27,11 @@ namespace VantageLite.UI
 
         private void TabManager_ActiveTabChanged(object sender, EventArgs e)
         {
+            if (!ReferenceEquals(sender, _tabManager))
+            {
+                return;
+            }
+
             AttachActiveTab();
             UpdateFromActiveTab();
             ApplyInternalPageTheme(ActiveTab);
@@ -324,6 +334,17 @@ namespace VantageLite.UI
 
         private void TabManager_Navigated(object sender, NavigatedEventArgs e)
         {
+            if (!ReferenceEquals(sender, _tabManager))
+            {
+                return;
+            }
+
+            // 隐私工作区的访问不写入历史。
+            if (_privacyMode)
+            {
+                return;
+            }
+
             if (e == null || string.IsNullOrEmpty(e.Url))
             {
                 return;
@@ -350,7 +371,7 @@ namespace VantageLite.UI
 
         private async void TabManager_NewWindowRequested(object sender, string url)
         {
-            if (_tabManager == null)
+            if (!ReferenceEquals(sender, _tabManager) || _tabManager == null)
             {
                 return;
             }

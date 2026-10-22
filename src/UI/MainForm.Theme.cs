@@ -1,4 +1,5 @@
 using System;
+using System.Drawing;
 using VantageLite.Browser;
 using VantageLite.Theming;
 
@@ -52,9 +53,41 @@ namespace VantageLite.UI
                 _contentHost.BackColor = ThemeManager.Current.WebViewBackground;
             }
 
+            bool privacyDark = ThemeManager.IsDark;
+
+            if (_privacyBanner != null)
+            {
+                _privacyBanner.BackColor = privacyDark ? Color.FromArgb(23, 42, 69) : Color.FromArgb(216, 232, 252);
+                _privacyBanner.Invalidate();
+            }
+
+            if (_privacyLabel != null)
+            {
+                _privacyLabel.BackColor = Color.Transparent;
+                _privacyLabel.ForeColor = privacyDark ? Color.White : Color.FromArgb(26, 43, 60);
+            }
+
+            if (_privacyExitButton != null)
+            {
+                _privacyExitButton.UseVisualStyleBackColor = false;
+                _privacyExitButton.BackColor = privacyDark ? Color.FromArgb(96, 165, 250) : Color.FromArgb(59, 130, 246);
+                _privacyExitButton.ForeColor = privacyDark ? Color.FromArgb(11, 31, 51) : Color.White;
+                _privacyExitButton.FlatAppearance.MouseOverBackColor = privacyDark ? Color.FromArgb(147, 197, 253) : Color.FromArgb(37, 99, 235);
+                _privacyExitButton.FlatAppearance.MouseDownBackColor = privacyDark ? Color.FromArgb(59, 130, 246) : Color.FromArgb(29, 78, 216);
+            }
+
+            if (_normalTabManager != null)
+            {
+                _normalTabManager.ApplyTheme();
+            }
+
+            if (_privateTabManager != null)
+            {
+                _privateTabManager.ApplyTheme();
+            }
+
             if (_tabManager != null)
             {
-                _tabManager.ApplyTheme();
                 ApplyInternalPageThemes();
             }
         }

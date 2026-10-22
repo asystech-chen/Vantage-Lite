@@ -82,6 +82,16 @@ namespace VantageLite.UI
             }
 
             int glassHeight = Padding.Top + (_titleBar == null ? WindowChrome.TitleBarHeight : _titleBar.Height);
+
+            if (_privacyBanner != null)
+            {
+                _privacyBanner.Height = WindowChrome.Scale(this, 30);
+            }
+
+            if (_privacyExitButton != null)
+            {
+                _privacyExitButton.Width = WindowChrome.Scale(this, 100);
+            }
             VantageLite.Diagnostics.Log.Info("dpi=" + DeviceDpi + " titleBar=" + (_titleBar == null ? 0 : _titleBar.Height) +
                 " navBar=" + (_navigationBar == null ? 0 : _navigationBar.Height) +
                 " bookmarksBar=" + (_bookmarksBar == null ? 0 : _bookmarksBar.Height));

@@ -20,6 +20,7 @@ namespace VantageLite.Theming
 
         private static bool _initialized;
         private static bool _isDark;
+        private static bool _privacyMode;
         private static string _mode = "system";
 
         public static event EventHandler ThemeChanged;
@@ -52,7 +53,29 @@ namespace VantageLite.Theming
 
         public static ThemePalette Current
         {
-            get { return _isDark ? ThemePalette.Dark : ThemePalette.Light; }
+            get
+            {
+                if (_privacyMode)
+                {
+                    return _isDark ? ThemePalette.PrivacyDark : ThemePalette.PrivacyLight;
+                }
+
+                return _isDark ? ThemePalette.Dark : ThemePalette.Light;
+            }
+        }
+
+        /// <summary>
+        /// 隐私工作区配色开关。切换后立即通知所有窗口重绘。
+        /// </summary>
+        public static void SetPrivacyMode(bool enabled)
+        {
+            if (_privacyMode == enabled)
+            {
+                return;
+            }
+
+            _privacyMode = enabled;
+            RaiseThemeChanged();
         }
 
         public static void Initialize()
@@ -102,6 +125,18 @@ namespace VantageLite.Theming
                 {
                     DwmSetWindowAttribute(form.Handle, immersiveDarkModeOld, ref dark, sizeof(int));
                 }
+            }
+            catch
+            {
+            }
+
+            // Win11 窗口边框：隐私模式使用 Vantage 蓝，退出恢复系统默认。
+            try
+            {
+                int border = _privacyMode
+                    ? (_isDark ? 0x00FAA560 : 0x00F6823B)
+                    : unchecked((int)0xFFFFFFFF);
+                DwmSetWindowAttribute(form.Handle, 34, ref border, sizeof(int));
             }
             catch
             {

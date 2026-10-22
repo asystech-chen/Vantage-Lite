@@ -73,5 +73,54 @@ namespace VantageLite.Theming
             CloseHover = Color.FromArgb(196, 43, 28),
             WebViewBackground = Color.FromArgb(255, 255, 255)
         };
+
+        /// <summary>
+        /// 隐私工作区：沿用 Vantage 的蓝绿体系，和普通窗口区分开。
+        /// </summary>
+        public static readonly ThemePalette PrivacyLight = new ThemePalette
+        {
+            WindowBackground = Color.FromArgb(238, 242, 248),
+            ChromeBackground = Color.FromArgb(255, 255, 255),
+            TabStripBackground = Color.FromArgb(216, 232, 252),
+            TabActive = Color.FromArgb(255, 255, 255),
+            TabInactive = Color.FromArgb(206, 224, 245),
+            TabHover = Color.FromArgb(226, 238, 252),
+            TextPrimary = Color.FromArgb(26, 43, 60),
+            TextSecondary = Color.FromArgb(90, 107, 124),
+            TextDisabled = Color.FromArgb(143, 163, 184),
+            AddressBackground = Color.FromArgb(255, 255, 255),
+            AddressBorder = Color.FromArgb(157, 180, 208),
+            ButtonHover = Color.FromArgb(220, 234, 251),
+            ButtonPressed = Color.FromArgb(199, 220, 247),
+            CaptionHover = Color.FromArgb(207, 226, 247),
+            CaptionPressed = Color.FromArgb(192, 215, 242),
+            Accent = Color.FromArgb(59, 130, 246),
+            Warning = Color.FromArgb(217, 119, 6),
+            CloseHover = Color.FromArgb(196, 43, 28),
+            WebViewBackground = Color.FromArgb(238, 242, 248)
+        };
+
+        public static readonly ThemePalette PrivacyDark = new ThemePalette
+        {
+            WindowBackground = Color.FromArgb(19, 26, 34),
+            ChromeBackground = Color.FromArgb(29, 27, 31),
+            TabStripBackground = Color.FromArgb(22, 64, 110),
+            TabActive = Color.FromArgb(43, 41, 51),
+            TabInactive = Color.FromArgb(20, 35, 47),
+            TabHover = Color.FromArgb(27, 48, 64),
+            TextPrimary = Color.FromArgb(235, 244, 245),
+            TextSecondary = Color.FromArgb(143, 168, 174),
+            TextDisabled = Color.FromArgb(111, 133, 140),
+            AddressBackground = Color.FromArgb(29, 27, 31),
+            AddressBorder = Color.FromArgb(42, 50, 64),
+            ButtonHover = Color.FromArgb(34, 58, 74),
+            ButtonPressed = Color.FromArgb(43, 74, 94),
+            CaptionHover = Color.FromArgb(30, 52, 66),
+            CaptionPressed = Color.FromArgb(39, 68, 86),
+            Accent = Color.FromArgb(96, 165, 250),
+            Warning = Color.FromArgb(240, 173, 78),
+            CloseHover = Color.FromArgb(196, 43, 28),
+            WebViewBackground = Color.FromArgb(29, 27, 31)
+        };
     }
 }

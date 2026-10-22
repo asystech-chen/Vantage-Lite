@@ -16,6 +16,7 @@ namespace VantageLite.Browser
         private readonly Control _host;
         private readonly CoreWebView2Environment _environment;
         private readonly bool _enableDevTools;
+        private readonly bool _privateMode;
         private int _maxLiveTabs;
         private int _suspendAfterSeconds;
         private int _discardAfterMinutes;
@@ -43,10 +44,23 @@ namespace VantageLite.Browser
             int maxLiveTabs,
             int suspendAfterSeconds,
             int discardAfterMinutes)
+            : this(host, environment, enableDevTools, maxLiveTabs, suspendAfterSeconds, discardAfterMinutes, false)
+        {
+        }
+
+        public TabManager(
+            Control host,
+            CoreWebView2Environment environment,
+            bool enableDevTools,
+            int maxLiveTabs,
+            int suspendAfterSeconds,
+            int discardAfterMinutes,
+            bool privateMode)
         {
             _host = host;
             _environment = environment;
             _enableDevTools = enableDevTools;
+            _privateMode = privateMode;
             _maxLiveTabs = Math.Max(1, maxLiveTabs);
             _suspendAfterSeconds = Math.Max(0, suspendAfterSeconds);
             _discardAfterMinutes = Math.Max(0, discardAfterMinutes);
@@ -57,6 +71,11 @@ namespace VantageLite.Browser
             _maintenanceTimer.Interval = 5000;
             _maintenanceTimer.Tick += MaintenanceTimer_Tick;
             _maintenanceTimer.Start();
+        }
+
+        public bool IsPrivate
+        {
+            get { return _privateMode; }
         }
 
         public IList<BrowserTab> Tabs
@@ -115,7 +134,7 @@ namespace VantageLite.Browser
 
         public async Task<BrowserTab> CreateTabAsync(string url, string internalAddress, string internalHtml)
         {
-            BrowserTab tab = new BrowserTab(_nextId++, _environment, _enableDevTools, url, internalAddress, internalHtml);
+            BrowserTab tab = new BrowserTab(_nextId++, _environment, _enableDevTools, url, internalAddress, internalHtml, _privateMode);
             tab.InternalHtmlProvider = InternalHtmlProvider;
             WireTab(tab);
             _tabs.Add(tab);
@@ -186,7 +205,7 @@ namespace VantageLite.Browser
         /// </summary>
         public BrowserTab AddPlaceholderTab(string url, string internalAddress, string title)
         {
-            BrowserTab tab = new BrowserTab(_nextId++, _environment, _enableDevTools, url, internalAddress, null);
+            BrowserTab tab = new BrowserTab(_nextId++, _environment, _enableDevTools, url, internalAddress, null, _privateMode);
             tab.InternalHtmlProvider = InternalHtmlProvider;
 
             if (!string.IsNullOrWhiteSpace(title))

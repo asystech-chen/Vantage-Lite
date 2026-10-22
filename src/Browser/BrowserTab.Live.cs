@@ -55,7 +55,17 @@ namespace VantageLite.Browser
             try
             {
                 Controls.Add(view);
-                await view.EnsureCoreWebView2Async(_environment);
+
+                if (_privateMode)
+                {
+                    CoreWebView2ControllerOptions controllerOptions = _environment.CreateCoreWebView2ControllerOptions();
+                    controllerOptions.IsInPrivateModeEnabled = true;
+                    await view.EnsureCoreWebView2Async(_environment, controllerOptions);
+                }
+                else
+                {
+                    await view.EnsureCoreWebView2Async(_environment);
+                }
 
                 // 初始化期间标签可能已被关闭或丢弃。
                 if (_disposed)
@@ -66,6 +76,12 @@ namespace VantageLite.Browser
                 }
 
                 CoreWebView2 core = view.CoreWebView2;
+
+                // 防止运行时忽略 InPrivate 标志时，隐私标签悄悄落到普通 Profile。
+                if (_privateMode && !core.Profile.IsInPrivateModeEnabled)
+                {
+                    throw new InvalidOperationException("WebView2 InPrivate 模式不可用");
+                }
 
                 _webView = view;
                 _core = core;

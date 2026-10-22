@@ -90,6 +90,7 @@ VantageLite.exe --user-data-dir=D:\tmp\vl-profile --url=https://asystech.cn
 | `Ctrl+R` / `F5` | 刷新 |
 | `Alt+←` / `Alt+→` | 后退 / 前进 |
 | `Ctrl+T` | 新建标签页 |
+| `Ctrl+Shift+T` | 重新打开关闭的标签页 |
 | `Ctrl+W` | 关闭当前标签页 |
 | `Ctrl+J` | 下载面板 |
 | `Ctrl+D` | 收藏当前页面 |
@@ -102,12 +103,12 @@ VantageLite.exe --user-data-dir=D:\tmp\vl-profile --url=https://asystech.cn
 
 ## 功能
 
-- 多标签：新建、切换、中键关闭、拖动排序；标签条溢出时横向滚动
+- 多标签：新建、切换、中键关闭、拖动排序、右键菜单（复制/关闭其他/关闭右侧/重新打开）；标签条溢出时横向滚动
 - 内存：后台 30 秒挂起、挂起被拒降级、存活标签上限 + LRU 丢弃、最小化节流
 - 书签：树形文件夹、书签工具栏、`about:bookmarks` 管理页、拖拽排序/移入文件夹、搜索
 - 历史：`about:history`，即时落盘，最多 2000 条；时间范围 + 关键词过滤、一键清空
 - 下载：弹出式下载面板（`Ctrl+J`）+ `about:downloads`，暂停/继续/取消/重试/打开文件/目录，历史持久化
-- 会话恢复：启动时恢复上次标签（与「关闭时清空」互斥）
+- 会话恢复：启动时恢复上次标签（默认关闭，与「关闭时清空」互斥）
 - 新标签页：`about:newtab`（logo + wordmark + 搜索框，可选书签快捷入口），可切换内置页/空白页/当前主页/自定义网址
 - 设置：`about:preferences`（启动页、新标签页、主题、最大存活标签、挂起/销毁等待、搜索引擎、书签栏、下载目录、隐私清理）
 - 关于：自绘对话框，logo 来自 `Resources/vantage-logo.svg`，跟随 Windows 文本大小
@@ -119,7 +120,6 @@ VantageLite.exe --user-data-dir=D:\tmp\vl-profile --url=https://asystech.cn
 
 短期（下一批）：
 
-- 标签条右键菜单（关闭其他/右侧、重开、复制）与标签拖拽排序
 - 书签导入/导出（HTML + `.url`；导入需另找验证环境）
 - 书签 URL 编辑
 - 历史按日期分组（今天/昨天/更早）

@@ -50,6 +50,95 @@ namespace VantageLite.UI
             CreateNewTab();
         }
 
+        private void TabStrip_TabReorderRequested(object sender, TabReorderEventArgs e)
+        {
+            if (_tabManager != null)
+            {
+                _tabManager.MoveTab(e.FromIndex, e.ToIndex);
+            }
+        }
+
+        /// <summary>
+        /// 标签条右键菜单：标签上显示标签操作，空白处只显示新建/重新打开。
+        /// </summary>
+        private void TabStrip_ContextMenuRequested(object sender, TabContextEventArgs e)
+        {
+            if (_tabManager == null)
+            {
+                return;
+            }
+
+            ContextMenuStrip menu = new ContextMenuStrip();
+            menu.ShowImageMargin = false;
+            menu.Font = VantageLite.Theming.ThemeFonts.Ui(9.5F);
+            VantageLite.Theming.ThemeManager.ApplyMenuTheme(menu);
+
+            if (e.TabId > 0)
+            {
+                BuildTabContextMenu(menu, e.TabId);
+            }
+            else
+            {
+                menu.Items.Add(AddMenuItem("新建标签页", delegate { CreateNewTab(); }));
+                menu.Items.Add(CreateReopenMenuItem());
+            }
+
+            menu.Closed += delegate { DisposeMenu(menu); };
+            MenuPositioner.Show(menu, this, e.ScreenPoint);
+        }
+
+        private void BuildTabContextMenu(ContextMenuStrip menu, int tabId)
+        {
+            BrowserTab tab = FindTabById(tabId);
+
+            if (tab == null)
+            {
+                return;
+            }
+
+            int index = IndexOfTab(tabId);
+            int count = _tabManager.Tabs.Count;
+
+            menu.Items.Add(AddMenuItem("复制标签页", delegate { DuplicateTab(tabId); }));
+
+            ToolStripMenuItem closeOthers = AddMenuItem("关闭其他标签页", delegate { CloseOtherTabs(tabId); });
+            closeOthers.Enabled = count > 1;
+            menu.Items.Add(closeOthers);
+
+            ToolStripMenuItem closeRight = AddMenuItem("关闭右侧标签页", delegate { CloseTabsToRight(tabId); });
+            closeRight.Enabled = index >= 0 && index < count - 1;
+            menu.Items.Add(closeRight);
+
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add(CreateReopenMenuItem());
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add(AddMenuItem("关闭标签页", delegate { CloseTabById(tabId); }));
+        }
+
+        private ToolStripMenuItem CreateReopenMenuItem()
+        {
+            ToolStripMenuItem item = AddMenuItem("重新打开关闭的标签页", delegate { ReopenClosedTab(); });
+            item.Enabled = _closedTabs.Count > 0;
+            return item;
+        }
+
+        private void DisposeMenu(ContextMenuStrip menu)
+        {
+            if (IsHandleCreated)
+            {
+                try
+                {
+                    BeginInvoke(new Action(menu.Dispose));
+                    return;
+                }
+                catch
+                {
+                }
+            }
+
+            menu.Dispose();
+        }
+
         private async void ActivateTabById(int id)
         {
             if (_tabManager != null)
@@ -64,6 +153,8 @@ namespace VantageLite.UI
             {
                 return;
             }
+
+            RememberClosedTab(id);
 
             try
             {

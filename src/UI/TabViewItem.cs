@@ -27,6 +27,7 @@ namespace VantageLite.UI
         private Color _titleColor;
         private int _fadeLeft;
         private int _fadeRight;
+        private bool _suppressSelect;
 
         public TabViewItem(int tabId)
         {
@@ -78,7 +79,16 @@ namespace VantageLite.UI
             Controls.Add(_closeButton);
             Controls.Add(_indicator);
 
-            Click += delegate { Raise(SelectRequested); };
+            Click += delegate
+            {
+                if (_suppressSelect)
+                {
+                    _suppressSelect = false;
+                    return;
+                }
+
+                Raise(SelectRequested);
+            };
             MouseDown += OnMouseDown;
             MouseEnter += OnMouseEnter;
             MouseLeave += OnMouseLeave;
@@ -115,6 +125,14 @@ namespace VantageLite.UI
         }
 
         public int TabId { get; private set; }
+
+        /// <summary>
+        /// 拖拽排序结束后，抑制本次 MouseUp 顺带触发的选中。
+        /// </summary>
+        public void SuppressNextSelect()
+        {
+            _suppressSelect = true;
+        }
 
         public event EventHandler SelectRequested;
         public event EventHandler CloseRequested;
@@ -407,6 +425,13 @@ namespace VantageLite.UI
 
         private void OnMouseDown(object sender, MouseEventArgs e)
         {
+            if (e.Button == MouseButtons.Left)
+            {
+                // 上一次拖拽若没有触发 Click，残留的抑制标记在这里清掉。
+                _suppressSelect = false;
+                return;
+            }
+
             if (e.Button == MouseButtons.Middle)
             {
                 Raise(MiddleCloseRequested);

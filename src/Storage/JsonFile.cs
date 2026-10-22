@@ -36,6 +36,7 @@ namespace VantageLite.Storage
         public const string DefaultNewTabMode = "builtin";
         public const string DefaultThemeMode = "system";
         public const string DefaultHomeMode = "asys";
+        public const bool DefaultRestoreSession = false;
 
         [DataMember(Name = "home", Order = 0)]
         public string HomeUrl { get; set; }
@@ -99,7 +100,7 @@ namespace VantageLite.Storage
             ClearOnExit = false;
             CustomSearchEngines = new List<CustomSearchEngine>();
             DownloadDirectory = string.Empty;
-            RestoreSession = true;
+            RestoreSession = DefaultRestoreSession;
             EnableMica = false;
             // HomeMode 故意不填：旧配置由 MainForm 按 HomeUrl 推断。
         }
@@ -122,7 +123,7 @@ namespace VantageLite.Storage
                 HomeMode = DefaultHomeMode,
                 CustomSearchEngines = new List<CustomSearchEngine>(),
                 DownloadDirectory = string.Empty,
-                RestoreSession = true,
+                RestoreSession = DefaultRestoreSession,
                 EnableMica = false
             };
         }

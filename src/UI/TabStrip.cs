@@ -19,6 +19,8 @@ namespace VantageLite.UI
         public event EventHandler NewTabRequested;
         public event EventHandler DragRequested;
         public event EventHandler ToggleMaximizeRequested;
+        public event EventHandler<TabContextEventArgs> ContextMenuRequested;
+        public event EventHandler<TabReorderEventArgs> TabReorderRequested;
 
         private readonly Panel _viewport;
         private readonly FlowLayoutPanel _panel;
@@ -26,6 +28,8 @@ namespace VantageLite.UI
         private readonly Dictionary<int, TabViewItem> _items;
         private readonly ToolTip _toolTip;
         private readonly Font _measureFont;
+        private readonly Panel _dropIndicator;
+        private readonly Timer _dragScrollTimer;
 
         // 记住最近一次 Sync 的数据，窗口宽度变化时据此重排标签。
         private IList<BrowserTab> _lastTabs;
@@ -76,6 +80,16 @@ namespace VantageLite.UI
             _panel.MouseMove += TabStrip_MouseMove;
             _panel.DoubleClick += TabStrip_DoubleClick;
             _viewport.Controls.Add(_panel);
+
+            _dropIndicator = new Panel();
+            _dropIndicator.Visible = false;
+            _dropIndicator.Width = WindowChrome.Scale(this, 2);
+            _dropIndicator.BackColor = ThemeManager.Current.Accent;
+            _viewport.Controls.Add(_dropIndicator);
+
+            _dragScrollTimer = new Timer();
+            _dragScrollTimer.Interval = 80;
+            _dragScrollTimer.Tick += DragScrollTimer_Tick;
 
             MouseUp += TabStrip_MouseUp;
             MouseDown += TabStrip_MouseDown;
@@ -129,6 +143,11 @@ namespace VantageLite.UI
                 _newTabButton.Height = WindowChrome.Scale(this, 28);
             }
 
+            if (_dropIndicator != null)
+            {
+                _dropIndicator.Width = WindowChrome.Scale(this, 2);
+            }
+
             Invalidate();
         }
 
@@ -138,6 +157,7 @@ namespace VantageLite.UI
             {
                 Application.RemoveMessageFilter(this);
                 ThemeManager.ThemeChanged -= ThemeManager_ThemeChanged;
+                _dragScrollTimer.Dispose();
                 _toolTip.Dispose();
                 _measureFont.Dispose();
             }
@@ -183,6 +203,11 @@ namespace VantageLite.UI
             if (_panel != null)
             {
                 _panel.BackColor = backdrop;
+            }
+
+            if (_dropIndicator != null)
+            {
+                _dropIndicator.BackColor = palette.Accent;
             }
 
             if (_newTabButton != null)
@@ -252,6 +277,9 @@ namespace VantageLite.UI
                         item.SelectRequested += OnItemSelectRequested;
                         item.CloseRequested += OnItemCloseRequested;
                         item.MiddleCloseRequested += OnItemMiddleCloseRequested;
+                        item.MouseDown += OnItemMouseDown;
+                        item.MouseMove += OnItemMouseMove;
+                        item.MouseUp += OnItemMouseUp;
                         _items[tab.Id] = item;
                         _panel.Controls.Add(item);
                     }
@@ -317,6 +345,12 @@ namespace VantageLite.UI
         private void TabStrip_MouseUp(object sender, MouseEventArgs e)
         {
             _leftDown = false;
+
+            if (e.Button == MouseButtons.Right)
+            {
+                RaiseContextMenu(0, Control.MousePosition);
+                return;
+            }
 
             if (e.Button != MouseButtons.Middle)
             {
@@ -398,6 +432,48 @@ namespace VantageLite.UI
                 handler(this, EventArgs.Empty);
             }
         }
+
+        private void RaiseContextMenu(int tabId, Point screenPoint)
+        {
+            EventHandler<TabContextEventArgs> handler = ContextMenuRequested;
+
+            if (handler != null)
+            {
+                handler(this, new TabContextEventArgs(tabId, screenPoint));
+            }
+        }
+    }
+
+    /// <summary>
+    /// 标签条右键菜单请求：TabId 为 0 表示点在空白处。
+    /// </summary>
+    public sealed class TabContextEventArgs : EventArgs
+    {
+        public TabContextEventArgs(int tabId, Point screenPoint)
+        {
+            TabId = tabId;
+            ScreenPoint = screenPoint;
+        }
+
+        public int TabId { get; private set; }
+
+        public Point ScreenPoint { get; private set; }
+    }
+
+    /// <summary>
+    /// 标签拖拽排序请求，索引基于拖动前的标签列表。
+    /// </summary>
+    public sealed class TabReorderEventArgs : EventArgs
+    {
+        public TabReorderEventArgs(int fromIndex, int toIndex)
+        {
+            FromIndex = fromIndex;
+            ToIndex = toIndex;
+        }
+
+        public int FromIndex { get; private set; }
+
+        public int ToIndex { get; private set; }
     }
 
     /// <summary>

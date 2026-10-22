@@ -119,6 +119,12 @@ namespace VantageLite.UI
                 return true;
             }
 
+            if (keyData == (Keys.Control | Keys.Shift | Keys.T))
+            {
+                ReopenClosedTab();
+                return true;
+            }
+
             if (keyData == (Keys.Control | Keys.T))
             {
                 CreateNewTab();

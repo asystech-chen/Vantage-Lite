@@ -371,5 +371,30 @@ namespace VantageLite.Browser
             await ActivateTabAsync(_tabs[index].Id);
         }
 
+        /// <summary>
+        /// 拖拽排序：把 fromIndex 处的标签移到 toIndex。活动标签与 WebView2 实例都不受影响。
+        /// </summary>
+        public void MoveTab(int fromIndex, int toIndex)
+        {
+            if (_disposed || _tabs.Count < 2)
+            {
+                return;
+            }
+
+            if (fromIndex < 0 || fromIndex >= _tabs.Count ||
+                toIndex < 0 || toIndex >= _tabs.Count ||
+                fromIndex == toIndex)
+            {
+                return;
+            }
+
+            BrowserTab tab = _tabs[fromIndex];
+            _tabs.RemoveAt(fromIndex);
+            _tabs.Insert(toIndex, tab);
+
+            Log.Info("[tabs] moved tab " + tab.Id + ": " + fromIndex + " -> " + toIndex);
+            RaiseTabsChanged();
+        }
+
     }
 }

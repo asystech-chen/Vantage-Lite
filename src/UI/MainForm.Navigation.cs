@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using VantageLite.Browser;
 using VantageLite.Diagnostics;
@@ -12,10 +13,21 @@ namespace VantageLite.UI
     /// </summary>
     public sealed partial class MainForm
     {
+        private const int MaxClosedTabs = 25;
+
         private string[] _autoFallbacks;
         private bool[] _autoFallbackTried;
         private int _autoFallbackIndex;
         private int _autoFallbackTabId;
+
+        // 本次运行内关闭的标签，供右键菜单 / Ctrl+Shift+T 重新打开。
+        private readonly List<ClosedTabInfo> _closedTabs = new List<ClosedTabInfo>();
+
+        private sealed class ClosedTabInfo
+        {
+            public string Url;
+            public string Title;
+        }
 
         private void CreateNewTab()
         {
@@ -90,6 +102,213 @@ namespace VantageLite.UI
             }
 
             await _tabManager.CreateTabAsync(target);
+        }
+
+        /// <summary>
+        /// 按地址新建标签：内部页重建 HTML，普通地址直接导航。
+        /// </summary>
+        private async Task CreateTabFromAddressAsync(string address)
+        {
+            if (_tabManager == null)
+            {
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(address))
+            {
+                await CreateNewTabCoreAsync();
+                return;
+            }
+
+            if (string.Equals(address, "about:blank", StringComparison.OrdinalIgnoreCase))
+            {
+                await _tabManager.CreateTabAsync("about:blank");
+                return;
+            }
+
+            string internalPage = NormalizeInternalPage(address);
+
+            if (internalPage != null)
+            {
+                await _tabManager.CreateTabAsync(
+                    "about:blank",
+                    internalPage,
+                    BuildInternalPageHtml(internalPage));
+                return;
+            }
+
+            await _tabManager.CreateTabAsync(address);
+        }
+
+        private BrowserTab FindTabById(int id)
+        {
+            if (_tabManager == null)
+            {
+                return null;
+            }
+
+            IList<BrowserTab> tabs = _tabManager.Tabs;
+
+            for (int i = 0; i < tabs.Count; i++)
+            {
+                if (tabs[i].Id == id)
+                {
+                    return tabs[i];
+                }
+            }
+
+            return null;
+        }
+
+        private int IndexOfTab(int id)
+        {
+            if (_tabManager == null)
+            {
+                return -1;
+            }
+
+            IList<BrowserTab> tabs = _tabManager.Tabs;
+
+            for (int i = 0; i < tabs.Count; i++)
+            {
+                if (tabs[i].Id == id)
+                {
+                    return i;
+                }
+            }
+
+            return -1;
+        }
+
+        /// <summary>
+        /// 关闭前记录地址与标题；about:blank 不值得恢复，直接跳过。
+        /// </summary>
+        private void RememberClosedTab(int id)
+        {
+            BrowserTab tab = FindTabById(id);
+
+            if (tab == null)
+            {
+                return;
+            }
+
+            string url = tab.Url;
+
+            if (string.IsNullOrWhiteSpace(url) ||
+                string.Equals(url, "about:blank", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            _closedTabs.Add(new ClosedTabInfo { Url = url, Title = tab.DisplayTitle });
+
+            if (_closedTabs.Count > MaxClosedTabs)
+            {
+                _closedTabs.RemoveAt(0);
+            }
+        }
+
+        private async void DuplicateTab(int id)
+        {
+            BrowserTab tab = FindTabById(id);
+
+            if (tab == null)
+            {
+                return;
+            }
+
+            try
+            {
+                await CreateTabFromAddressAsync(tab.Url);
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Duplicate tab failed", ex);
+            }
+        }
+
+        private async void ReopenClosedTab()
+        {
+            if (_closedTabs.Count == 0)
+            {
+                return;
+            }
+
+            int last = _closedTabs.Count - 1;
+            ClosedTabInfo info = _closedTabs[last];
+            _closedTabs.RemoveAt(last);
+
+            try
+            {
+                await CreateTabFromAddressAsync(info.Url);
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Reopen tab failed: " + info.Url, ex);
+                _closedTabs.Add(info);
+
+                if (_closedTabs.Count > MaxClosedTabs)
+                {
+                    _closedTabs.RemoveAt(0);
+                }
+            }
+        }
+
+        private async void CloseOtherTabs(int keepId)
+        {
+            if (_tabManager == null)
+            {
+                return;
+            }
+
+            List<BrowserTab> tabs = new List<BrowserTab>(_tabManager.Tabs);
+
+            try
+            {
+                for (int i = 0; i < tabs.Count; i++)
+                {
+                    if (tabs[i].Id == keepId)
+                    {
+                        continue;
+                    }
+
+                    RememberClosedTab(tabs[i].Id);
+                    await _tabManager.CloseTabAsync(tabs[i].Id);
+                }
+
+                await _tabManager.ActivateTabAsync(keepId);
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Close other tabs failed", ex);
+            }
+        }
+
+        private async void CloseTabsToRight(int keepId)
+        {
+            int index = IndexOfTab(keepId);
+
+            if (_tabManager == null || index < 0)
+            {
+                return;
+            }
+
+            List<BrowserTab> tabs = new List<BrowserTab>(_tabManager.Tabs);
+
+            try
+            {
+                for (int i = index + 1; i < tabs.Count; i++)
+                {
+                    RememberClosedTab(tabs[i].Id);
+                    await _tabManager.CloseTabAsync(tabs[i].Id);
+                }
+
+                await _tabManager.ActivateTabAsync(keepId);
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Close tabs to right failed", ex);
+            }
         }
 
         /// <summary>

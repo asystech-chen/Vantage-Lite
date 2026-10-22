@@ -225,6 +225,8 @@ namespace VantageLite.UI
                 _tabStrip.TabSelected += TabStrip_TabSelected;
                 _tabStrip.TabCloseRequested += TabStrip_TabCloseRequested;
                 _tabStrip.NewTabRequested += TabStrip_NewTabRequested;
+                _tabStrip.ContextMenuRequested += TabStrip_ContextMenuRequested;
+                _tabStrip.TabReorderRequested += TabStrip_TabReorderRequested;
 
                 Log.Info("WebView2 environment ready. max live tabs = " + maxLiveTabs);
 

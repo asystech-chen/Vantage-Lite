@@ -1,3 +1,23 @@
+# Vantage Lite 0.19.0 更新日志
+
+> 书签搬家最怕搬完发现旧房子还没退租。
+
+## 新功能
+
+- **从已安装浏览器导入书签** — 自动检测 Chrome、Edge、Brave、Vivaldi、Chromium、Yandex、QQ 浏览器、360 极速、Opera、Opera GX、Firefox、Vantage、LibreWolf、Waterfox，支持同时勾选多个浏览器配置
+- **Firefox 系自动备份** — 读取 Firefox / Vantage / LibreWolf / Waterfox 最近一次 `bookmarkbackups/*.jsonlz4` 自动备份，允许最多一天的滞后
+- **HTML 与 .url 导入** — 可从其他浏览器导出的 Netscape HTML 或 Windows 快捷方式文件导入
+- **导入落点与去重** — 统一放进「其他书签 / 导入的书签 日期」；按 URL 忽略大小写去重，跳过无效协议并显示统计
+- **设置页入口** — 设置 → 书签 → 导入书签
+
+## 发布
+
+- **版本** — `0.19.0`
+- **单文件 exe** — WebView2 托管 DLL 与 x64 Loader 已嵌入，约 1.5MB
+- **未签名** — 首次运行可能触发 SmartScreen
+
+---
+
 # Vantage Lite 0.18.0 更新日志
 
 本版汇总自 `v0.16.3` 以来的变更（包含未单独打 tag 的 0.17.0）。

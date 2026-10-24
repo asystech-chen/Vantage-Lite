@@ -593,6 +593,12 @@ namespace VantageLite.UI
             body.Append("<span class=\"hint\">留空则使用系统默认下载文件夹；修改后新下载立即生效</span>");
             body.Append("</div></section>");
 
+            body.Append("<section class=\"card\"><div class=\"card-head\"><h2>书签</h2>")
+                .Append("<p>从已安装的浏览器导入书签</p></div><div class=\"card-body\">");
+            body.Append("<div class=\"button-row\"><button onclick=\"importBookmarks()\">导入书签…</button></div>");
+            body.Append("<span class=\"hint\">支持 Chrome、Edge、Brave、Vivaldi、Opera、Firefox；也可从 HTML 或 .url 文件导入</span>");
+            body.Append("</div></section>");
+
             body.Append("<section class=\"card\"><div class=\"card-head\"><h2>界面</h2>")
                 .Append("<p>主题与工具栏</p></div><div class=\"card-body\">");
             body.Append("<div class=\"field-row\"><span class=\"label\">主题</span><span class=\"control\">")
@@ -664,6 +670,7 @@ namespace VantageLite.UI
                 + "document.getElementById('newTabShortcutRow').style.display=(m==='builtin')?'flex':'none';}");
             body.Append("syncNewTabFields();");
             body.Append("function pickDownloadDir(){post({cmd:'pickDownloadDir'});}");
+            body.Append("function importBookmarks(){post({cmd:'importBookmarks'});}");
             body.Append("var saveTimer=null;"
                 + "function scheduleSave(){if(saveTimer){clearTimeout(saveTimer);}saveTimer=setTimeout(saveSettings,300);}");
             body.Append("(function(){var els=document.querySelectorAll('.settings input,.settings select');"
@@ -758,7 +765,7 @@ namespace VantageLite.UI
                 .Append("</span><span class=\"v\">").Append(Escape(value)).Append("</span></div>");
         }
 
-        public static string Bookmarks(BookmarkStore store, ICollection<string> expanded)
+        public static string Bookmarks(BookmarkStore store, ICollection<string> expanded, string status = null)
         {
             BookmarkNode root = store == null ? null : store.Root;
             int total = CountBookmarks(root, 0);
@@ -767,9 +774,10 @@ namespace VantageLite.UI
             body.Append("<div class=\"bar\">");
             body.Append("<button onclick=\"newFolder('").Append(BookmarkStore.ToolbarId).Append("')\">＋ 文件夹</button>");
             body.Append("<button onclick=\"toggleBar()\">书签栏</button>");
+            body.Append("<button onclick=\"importBookmarks()\">导入书签…</button>");
             body.Append("<input id=\"bmQuery\" class=\"search\" type=\"text\" placeholder=\"搜索书签\" oninput=\"applyBookmarkSearch()\">");
             body.Append("<span class=\"clip\">").Append(Escape(ClipboardText(store))).Append("</span>");
-            body.Append("<span id=\"status\" class=\"status\">连接中…</span>");
+            body.Append("<span id=\"status\" class=\"status\">").Append(Escape(string.IsNullOrEmpty(status) ? "连接中…" : status)).Append("</span>");
             body.Append("</div>");
 
             if (total == 0)
@@ -811,7 +819,7 @@ namespace VantageLite.UI
             body.Append("<div class=\"panel-buttons\"><button class=\"danger\" onclick=\"confirmOk()\">删除</button>");
             body.Append("<button onclick=\"confirmCancel()\">取消</button></div></div></div>");
 
-            body.Append(BuildScript(store));
+            body.Append(BuildScript(store, !string.IsNullOrEmpty(status)));
 
             return Page("书签", "共 " + total + " 个书签 · 点行尾 ⋯ 管理", body.ToString());
         }
@@ -883,10 +891,11 @@ namespace VantageLite.UI
             return "<button class=\"more\" onclick=\"showMenu(event,'" + id + "')\">⋯</button>";
         }
 
-        private static string BuildScript(BookmarkStore store)
+        private static string BuildScript(BookmarkStore store, bool hasInitialStatus)
         {
             StringBuilder sb = new StringBuilder();
             sb.Append("<script>");
+            sb.Append("var initialStatus=").Append(hasInitialStatus ? "true" : "false").Append(";");
             sb.Append("var nodes=").Append(NodesJson(store == null ? null : store.Root)).Append(";");
             sb.Append("var hasClip=").Append(store != null && store.ClipboardId != null ? "true" : "false").Append(";");
             sb.Append("var moving=null;var menuFor=null;");
@@ -908,13 +917,19 @@ if(!window.chrome||!window.chrome.webview){
 }else{
   window.chrome.webview.addEventListener('message',function(e){
     var s=document.getElementById('status');
-    if(s){s.textContent=e.data||'已连接';}
+    if(s){
+      // 导入结果等初始提示要保留到用户下一次操作。
+      if(initialStatus&&e.data==='已连接'){return;}
+      initialStatus=false;
+      s.textContent=e.data||'已连接';
+    }
   });
 }
 function cut(id){post({cmd:'cut',id:id});}
 function copy(id){post({cmd:'copy',id:id});}
 function pasteTo(id){if(hasClip){post({cmd:'paste',parent:id});}}
 function toggleBar(){post({cmd:'shortcut',name:'bookmarksbar'});}
+function importBookmarks(){post({cmd:'importBookmarks'});}
 function showMenu(ev,id){
   ev.preventDefault();ev.stopPropagation();
   menuFor=id;

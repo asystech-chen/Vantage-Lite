@@ -30,6 +30,9 @@ namespace VantageLite.UI
         private DateTime _lastBookmarkToggleUtc;
         private DateTime _lastBarToggleUtc;
 
+        // 导入完成后带给书签页的一次性提示；页面重建时消费。
+        private string _pendingBookmarksStatus;
+
         private void ToggleBookmark()
         {
             DateTime now = DateTime.UtcNow;
@@ -130,7 +133,9 @@ namespace VantageLite.UI
 
             if (string.Equals(address, BookmarksAddress, StringComparison.OrdinalIgnoreCase))
             {
-                return InternalPages.Bookmarks(_bookmarks, _expandedBookmarks);
+                string status = _pendingBookmarksStatus;
+                _pendingBookmarksStatus = null;
+                return InternalPages.Bookmarks(_bookmarks, _expandedBookmarks, status);
             }
 
             return null;
@@ -158,6 +163,147 @@ namespace VantageLite.UI
 
         private void ShowBookmarkManager()
         {
+            OpenInternalPage(BookmarksAddress);
+        }
+
+        /// <summary>
+        /// 导入入口：先检测已安装的浏览器，让用户勾选；也可以改走文件导入。
+        /// </summary>
+        private void ImportBookmarks()
+        {
+            BookmarkSources.ScanResult scan;
+            Cursor previous = Cursor;
+
+            try
+            {
+                Cursor = Cursors.WaitCursor;
+                scan = BookmarkSources.Detect();
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Detect bookmark sources failed", ex);
+                scan = new BookmarkSources.ScanResult();
+                scan.Notes.Add("检测已安装浏览器失败：" + ex.Message);
+            }
+            finally
+            {
+                Cursor = previous;
+            }
+
+            using (ImportBookmarksForm dialog = new ImportBookmarksForm(
+                scan.Sources,
+                string.Join("\r\n", scan.Notes.ToArray())))
+            {
+                if (dialog.ShowDialog(this) != DialogResult.OK)
+                {
+                    return;
+                }
+
+                if (dialog.UseFiles)
+                {
+                    ImportBookmarksFromFiles();
+                    return;
+                }
+
+                if (dialog.SelectedSources.Count == 0)
+                {
+                    return;
+                }
+
+                ImportBookmarksFromSources(dialog.SelectedSources);
+            }
+        }
+
+        private void ImportBookmarksFromSources(IList<BookmarkSources.Source> sources)
+        {
+            BookmarkImporter.ImportResult result;
+            Cursor previous = Cursor;
+
+            try
+            {
+                Cursor = Cursors.WaitCursor;
+                result = BookmarkImporter.ImportSources(_bookmarks, sources, BookmarkStore.OtherId);
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Import browser bookmarks failed", ex);
+                MessageBox.Show(this, "导入失败：" + ex.Message, "导入书签",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+            finally
+            {
+                Cursor = previous;
+            }
+
+            ApplyImportResult(result);
+        }
+
+        /// <summary>
+        /// 从其他浏览器导出的 HTML 或 .url 文件导入书签。
+        /// </summary>
+        private void ImportBookmarksFromFiles()
+        {
+            using (OpenFileDialog dialog = new OpenFileDialog())
+            {
+                dialog.Title = "导入书签";
+                dialog.Multiselect = true;
+                dialog.CheckFileExists = true;
+                dialog.Filter = "书签文件 (*.html;*.htm;*.url)|*.html;*.htm;*.url|"
+                    + "HTML 书签 (*.html;*.htm)|*.html;*.htm|"
+                    + "Internet 快捷方式 (*.url)|*.url|"
+                    + "所有文件 (*.*)|*.*";
+
+                if (dialog.ShowDialog(this) != DialogResult.OK)
+                {
+                    return;
+                }
+
+                BookmarkImporter.ImportResult result;
+                Cursor previous = Cursor;
+
+                try
+                {
+                    Cursor = Cursors.WaitCursor;
+                    result = BookmarkImporter.Import(_bookmarks, dialog.FileNames, BookmarkStore.OtherId);
+                }
+                catch (Exception ex)
+                {
+                    Log.Error("Import bookmarks failed", ex);
+                    MessageBox.Show(this, "导入失败：" + ex.Message, "导入书签",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+                finally
+                {
+                    Cursor = previous;
+                }
+
+                ApplyImportResult(result);
+            }
+        }
+
+        private void ApplyImportResult(BookmarkImporter.ImportResult result)
+        {
+            Log.Info("[bookmarks] import files=" + result.Files
+                + " imported=" + result.Imported
+                + " duplicates=" + result.Duplicates
+                + " invalid=" + result.Invalid);
+
+            if (result.Errors.Count > 0)
+            {
+                Log.Warn("[bookmarks] import errors: " + string.Join(" | ", result.Errors.ToArray()));
+            }
+
+            _bookmarksBar.Refresh(_bookmarks);
+            UpdateBookmarkState();
+
+            if (!string.IsNullOrEmpty(result.FolderId))
+            {
+                _expandedBookmarks.Add(result.FolderId);
+            }
+
+            _pendingBookmarksStatus = result.Message;
             OpenInternalPage(BookmarksAddress);
         }
 
@@ -574,6 +720,12 @@ namespace VantageLite.UI
                 Log.Info("History cleared from about:history");
                 RenderHistoryPage();
                 PostStatus("已清空浏览记录");
+                return;
+            }
+
+            if (string.Equals(command.Cmd, "importBookmarks", StringComparison.OrdinalIgnoreCase))
+            {
+                ImportBookmarks();
                 return;
             }
 
@@ -1192,6 +1344,7 @@ namespace VantageLite.UI
             menu.Items.Add(AddMenuItem("历史", delegate { OpenInternalPage(HistoryAddress); }));
             menu.Items.Add(AddMenuItem("下载内容", delegate { ToggleDownloadsPanel(); }));
             menu.Items.Add(AddMenuItem("书签管理器", delegate { ShowBookmarkManager(); }));
+            menu.Items.Add(AddMenuItem("导入书签…", delegate { ImportBookmarks(); }));
             menu.Items.Add(AddMenuItem(
                 _bookmarksBar.Visible ? "隐藏书签栏" : "显示书签栏",
                 delegate { ToggleBookmarksBar(); }));

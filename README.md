@@ -122,8 +122,6 @@ VantageLite.exe --user-data-dir=D:\tmp\vl-profile --url=https://asystech.cn
 
 短期（下一批）：
 
-- 书签 URL 编辑
-- 历史按日期分组（今天/昨天/更早）
 - 下载项增强：复制链接、打开来源页、删除磁盘文件、完成提示
 
 中期：

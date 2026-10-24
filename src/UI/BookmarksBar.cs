@@ -2166,9 +2166,12 @@ namespace VantageLite.UI
             }
 
             Control boundsOwner = owner.TopLevelControl ?? owner;
+            Rectangle bounds = boundsOwner.RectangleToScreen(boundsOwner.ClientRectangle);
+
+            // 菜单宽度固定，高度最多占窗口客户区的一多半；超出后由原生菜单显示滚动按钮。
+            ApplySizeConstraints(menu, owner, bounds);
             ConstrainSubMenus(menu, boundsOwner);
 
-            Rectangle bounds = boundsOwner.RectangleToScreen(boundsOwner.ClientRectangle);
             Size size = menu.GetPreferredSize(Size.Empty);
 
             int x = screenPoint.X;
@@ -2238,6 +2241,124 @@ namespace VantageLite.UI
         private static void Untrack(ToolStripDropDown menu)
         {
             OpenMenus.Remove(menu);
+        }
+
+        private static void ApplySizeConstraints(ContextMenuStrip menu, Control owner, Rectangle bounds)
+        {
+            int width = WindowChrome.Scale(owner, menu.ShowImageMargin ? 300 : 240);
+            int availableWidth = Math.Max(WindowChrome.Scale(owner, 160), bounds.Width - WindowChrome.Scale(owner, 16));
+            width = Math.Min(width, availableWidth);
+
+            int maxHeight = Math.Max(WindowChrome.Scale(owner, 160), (int)(bounds.Height * 0.65));
+            int screenLimit = Screen.FromControl(owner).WorkingArea.Height - WindowChrome.Scale(owner, 24);
+            maxHeight = Math.Min(maxHeight, screenLimit);
+
+            ApplyMenuSize(menu, menu.ShowImageMargin, owner, width, maxHeight);
+        }
+
+        private static void ApplyMenuSize(
+            ToolStripDropDown menu,
+            bool showImageMargin,
+            Control owner,
+            int width,
+            int maxHeight)
+        {
+            menu.MaximumSize = new Size(width, maxHeight);
+            menu.MinimumSize = new Size(width, 0);
+            menu.AutoSize = true;
+            menu.ShowItemToolTips = true;
+            menu.MouseWheel -= Menu_MouseWheel;
+            menu.MouseWheel += Menu_MouseWheel;
+
+            int textWidth = width - WindowChrome.Scale(owner, showImageMargin ? 58 : 30);
+            TrimItems(menu.Items, menu.Font, textWidth);
+
+            for (int i = 0; i < menu.Items.Count; i++)
+            {
+                ToolStripMenuItem item = menu.Items[i] as ToolStripMenuItem;
+
+                if (item == null || item.DropDownItems.Count == 0)
+                {
+                    continue;
+                }
+
+                ApplyMenuSize(item.DropDown, showImageMargin, owner, width, maxHeight);
+            }
+        }
+
+        private static void Menu_MouseWheel(object sender, MouseEventArgs e)
+        {
+            // 原生菜单没有真正的滚动条，用上下方向键让选中项滚入可视区域。
+            string key = e.Delta > 0 ? "{UP}" : "{DOWN}";
+            int steps = Math.Max(1, Math.Abs(e.Delta) / 120);
+
+            for (int i = 0; i < steps; i++)
+            {
+                SendKeys.SendWait(key);
+            }
+        }
+
+        private static void TrimItems(ToolStripItemCollection items, Font font, int maxWidth)
+        {
+            for (int i = 0; i < items.Count; i++)
+            {
+                ToolStripMenuItem item = items[i] as ToolStripMenuItem;
+
+                if (item == null)
+                {
+                    continue;
+                }
+
+                if (item.DropDownItems.Count > 0)
+                {
+                    TrimItems(item.DropDownItems, font, maxWidth);
+                }
+
+                string text = item.Text;
+                string fitted = FitText(text, font, maxWidth);
+
+                if (!string.Equals(text, fitted, StringComparison.Ordinal))
+                {
+                    item.ToolTipText = string.IsNullOrEmpty(item.ToolTipText)
+                        ? text
+                        : text + "\n" + item.ToolTipText;
+                    item.Text = fitted;
+                }
+            }
+        }
+
+        private static string FitText(string text, Font font, int maxWidth)
+        {
+            if (string.IsNullOrEmpty(text) || maxWidth <= 0)
+            {
+                return text;
+            }
+
+            if (TextRenderer.MeasureText(text, font).Width <= maxWidth)
+            {
+                return text;
+            }
+
+            const string Ellipsis = "…";
+            int low = 0;
+            int high = text.Length;
+
+            while (low < high)
+            {
+                int mid = (low + high + 1) / 2;
+                string candidate = text.Substring(0, mid) + Ellipsis;
+
+                if (TextRenderer.MeasureText(candidate, font).Width <= maxWidth)
+                {
+                    low = mid;
+                }
+                else
+                {
+                    high = mid - 1;
+                }
+            }
+
+            return low <= 0 ? Ellipsis : text.Substring(0, low) + Ellipsis;
         }
 
         private static void ConstrainSubMenus(ContextMenuStrip menu, Control owner)

@@ -524,6 +524,32 @@ namespace VantageLite.UI
             body.Append("<span class=\"hint\">与「关闭时清空」互斥；开启清空后不会恢复会话</span>");
             body.Append("</div></section>");
 
+            body.Append("<section class=\"card\"><div class=\"card-head\"><h2>界面</h2>")
+                .Append("<p>主题与工具栏</p></div><div class=\"card-body\">");
+            body.Append("<div class=\"field-row\"><span class=\"label\">主题</span><span class=\"control\">")
+                .Append("<select id=\"themeMode\" onchange=\"applyThemeNow()\">");
+            AppendThemeOption(body, settings.ThemeMode, "system", "跟随系统");
+            AppendThemeOption(body, settings.ThemeMode, "light", "浅色");
+            AppendThemeOption(body, settings.ThemeMode, "dark", "深色");
+            body.Append("</select><span class=\"hint\">跟随系统会随 Windows 应用模式自动切换</span></span></div>");
+            body.Append("<label class=\"check\"><input id=\"bar\" type=\"checkbox\"")
+                .Append(settings.ShowBookmarksBar ? " checked" : string.Empty)
+                .Append("> 显示书签栏</label>");
+            body.Append("</div></section>");
+
+            body.Append("<section class=\"card\"><div class=\"card-head\"><h2>搜索</h2>")
+                .Append("<p>地址栏与新标签页使用的搜索引擎</p></div><div class=\"card-body\">");
+            body.Append("<div class=\"field-row\"><span class=\"label\">搜索引擎</span><span class=\"control\">")
+                .Append("<select id=\"search\">");
+            AppendSearchOption(body, settings.SearchEngine, "bing", "必应");
+            AppendSearchOption(body, settings.SearchEngine, "baidu", "百度");
+            AppendSearchOption(body, settings.SearchEngine, "google", "Google");
+            AppendSearchOption(body, settings.SearchEngine, "duckduckgo", "DuckDuckGo");
+            AppendCustomEngineOptions(body, settings);
+            body.Append("</select>");
+            body.Append("<span class=\"hint\">自定义引擎可在下方卡片中添加</span></span></div>");
+            body.Append("</div></section>");
+
             body.Append("<section class=\"card\"><div class=\"card-head\"><h2>新标签页</h2>")
                 .Append("<p>Ctrl+T 和 + 按钮打开的内容</p></div><div class=\"card-body\">");
             body.Append("<div class=\"field-row\"><span class=\"label\">打开方式</span><span class=\"control\">")
@@ -544,6 +570,34 @@ namespace VantageLite.UI
                 .Append("<span class=\"hint\">仅“Vantage Lite 新标签页”时生效</span></span></div>");
             body.Append("</div></section>");
 
+            body.Append("<section class=\"card\"><div class=\"card-head\"><h2>隐私</h2>")
+                .Append("<p>Cookie 与浏览痕迹</p></div><div class=\"card-body\">");
+            body.Append("<label class=\"check\"><input id=\"clearOnExit\" type=\"checkbox\"")
+                .Append(settings.ClearOnExit ? " checked" : string.Empty)
+                .Append("> 每次关闭时清空 Cookie 和浏览记录</label>");
+            body.Append("<div class=\"button-row\">")
+                .Append("<button onclick=\"askAction('清理所有 Cookie','清理后所有网站将退出登录。','clearCookies')\">清理所有 Cookie</button>")
+                .Append("<button onclick=\"askAction('清空浏览记录','将删除全部本地历史记录。','clearHistory')\">清空浏览记录</button>")
+                .Append("<button class=\"danger\" onclick=\"askAction('清空所有使用痕迹','将清除 Cookie、缓存、历史等数据；书签和设置会保留。','clearAllData')\">清空所有使用痕迹</button>")
+                .Append("</div>");
+            body.Append("</div></section>");
+
+            body.Append("<section class=\"card\"><div class=\"card-head\"><h2>下载</h2>")
+                .Append("<p>文件保存位置；下载面板由 WebView2 提供</p></div><div class=\"card-body\">");
+            body.Append("<div class=\"field-row\"><span class=\"label\">保存目录</span>")
+                .Append("<span class=\"control dir-row\"><input id=\"downloadDir\" type=\"text\" value=\"")
+                .Append(Escape(settings.DownloadDirectory))
+                .Append("\" placeholder=\"留空则使用系统下载文件夹\">")
+                .Append("<button onclick=\"pickDownloadDir()\">浏览…</button></span></div>");
+            body.Append("<span class=\"hint\">留空则使用系统默认下载文件夹；修改后新下载立即生效</span>");
+            body.Append("</div></section>");
+
+            body.Append("<section class=\"card\"><div class=\"card-head\"><h2>书签</h2>")
+                .Append("<p>从已安装的浏览器导入书签</p></div><div class=\"card-body\">");
+            body.Append("<div class=\"button-row\"><button onclick=\"importBookmarks()\">导入书签…</button></div>");
+            body.Append("<span class=\"hint\">支持 Chrome、Edge、Brave、Vivaldi、Opera、Firefox、Vantage 等；也可从 HTML 或 .url 文件导入</span>");
+            body.Append("</div></section>");
+
             body.Append("<section class=\"card\"><div class=\"card-head\"><h2>性能</h2>")
                 .Append("<p>控制后台标签占用的内存</p></div><div class=\"card-body\">");
             AppendNumberRow(body, "maxTabs", "最大存活标签页", settings.MaxLiveTabs, 1, 50,
@@ -552,19 +606,6 @@ namespace VantageLite.UI
                 "0 表示不自动挂起");
             AppendNumberRow(body, "discard", "挂起后销毁等待（分钟）", settings.DiscardAfterMinutes, 0, 1440,
                 "0 表示不自动销毁");
-            body.Append("</div></section>");
-
-            body.Append("<section class=\"card\"><div class=\"card-head\"><h2>搜索</h2>")
-                .Append("<p>地址栏与新标签页使用的搜索引擎</p></div><div class=\"card-body\">");
-            body.Append("<div class=\"field-row\"><span class=\"label\">搜索引擎</span><span class=\"control\">")
-                .Append("<select id=\"search\">");
-            AppendSearchOption(body, settings.SearchEngine, "bing", "必应");
-            AppendSearchOption(body, settings.SearchEngine, "baidu", "百度");
-            AppendSearchOption(body, settings.SearchEngine, "google", "Google");
-            AppendSearchOption(body, settings.SearchEngine, "duckduckgo", "DuckDuckGo");
-            AppendCustomEngineOptions(body, settings);
-            body.Append("</select>");
-            body.Append("<span class=\"hint\">自定义引擎可在下方卡片中添加</span></span></div>");
             body.Append("</div></section>");
 
             body.Append("<section class=\"card\"><div class=\"card-head\"><h2>自定义搜索引擎</h2>")
@@ -581,47 +622,6 @@ namespace VantageLite.UI
 
             body.Append("</div>");
             body.Append("<div><button onclick=\"addCustomEngine()\">＋ 添加搜索引擎</button></div>");
-            body.Append("</div></section>");
-
-            body.Append("<section class=\"card\"><div class=\"card-head\"><h2>下载</h2>")
-                .Append("<p>文件保存位置；下载面板由 WebView2 提供</p></div><div class=\"card-body\">");
-            body.Append("<div class=\"field-row\"><span class=\"label\">保存目录</span>")
-                .Append("<span class=\"control dir-row\"><input id=\"downloadDir\" type=\"text\" value=\"")
-                .Append(Escape(settings.DownloadDirectory))
-                .Append("\" placeholder=\"留空则使用系统下载文件夹\">")
-                .Append("<button onclick=\"pickDownloadDir()\">浏览…</button></span></div>");
-            body.Append("<span class=\"hint\">留空则使用系统默认下载文件夹；修改后新下载立即生效</span>");
-            body.Append("</div></section>");
-
-            body.Append("<section class=\"card\"><div class=\"card-head\"><h2>书签</h2>")
-                .Append("<p>从已安装的浏览器导入书签</p></div><div class=\"card-body\">");
-            body.Append("<div class=\"button-row\"><button onclick=\"importBookmarks()\">导入书签…</button></div>");
-            body.Append("<span class=\"hint\">支持 Chrome、Edge、Brave、Vivaldi、Opera、Firefox；也可从 HTML 或 .url 文件导入</span>");
-            body.Append("</div></section>");
-
-            body.Append("<section class=\"card\"><div class=\"card-head\"><h2>界面</h2>")
-                .Append("<p>主题与工具栏</p></div><div class=\"card-body\">");
-            body.Append("<div class=\"field-row\"><span class=\"label\">主题</span><span class=\"control\">")
-                .Append("<select id=\"themeMode\" onchange=\"applyThemeNow()\">");
-            AppendThemeOption(body, settings.ThemeMode, "system", "跟随系统");
-            AppendThemeOption(body, settings.ThemeMode, "light", "浅色");
-            AppendThemeOption(body, settings.ThemeMode, "dark", "深色");
-            body.Append("</select><span class=\"hint\">跟随系统会随 Windows 应用模式自动切换</span></span></div>");
-            body.Append("<label class=\"check\"><input id=\"bar\" type=\"checkbox\"")
-                .Append(settings.ShowBookmarksBar ? " checked" : string.Empty)
-                .Append("> 显示书签栏</label>");
-            body.Append("</div></section>");
-
-            body.Append("<section class=\"card\"><div class=\"card-head\"><h2>隐私</h2>")
-                .Append("<p>Cookie 与浏览痕迹</p></div><div class=\"card-body\">");
-            body.Append("<label class=\"check\"><input id=\"clearOnExit\" type=\"checkbox\"")
-                .Append(settings.ClearOnExit ? " checked" : string.Empty)
-                .Append("> 每次关闭时清空 Cookie 和浏览记录</label>");
-            body.Append("<div class=\"button-row\">")
-                .Append("<button onclick=\"askAction('清理所有 Cookie','清理后所有网站将退出登录。','clearCookies')\">清理所有 Cookie</button>")
-                .Append("<button onclick=\"askAction('清空浏览记录','将删除全部本地历史记录。','clearHistory')\">清空浏览记录</button>")
-                .Append("<button class=\"danger\" onclick=\"askAction('清空所有使用痕迹','将清除 Cookie、缓存、历史等数据；书签和设置会保留。','clearAllData')\">清空所有使用痕迹</button>")
-                .Append("</div>");
             body.Append("</div></section>");
 
             body.Append("</div>");
@@ -946,8 +946,9 @@ function showMenu(ev,id){
     el.style.display=hide?'none':'block';
   }
   menu.style.display='block';
-  menu.style.left=Math.min(ev.pageX,window.innerWidth-200)+'px';
-  menu.style.top=Math.min(ev.pageY,window.innerHeight-240)+'px';
+  var h=Math.min(menu.offsetHeight,Math.round(window.innerHeight*0.65));
+  menu.style.left=Math.max(8,Math.min(ev.pageX,window.pageXOffset+window.innerWidth-228))+'px';
+  menu.style.top=Math.max(8,Math.min(ev.pageY,window.pageYOffset+window.innerHeight-h-8))+'px';
 }
 function hideMenu(){var m=document.getElementById('menu');if(m){m.style.display='none';}}
 document.addEventListener('click',hideMenu);
@@ -1333,8 +1334,10 @@ snapshotTree();
                 + ".fav{width:16px;height:16px;flex:0 0 16px;display:block;border-radius:2px}"
                 + ".tri{width:14px;color:var(--muted);font-size:10px}"
                 + ".menu{position:absolute;display:none;background:var(--bg);border:1px solid var(--border)"
-                + ";border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,.35);padding:4px;z-index:10;min-width:160px}"
-                + ".menu div{padding:6px 10px;border-radius:4px;cursor:pointer;font-size:13px}"
+                + ";border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,.35);padding:4px;z-index:10;width:220px;"
+                + "max-height:65vh;overflow-y:auto;box-sizing:border-box}"
+                + ".menu div{padding:6px 10px;border-radius:4px;cursor:pointer;font-size:13px;"
+                + "white-space:nowrap;overflow:hidden;text-overflow:ellipsis}"
                 + ".menu div:hover{background:var(--btn)}"
                 + ".menu .danger{color:#d9534f}"
                 + ".field{display:flex;flex-direction:column;gap:4px;margin-bottom:16px}"

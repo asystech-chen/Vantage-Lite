@@ -750,6 +750,7 @@ namespace VantageLite.UI
             }
 
             bool changed;
+            string failure = null;
 
             switch (command.Cmd)
             {
@@ -758,6 +759,15 @@ namespace VantageLite.UI
                     break;
                 case "rename":
                     changed = _bookmarks.Rename(command.Id, command.Name);
+                    break;
+                case "editUrl":
+                    changed = _bookmarks.UpdateUrl(command.Id, command.Url);
+
+                    if (!changed)
+                    {
+                        failure = "网址无效或已存在";
+                    }
+
                     break;
                 case "delete":
                     changed = _bookmarks.Remove(command.Id);
@@ -786,7 +796,7 @@ namespace VantageLite.UI
                 BrowserTab page = ActiveTab;
                 if (page != null)
                 {
-                    page.PostWebMessage("操作未完成：" + command.Cmd);
+                    page.PostWebMessage(failure ?? ("操作未完成：" + command.Cmd));
                 }
 
                 return;

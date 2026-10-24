@@ -151,6 +151,81 @@ namespace VantageLite.Storage
             return true;
         }
 
+        /// <summary>
+        /// 修改书签网址。只接受常见协议；与已有书签重复时拒绝。
+        /// </summary>
+        public bool UpdateUrl(string id, string url)
+        {
+            if (string.IsNullOrEmpty(id) || string.IsNullOrWhiteSpace(url))
+            {
+                return false;
+            }
+
+            BookmarkNode node = Find(id);
+
+            if (node == null || node.IsFolder)
+            {
+                return false;
+            }
+
+            string normalized = NormalizeBookmarkUrl(url);
+
+            if (normalized == null)
+            {
+                return false;
+            }
+
+            BookmarkNode existing = FindBookmark(normalized);
+
+            if (existing != null && !string.Equals(existing.Id, id, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            bool titleWasUrl = string.Equals((node.Title ?? string.Empty).Trim(), node.Url, StringComparison.OrdinalIgnoreCase);
+            node.Url = normalized;
+
+            if (titleWasUrl)
+            {
+                node.Title = normalized;
+            }
+
+            Save();
+            return true;
+        }
+
+        private static string NormalizeBookmarkUrl(string value)
+        {
+            value = value.Trim();
+
+            Uri uri;
+            if (!Uri.TryCreate(value, UriKind.Absolute, out uri))
+            {
+                // 允许直接输入 example.com，补 https。
+                if (value.IndexOf(' ') < 0 && value.IndexOf('.') >= 0)
+                {
+                    value = "https://" + value;
+                }
+
+                if (!Uri.TryCreate(value, UriKind.Absolute, out uri))
+                {
+                    return null;
+                }
+            }
+
+            switch (uri.Scheme.ToLowerInvariant())
+            {
+                case "http":
+                case "https":
+                case "ftp":
+                case "file":
+                case "mailto":
+                    return value;
+                default:
+                    return null;
+            }
+        }
+
         public bool Cut(string id)
         {
             if (string.IsNullOrEmpty(id) || IsSystemFolder(id) || Find(id) == null)

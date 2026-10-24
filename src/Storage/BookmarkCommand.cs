@@ -75,5 +75,8 @@ namespace VantageLite.Storage
 
         [DataMember(Name = "restoreSession", Order = 22, EmitDefaultValue = false)]
         public bool? RestoreSession { get; set; }
+
+        [DataMember(Name = "url", Order = 23, EmitDefaultValue = false)]
+        public string Url { get; set; }
     }
 }

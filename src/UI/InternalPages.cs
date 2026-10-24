@@ -797,6 +797,7 @@ namespace VantageLite.UI
             body.Append("<div data-action=\"copy\" onclick=\"menuAction('copy')\">复制</div>");
             body.Append("<div data-action=\"move\" onclick=\"menuAction('move')\">移动到文件夹…</div>");
             body.Append("<div data-action=\"rename\" onclick=\"menuAction('rename')\">重命名…</div>");
+            body.Append("<div data-bookmark=\"1\" data-action=\"editUrl\" onclick=\"menuAction('editUrl')\">编辑网址…</div>");
             body.Append("<div class=\"danger\" data-action=\"delete\" onclick=\"menuAction('delete')\">删除</div>");
             body.Append("</div>");
 
@@ -909,6 +910,7 @@ function askOk(){var i=document.getElementById('askInput');var v=i.value.trim();
 function askCancel(){askCb=null;document.getElementById('askBox').style.display='none';}
 function newFolder(parent){ask('新建文件夹','新建文件夹',function(n){post({cmd:'newFolder',parent:parent,name:n});});}
 function rename(id){ask('重命名',(nodes[id]||{}).title||'',function(n){post({cmd:'rename',id:id,name:n});});}
+function editUrl(id){ask('编辑网址',(nodes[id]||{}).url||'',function(u){post({cmd:'editUrl',id:id,url:u});});}
 function del(id){confirmCb=function(){post({cmd:'delete',id:id});};document.getElementById('confirmText').textContent='删除「'+((nodes[id]||{}).title||'')+'」？';document.getElementById('confirmBox').style.display='flex';}
 function confirmOk(){var cb=confirmCb;confirmCb=null;document.getElementById('confirmBox').style.display='none';if(cb){cb();}}
 function confirmCancel(){confirmCb=null;document.getElementById('confirmBox').style.display='none';}
@@ -939,9 +941,10 @@ function showMenu(ev,id){
   for(var i=0;i<items.length;i++){
     var el=items[i];
     var folderOnly=el.getAttribute('data-folder')==='1';
+    var bookmarkOnly=el.getAttribute('data-bookmark')==='1';
     var action=el.getAttribute('data-action');
     var sys=!!(nodes[id]&&nodes[id].system);
-    var hide=(folderOnly&&!isFolder)||(action==='paste'&&!hasClip)||
+    var hide=(folderOnly&&!isFolder)||(bookmarkOnly&&isFolder)||(action==='paste'&&!hasClip)||
       (sys&&(action==='delete'||action==='rename'||action==='cut'||action==='move'));
     el.style.display=hide?'none':'block';
   }
@@ -957,6 +960,7 @@ function menuAction(a){
   if(a==='newFolder'){newFolder(id);}else if(a==='paste'){pasteTo(id);}
   else if(a==='cut'){cut(id);}else if(a==='copy'){copy(id);}
   else if(a==='move'){move(id);}else if(a==='rename'){rename(id);}
+  else if(a==='editUrl'){editUrl(id);}
   else if(a==='delete'){del(id);}
 }
 function toggleFolder(id,ev){
@@ -1175,6 +1179,7 @@ snapshotTree();
                               child.Id == BookmarkStore.RootId;
 
                 sb.Append(Json(child.Id)).Append(":{title:").Append(Json(child.Title))
+                    .Append(",url:").Append(Json(child.Url))
                     .Append(",folder:").Append(child.IsFolder ? "true" : "false")
                     .Append(",system:").Append(system ? "true" : "false")
                     .Append(",parent:").Append(Json(parentId)).Append('}');

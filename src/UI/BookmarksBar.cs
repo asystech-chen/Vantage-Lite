@@ -648,6 +648,7 @@ namespace VantageLite.UI
             else
             {
                 menu.Items.Add(MenuItem("打开", delegate { RaiseOpen(node.Url); }));
+                menu.Items.Add(MenuItem("编辑网址…", delegate { EditUrl(node); }));
             }
 
             menu.Items.Add(new ToolStripSeparator());
@@ -726,6 +727,29 @@ namespace VantageLite.UI
                 _store.AddFolder(parentId, name);
                 NotifyChanged();
             }
+        }
+
+        private void EditUrl(BookmarkNode node)
+        {
+            if (node == null || node.IsFolder)
+            {
+                return;
+            }
+
+            string url = PromptDialog.Ask(this, "编辑网址", "网址：", node.Url);
+
+            if (string.IsNullOrWhiteSpace(url))
+            {
+                return;
+            }
+
+            if (!_store.UpdateUrl(node.Id, url))
+            {
+                MessageDialog.Show(this, "网址无效或已存在。", "编辑网址", MessageBoxButtons.OK);
+                return;
+            }
+
+            NotifyChanged();
         }
 
         private void Rename(BookmarkNode node)

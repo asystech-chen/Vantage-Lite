@@ -374,32 +374,6 @@ namespace VantageLite.Storage
             return false;
         }
 
-        /// <summary>
-        /// 导入专用：挂载一棵已构建好的子树，只落盘一次。
-        /// </summary>
-        public void AddImportedFolder(string parentId, BookmarkNode folder)
-        {
-            if (folder == null)
-            {
-                return;
-            }
-
-            BookmarkNode parent = Find(parentId);
-
-            if (parent == null || !parent.IsFolder)
-            {
-                parent = OtherFolder;
-            }
-
-            if (parent == null)
-            {
-                return;
-            }
-
-            parent.GetChildren().Add(folder);
-            Save();
-        }
-
         public void Save()
         {
             JsonFile.Save(_path, Root);

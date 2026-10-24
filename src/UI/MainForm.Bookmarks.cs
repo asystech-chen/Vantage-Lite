@@ -298,9 +298,11 @@ namespace VantageLite.UI
             _bookmarksBar.Refresh(_bookmarks);
             UpdateBookmarkState();
 
-            if (!string.IsNullOrEmpty(result.FolderId))
+            if (result.Imported > 0)
             {
-                _expandedBookmarks.Add(result.FolderId);
+                // 导入直接并入书签工具栏 / 其他书签，展开两层方便确认结果。
+                _expandedBookmarks.Add(BookmarkStore.ToolbarId);
+                _expandedBookmarks.Add(BookmarkStore.OtherId);
             }
 
             _pendingBookmarksStatus = result.Message;
@@ -1373,7 +1375,7 @@ namespace VantageLite.UI
                 menu.Dispose();
             };
 
-            MenuPositioner.Show(menu, this, Cursor.Position);
+            MenuPositioner.Show(menu, this, Cursor.Position, false);
         }
 
         private static ToolStripMenuItem AddMenuItem(string text, Action action)

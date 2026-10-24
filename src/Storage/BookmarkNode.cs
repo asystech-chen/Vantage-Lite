@@ -32,6 +32,11 @@ namespace VantageLite.Storage
         [DataMember(Name = "children", Order = 5, EmitDefaultValue = false)]
         public List<BookmarkNode> Children { get; set; }
 
+        /// <summary>
+        /// 仅导入时使用：toolbar / other / other-folder，不写入 JSON。
+        /// </summary>
+        public string ImportTarget { get; set; }
+
         public bool IsFolder
         {
             get { return string.Equals(Type, FolderType, StringComparison.OrdinalIgnoreCase); }

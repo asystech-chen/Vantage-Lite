@@ -65,7 +65,8 @@ namespace VantageLite.Storage
         }
 
         /// <summary>
-        /// 导入多个 HTML / .url 文件，落到 parentId 下新建的日期文件夹。
+        /// 导入多个 HTML / .url 文件。书签栏内容并入「书签工具栏」，
+        /// 其他内容并入「其他书签」，不再创建额外的日期文件夹。
         /// </summary>
         public static ImportResult Import(BookmarkStore store, IEnumerable<string> paths, string parentId)
         {
@@ -76,7 +77,7 @@ namespace VantageLite.Storage
             }
 
             HashSet<string> known = CollectExisting(store);
-            BookmarkNode container = CreateContainer();
+            BookmarkNode parsed = NewFolder("import");
 
             foreach (string path in paths)
             {
@@ -94,11 +95,11 @@ namespace VantageLite.Storage
 
                     if (extension == ".url")
                     {
-                        ImportUrlFile(path, container, known, result);
+                        ImportUrlFile(path, parsed);
                     }
                     else
                     {
-                        ParseHtml(ReadText(path), container, known, result);
+                        ParseHtml(ReadText(path), parsed);
                     }
                 }
                 catch (Exception ex)
@@ -107,21 +108,20 @@ namespace VantageLite.Storage
                 }
             }
 
-            // 全部重复或只有空文件夹时不落库，避免留下空目录。
-            if (result.Imported == 0)
+            MergeSourceTree(store, parsed, known, result, parentId);
+
+            if (result.Imported > 0)
             {
-                return result;
+                store.Save();
             }
 
-            container.Title = UniqueTitle(store, parentId, container.Title);
-            store.AddImportedFolder(parentId, container);
-            result.FolderId = container.Id;
-
+            result.FolderId = parentId;
             return result;
         }
 
         /// <summary>
-        /// 导入已安装浏览器的书签树；每个来源在容器里占一个子文件夹。
+        /// 导入已安装浏览器的书签树：工具栏根并入「书签工具栏」，
+        /// 其他根并入「其他书签」，移动设备等保留为「其他书签」下的文件夹。
         /// </summary>
         public static ImportResult ImportSources(
             BookmarkStore store,
@@ -136,7 +136,6 @@ namespace VantageLite.Storage
             }
 
             HashSet<string> known = CollectExisting(store);
-            BookmarkNode container = CreateContainer();
 
             foreach (BookmarkSources.Source source in sources)
             {
@@ -162,38 +161,26 @@ namespace VantageLite.Storage
                     continue;
                 }
 
-                int importedBefore = result.Imported;
-                PruneDuplicates(tree, known, result);
-
-                if (result.Imported == importedBefore)
-                {
-                    continue;
-                }
-
-                tree.Title = UniqueSiblingTitle(container.GetChildren(), tree.Title);
-                container.GetChildren().Add(tree);
+                MergeSourceTree(store, tree, known, result, parentId);
                 result.Files++;
             }
 
-            if (result.Imported == 0)
+            if (result.Imported > 0)
             {
-                return result;
+                store.Save();
             }
 
-            container.Title = UniqueTitle(store, parentId, container.Title);
-            store.AddImportedFolder(parentId, container);
-            result.FolderId = container.Id;
-
+            result.FolderId = parentId;
             return result;
         }
 
-        private static BookmarkNode CreateContainer()
+        private static BookmarkNode NewFolder(string title)
         {
             return new BookmarkNode
             {
                 Id = Guid.NewGuid().ToString("N"),
                 Type = BookmarkNode.FolderType,
-                Title = "导入的书签 " + DateTime.Now.ToString("yyyy-MM-dd"),
+                Title = title,
                 CreatedUtc = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
                 Children = new List<BookmarkNode>()
             };
@@ -207,65 +194,195 @@ namespace VantageLite.Storage
         }
 
         /// <summary>
-        /// 递归去掉无效地址和全树重复项；同时更新统计。
+        /// 按根节点的来源目标合并：toolbar/other 直接展开到系统文件夹，
+        /// other-folder 作为普通文件夹合并。
         /// </summary>
-        private static void PruneDuplicates(BookmarkNode folder, HashSet<string> known, ImportResult result)
+        private static void MergeSourceTree(
+            BookmarkStore store,
+            BookmarkNode sourceRoot,
+            HashSet<string> known,
+            ImportResult result,
+            string fallbackParentId)
         {
-            if (folder == null)
+            BookmarkNode fallback = store.Find(fallbackParentId);
+
+            if (fallback == null || !fallback.IsFolder)
             {
-                return;
+                fallback = store.OtherFolder;
             }
 
-            IList<BookmarkNode> children = folder.GetChildren();
+            BookmarkNode toolbar = store.ToolbarFolder;
+            BookmarkNode other = store.OtherFolder;
 
-            for (int i = children.Count - 1; i >= 0; i--)
+            IList<BookmarkNode> roots = sourceRoot.GetChildren();
+
+            for (int i = 0; i < roots.Count; i++)
             {
-                BookmarkNode child = children[i];
+                BookmarkNode root = roots[i];
+                string target = root.ImportTarget;
 
-                if (child.IsFolder)
+                if (string.Equals(target, "toolbar", StringComparison.Ordinal) ||
+                    (target == null && IsToolbarFolder(root)))
                 {
-                    PruneDuplicates(child, known, result);
-
-                    if (child.GetChildren().Count == 0)
+                    if (toolbar != null)
                     {
-                        children.RemoveAt(i);
+                        MergeChildren(toolbar, root, known, result);
                     }
 
                     continue;
                 }
 
-                string url = child.Url == null ? null : child.Url.Trim();
-
-                if (!IsSupportedUrl(url))
+                if (string.Equals(target, "other", StringComparison.Ordinal) ||
+                    (target == null && IsOtherFolder(root)))
                 {
-                    result.Invalid++;
-                    children.RemoveAt(i);
+                    if (other != null)
+                    {
+                        MergeChildren(other, root, known, result);
+                    }
+
                     continue;
                 }
 
-                if (!known.Add(url))
+                if (string.Equals(target, "other-folder", StringComparison.Ordinal))
                 {
-                    result.Duplicates++;
-                    children.RemoveAt(i);
+                    if (other != null)
+                    {
+                        MergeNode(other, root, known, result);
+                    }
+
                     continue;
                 }
 
-                child.Url = url;
-
-                if (string.IsNullOrWhiteSpace(child.Title))
-                {
-                    child.Title = url;
-                }
-
-                result.Imported++;
+                MergeNode(fallback, root, known, result);
             }
         }
 
-        private static void ParseHtml(string html, BookmarkNode container, HashSet<string> known, ImportResult result)
+        private static void MergeChildren(
+            BookmarkNode parent,
+            BookmarkNode sourceFolder,
+            HashSet<string> known,
+            ImportResult result)
+        {
+            IList<BookmarkNode> children = sourceFolder.GetChildren();
+
+            for (int i = 0; i < children.Count; i++)
+            {
+                MergeNode(parent, children[i], known, result);
+            }
+        }
+
+        private static void MergeNode(
+            BookmarkNode parent,
+            BookmarkNode source,
+            HashSet<string> known,
+            ImportResult result)
+        {
+            if (parent == null || source == null)
+            {
+                return;
+            }
+
+            if (source.IsFolder)
+            {
+                string title = string.IsNullOrWhiteSpace(source.Title) ? "未命名文件夹" : source.Title.Trim();
+                BookmarkNode existing = FindFolder(parent, title);
+
+                if (existing != null)
+                {
+                    MergeChildren(existing, source, known, result);
+                    return;
+                }
+
+                BookmarkNode folder = NewFolder(title);
+                folder.CreatedUtc = source.CreatedUtc;
+                parent.GetChildren().Add(folder);
+                MergeChildren(folder, source, known, result);
+
+                if (folder.GetChildren().Count == 0)
+                {
+                    parent.GetChildren().Remove(folder);
+                }
+
+                return;
+            }
+
+            string url = source.Url == null ? null : source.Url.Trim();
+
+            if (!IsSupportedUrl(url))
+            {
+                result.Invalid++;
+                return;
+            }
+
+            if (!known.Add(url))
+            {
+                result.Duplicates++;
+                return;
+            }
+
+            parent.GetChildren().Add(new BookmarkNode
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                Type = BookmarkNode.BookmarkType,
+                Title = string.IsNullOrWhiteSpace(source.Title) ? url : source.Title.Trim(),
+                Url = url,
+                CreatedUtc = source.CreatedUtc > 0
+                    ? source.CreatedUtc
+                    : DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+            });
+
+            result.Imported++;
+        }
+
+        private static BookmarkNode FindFolder(BookmarkNode parent, string title)
+        {
+            IList<BookmarkNode> children = parent.GetChildren();
+
+            for (int i = 0; i < children.Count; i++)
+            {
+                BookmarkNode child = children[i];
+
+                if (child.IsFolder &&
+                    string.Equals((child.Title ?? string.Empty).Trim(), title, StringComparison.OrdinalIgnoreCase))
+                {
+                    return child;
+                }
+            }
+
+            return null;
+        }
+
+        private static bool IsToolbarFolder(BookmarkNode node)
+        {
+            string title = (node == null ? null : node.Title);
+            title = title == null ? string.Empty : title.Trim();
+
+            return string.Equals(title, "Bookmarks bar", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(title, "Bookmarks Toolbar", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(title, "Personal Toolbar", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(title, "Favorites bar", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(title, "Favorites Bar", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(title, "书签栏", StringComparison.Ordinal) ||
+                   string.Equals(title, "书签工具栏", StringComparison.Ordinal) ||
+                   string.Equals(title, "收藏夹栏", StringComparison.Ordinal);
+        }
+
+        private static bool IsOtherFolder(BookmarkNode node)
+        {
+            string title = (node == null ? null : node.Title);
+            title = title == null ? string.Empty : title.Trim();
+
+            return string.Equals(title, "Other bookmarks", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(title, "Other Bookmarks", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(title, "Other favorites", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(title, "其他书签", StringComparison.Ordinal) ||
+                   string.Equals(title, "其他收藏夹", StringComparison.Ordinal);
+        }
+
+        private static void ParseHtml(string html, BookmarkNode container)
         {
             if (string.IsNullOrEmpty(html))
             {
-                result.Invalid++;
                 return;
             }
 
@@ -367,6 +484,12 @@ namespace VantageLite.Storage
                         folder.Title = "新建文件夹";
                     }
 
+                    string toolbarFlag = GetAttribute(attributes, "personal_toolbar_folder");
+                    if (string.Equals(toolbarFlag, "true", StringComparison.OrdinalIgnoreCase))
+                    {
+                        folder.ImportTarget = "toolbar";
+                    }
+
                     current.Add(folder);
                     pendingFolder = folder;
                     continue;
@@ -378,13 +501,13 @@ namespace VantageLite.Storage
                     long created = ParseDate(GetAttribute(attributes, "add_date"));
                     string title = ReadElementText(html, ref index, "a");
 
-                    TryAddBookmark(current, known, CleanText(title), href, created, result);
+                    AddParsedBookmark(current, CleanText(title), href, created);
                     pendingFolder = null;
                 }
             }
         }
 
-        private static void ImportUrlFile(string path, BookmarkNode container, HashSet<string> known, ImportResult result)
+        private static void ImportUrlFile(string path, BookmarkNode container)
         {
             string url = null;
             string text = ReadText(path);
@@ -417,42 +540,19 @@ namespace VantageLite.Storage
             }
 
             string title = Path.GetFileNameWithoutExtension(path);
-            TryAddBookmark(container.GetChildren(), known, title, url, 0, result);
+            AddParsedBookmark(container.GetChildren(), title, url, 0);
         }
 
-        private static bool TryAddBookmark(
-            IList<BookmarkNode> target,
-            HashSet<string> known,
-            string title,
-            string url,
-            long created,
-            ImportResult result)
+        private static void AddParsedBookmark(IList<BookmarkNode> target, string title, string url, long created)
         {
-            url = string.IsNullOrWhiteSpace(url) ? null : url.Trim();
-
-            if (!IsSupportedUrl(url))
-            {
-                result.Invalid++;
-                return false;
-            }
-
-            if (!known.Add(url))
-            {
-                result.Duplicates++;
-                return false;
-            }
-
             target.Add(new BookmarkNode
             {
                 Id = Guid.NewGuid().ToString("N"),
                 Type = BookmarkNode.BookmarkType,
-                Title = string.IsNullOrEmpty(title) ? url : title,
+                Title = string.IsNullOrEmpty(title) ? (url ?? string.Empty) : title,
                 Url = url,
                 CreatedUtc = created > 0 ? created : DateTimeOffset.UtcNow.ToUnixTimeSeconds()
             });
-
-            result.Imported++;
-            return true;
         }
 
         private static bool IsSupportedUrl(string url)
@@ -626,55 +726,6 @@ namespace VantageLite.Storage
                     return Encoding.Default.GetString(bytes);
                 }
             }
-        }
-
-        private static string UniqueTitle(BookmarkStore store, string parentId, string baseTitle)
-        {
-            BookmarkNode parent = store.Find(parentId);
-
-            if (parent == null || !parent.IsFolder)
-            {
-                parent = store.OtherFolder;
-            }
-
-            if (parent == null || parent.Children == null)
-            {
-                return baseTitle;
-            }
-
-            return UniqueSiblingTitle(parent.Children, baseTitle);
-        }
-
-        private static string UniqueSiblingTitle(IList<BookmarkNode> siblings, string baseTitle)
-        {
-            HashSet<string> titles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            for (int i = 0; i < siblings.Count; i++)
-            {
-                BookmarkNode child = siblings[i];
-
-                if (child != null && child.IsFolder)
-                {
-                    titles.Add(child.Title ?? string.Empty);
-                }
-            }
-
-            if (!titles.Contains(baseTitle))
-            {
-                return baseTitle;
-            }
-
-            for (int i = 2; i < 1000; i++)
-            {
-                string candidate = baseTitle + " (" + i + ")";
-
-                if (!titles.Contains(candidate))
-                {
-                    return candidate;
-                }
-            }
-
-            return baseTitle + " (" + DateTime.Now.ToString("HHmmss") + ")";
         }
 
         private static void CollectUrls(BookmarkNode node, HashSet<string> urls)

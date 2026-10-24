@@ -2158,7 +2158,7 @@ namespace VantageLite.UI
             OpenMenus.Clear();
         }
 
-        public static void Show(ContextMenuStrip menu, Control owner, Point screenPoint)
+        public static void Show(ContextMenuStrip menu, Control owner, Point screenPoint, bool constrainSize = true)
         {
             if (menu == null || owner == null)
             {
@@ -2169,7 +2169,12 @@ namespace VantageLite.UI
             Rectangle bounds = boundsOwner.RectangleToScreen(boundsOwner.ClientRectangle);
 
             // 菜单宽度固定，高度最多占窗口客户区的一多半；超出后由原生菜单显示滚动按钮。
-            ApplySizeConstraints(menu, owner, bounds);
+            // 汉堡菜单保持原生宽度，固定宽度反而更难看。
+            if (constrainSize)
+            {
+                ApplySizeConstraints(menu, owner, bounds);
+            }
+
             ConstrainSubMenus(menu, boundsOwner);
 
             Size size = menu.GetPreferredSize(Size.Empty);

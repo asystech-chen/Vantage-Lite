@@ -395,9 +395,9 @@ namespace VantageLite.Storage
 
             BookmarkNode tree = NewFolder("Chromium");
 
-            AppendConverted(tree, ConvertChromium(file.Roots.BookmarkBar));
-            AppendConverted(tree, ConvertChromium(file.Roots.Other));
-            AppendConverted(tree, ConvertChromium(file.Roots.Synced));
+            AppendRoot(tree, ConvertChromium(file.Roots.BookmarkBar), "toolbar");
+            AppendRoot(tree, ConvertChromium(file.Roots.Other), "other");
+            AppendRoot(tree, ConvertChromium(file.Roots.Synced), "other-folder");
 
             return tree;
         }
@@ -408,6 +408,17 @@ namespace VantageLite.Storage
             {
                 parent.GetChildren().Add(child);
             }
+        }
+
+        private static void AppendRoot(BookmarkNode parent, BookmarkNode child, string target)
+        {
+            if (child == null)
+            {
+                return;
+            }
+
+            child.ImportTarget = target;
+            parent.GetChildren().Add(child);
         }
 
         private static BookmarkNode ConvertChromium(ChromiumNode node)
@@ -468,7 +479,14 @@ namespace VantageLite.Storage
             {
                 for (int i = 0; i < root.Children.Count; i++)
                 {
-                    AppendConverted(tree, ConvertFirefox(root.Children[i]));
+                    FirefoxNode child = root.Children[i];
+                    string target = string.Equals(child.Guid, "toolbar_____", StringComparison.Ordinal)
+                        ? "toolbar"
+                        : (string.Equals(child.Guid, "unfiled_____", StringComparison.Ordinal)
+                            ? "other"
+                            : "other-folder");
+
+                    AppendRoot(tree, ConvertFirefox(child), target);
                 }
             }
 

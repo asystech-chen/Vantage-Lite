@@ -517,6 +517,26 @@ namespace VantageLite.UI
                 case "delete":
                     _downloads.Delete(item);
                     break;
+                case "copylink":
+                    if (!string.IsNullOrWhiteSpace(item.Url))
+                    {
+                        Clipboard.SetText(item.Url);
+                    }
+
+                    break;
+                case "source":
+                    OpenBookmarkInNewTab(item.Url);
+                    break;
+                case "deletefile":
+                    if (MessageDialog.Show(this,
+                        "删除磁盘文件「" + item.DisplayName + "」？下载记录会保留。",
+                        "删除文件",
+                        MessageBoxButtons.YesNo) == DialogResult.Yes)
+                    {
+                        _downloads.DeleteFile(item);
+                    }
+
+                    break;
                 case "pause":
                     if (item.Paused)
                     {
@@ -648,6 +668,10 @@ namespace VantageLite.UI
                 else if (string.Equals(command.Name, "bookmarks", StringComparison.OrdinalIgnoreCase))
                 {
                     ShowBookmarkManager();
+                }
+                else if (string.Equals(command.Name, "reopen", StringComparison.OrdinalIgnoreCase))
+                {
+                    ReopenClosedTab();
                 }
 
                 return;

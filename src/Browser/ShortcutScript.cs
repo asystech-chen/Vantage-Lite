@@ -37,6 +37,8 @@ namespace VantageLite.Browser
       name = 'bookmark';
     } else if (key === 'b' && e.shiftKey) {
       name = 'bookmarksbar';
+    } else if (key === 't' && e.shiftKey) {
+      name = 'reopen';
     }
     if (!name) { return; }
     e.preventDefault();

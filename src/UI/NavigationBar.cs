@@ -20,6 +20,7 @@ namespace VantageLite.UI
         public event EventHandler BookmarkRequested;
         public event EventHandler DownloadsRequested;
         public event EventHandler MenuRequested;
+        public event EventHandler ReopenClosedTabRequested;
 
         private readonly ToolTip _toolTip;
         private GlyphButton _backButton;
@@ -28,6 +29,7 @@ namespace VantageLite.UI
         private GlyphButton _homeButton;
         private GlyphButton _bookmarkButton;
         private GlyphButton _downloadButton;
+        private GlyphButton _restoreButton;
         private GlyphButton _menuButton;
         private Panel _addressHost;
         private TextBox _addressBox;
@@ -120,6 +122,14 @@ namespace VantageLite.UI
         /// <summary>
         /// 下载按钮右下角的屏幕坐标，用于把下载面板贴在按钮下方弹出。
         /// </summary>
+        public void SetDownloadBadge(bool visible)
+        {
+            if (_downloadButton != null)
+            {
+                _downloadButton.Badge = visible;
+            }
+        }
+
         public Point GetDownloadsAnchor()
         {
             return _downloadButton.PointToScreen(
@@ -166,6 +176,7 @@ namespace VantageLite.UI
             _homeButton = CreateButton(IconFont.Home, "主页");
             _bookmarkButton = CreateButton(IconFont.Star, "收藏当前页面 (Ctrl+D)");
             _downloadButton = CreateButton(IconFont.Download, "下载内容");
+            _restoreButton = CreateButton(IconFont.Undo, "重新打开关闭的标签页 (Ctrl+Shift+T)");
             _menuButton = CreateButton(IconFont.Menu, "菜单");
 
             _backButton.Click += delegate { Raise(BackRequested); };
@@ -173,6 +184,7 @@ namespace VantageLite.UI
             _homeButton.Click += delegate { Raise(HomeRequested); };
             _bookmarkButton.Click += delegate { Raise(BookmarkRequested); };
             _downloadButton.Click += delegate { Raise(DownloadsRequested); };
+            _restoreButton.Click += delegate { Raise(ReopenClosedTabRequested); };
             _menuButton.Click += delegate { Raise(MenuRequested); };
             _reloadButton.Click += delegate
             {
@@ -193,7 +205,7 @@ namespace VantageLite.UI
 
             FlowLayoutPanel rightButtons = new FlowLayoutPanel();
             rightButtons.Dock = DockStyle.Right;
-            rightButtons.Width = 108;
+            rightButtons.Width = 144;
             rightButtons.WrapContents = false;
             rightButtons.FlowDirection = FlowDirection.RightToLeft;
             rightButtons.Margin = Padding.Empty;
@@ -202,6 +214,7 @@ namespace VantageLite.UI
             rightButtons.Controls.Add(_menuButton);
             rightButtons.Controls.Add(_downloadButton);
             rightButtons.Controls.Add(_bookmarkButton);
+            rightButtons.Controls.Add(_restoreButton);
 
             _addressBox = new TextBox();
             _addressBox.BorderStyle = BorderStyle.None;
@@ -469,6 +482,7 @@ namespace VantageLite.UI
         private string _glyph;
         private bool _hover;
         private bool _pressed;
+        private bool _badge;
 
         public GlyphButton(string glyph)
         {
@@ -492,6 +506,21 @@ namespace VantageLite.UI
             set
             {
                 _glyph = value;
+                Invalidate();
+            }
+        }
+
+        public bool Badge
+        {
+            get { return _badge; }
+            set
+            {
+                if (_badge == value)
+                {
+                    return;
+                }
+
+                _badge = value;
                 Invalidate();
             }
         }
@@ -571,6 +600,18 @@ namespace VantageLite.UI
                 TextFormatFlags.VerticalCenter |
                 TextFormatFlags.NoPrefix |
                 TextFormatFlags.SingleLine);
+
+            if (_badge)
+            {
+                int size = WindowChrome.Scale(this, 7);
+                int x = Math.Max(0, Width - size - WindowChrome.Scale(this, 5));
+                int y = WindowChrome.Scale(this, 5);
+
+                using (SolidBrush badge = new SolidBrush(ThemeManager.Current.Accent))
+                {
+                    e.Graphics.FillEllipse(badge, x, y, size, size);
+                }
+            }
         }
     }
 }

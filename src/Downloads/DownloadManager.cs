@@ -461,6 +461,32 @@ namespace VantageLite.Downloads
         }
 
         /// <summary>
+        /// 删除磁盘文件但保留下载记录；成功后清空 FilePath。
+        /// </summary>
+        public bool DeleteFile(DownloadItem item)
+        {
+            if (item == null || string.IsNullOrEmpty(item.FilePath) || !File.Exists(item.FilePath))
+            {
+                return false;
+            }
+
+            try
+            {
+                File.Delete(item.FilePath);
+                item.FilePath = null;
+                Save();
+                RaiseChanged();
+                item.RaiseUpdated();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log.Warn("[download] delete file failed: " + Log.Describe(ex));
+                return false;
+            }
+        }
+
+        /// <summary>
         /// 删除一条记录（不删除磁盘文件）；进行中的先取消再删除。
         /// </summary>
         public void Delete(DownloadItem item)

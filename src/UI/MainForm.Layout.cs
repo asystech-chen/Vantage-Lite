@@ -87,6 +87,7 @@ namespace VantageLite.UI
             _navigationBar.BookmarkRequested += delegate { ToggleBookmark(); };
             _navigationBar.DownloadsRequested += delegate { ToggleDownloadsPanel(); };
             _navigationBar.MenuRequested += delegate { ShowMainMenu(); };
+            _navigationBar.ReopenClosedTabRequested += delegate { ReopenClosedTab(); };
             _titleBar.MinimizeRequested += delegate { WindowState = FormWindowState.Minimized; };
             _titleBar.MaximizeToggleRequested += delegate { ToggleMaximize(); };
             _titleBar.CloseRequested += delegate { Close(); };

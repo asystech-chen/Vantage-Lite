@@ -34,7 +34,11 @@ namespace VantageLite.UI
                 {
                     try
                     {
-                        BeginInvoke(new Action(RenderDownloadsPage));
+                        BeginInvoke(new Action(delegate
+                        {
+                            RenderDownloadsPage();
+                            RefreshDownloadBadge();
+                        }));
                     }
                     catch
                     {

@@ -44,6 +44,16 @@ namespace VantageLite.UI
         /// </summary>
         public event EventHandler<DownloadItem> RetryRequested;
 
+        /// <summary>
+        /// 行内「打开来源页」：由宿主在新标签中打开下载地址。
+        /// </summary>
+        public event EventHandler<DownloadItem> SourceRequested;
+
+        /// <summary>
+        /// 行内「删除磁盘文件」：由宿主确认后删除。
+        /// </summary>
+        public event EventHandler<DownloadItem> DeleteFileRequested;
+
         public DownloadsForm(DownloadManager manager)
         {
             _manager = manager;
@@ -201,6 +211,24 @@ namespace VantageLite.UI
                     row.RetryRequested += delegate
                     {
                         EventHandler<DownloadItem> handler = RetryRequested;
+
+                        if (handler != null)
+                        {
+                            handler(this, item);
+                        }
+                    };
+                    row.SourceRequested += delegate
+                    {
+                        EventHandler<DownloadItem> handler = SourceRequested;
+
+                        if (handler != null)
+                        {
+                            handler(this, item);
+                        }
+                    };
+                    row.DeleteFileRequested += delegate
+                    {
+                        EventHandler<DownloadItem> handler = DeleteFileRequested;
 
                         if (handler != null)
                         {
@@ -393,6 +421,9 @@ namespace VantageLite.UI
         private readonly GlyphButton _cancel;
         private readonly GlyphButton _delete;
         private readonly GlyphButton _retry;
+        private readonly GlyphButton _copy;
+        private readonly GlyphButton _source;
+        private readonly GlyphButton _deleteFile;
 
         private static int S(int value)
         {
@@ -444,6 +475,9 @@ namespace VantageLite.UI
             _cancel = MakeIconButton(IconFont.Cancel, "取消下载");
             _delete = MakeIconButton(IconFont.Delete, "删除记录");
             _retry = MakeIconButton(IconFont.Retry, "重试");
+            _copy = MakeIconButton(IconFont.Copy, "复制下载链接");
+            _source = MakeIconButton(IconFont.Link, "打开来源页");
+            _deleteFile = MakeIconButton(IconFont.Cancel, "删除磁盘文件");
 
             _open.Click += delegate { _manager.OpenFile(_item); };
             _folder.Click += delegate { _manager.OpenFolder(_item); };
@@ -461,13 +495,25 @@ namespace VantageLite.UI
             _cancel.Click += delegate { _manager.Cancel(_item); };
             _delete.Click += delegate { _manager.Delete(_item); };
             _retry.Click += delegate { RaiseRetry(); };
+            _copy.Click += delegate
+            {
+                if (!string.IsNullOrWhiteSpace(_item.Url))
+                {
+                    Clipboard.SetText(_item.Url);
+                }
+            };
+            _source.Click += delegate { RaiseSource(); };
+            _deleteFile.Click += delegate { RaiseDeleteFile(); };
 
             _buttons.Controls.Add(_cancel);
             _buttons.Controls.Add(_pause);
             _buttons.Controls.Add(_retry);
             _buttons.Controls.Add(_delete);
+            _buttons.Controls.Add(_deleteFile);
             _buttons.Controls.Add(_folder);
             _buttons.Controls.Add(_open);
+            _buttons.Controls.Add(_source);
+            _buttons.Controls.Add(_copy);
 
             Controls.Add(_name);
             Controls.Add(_status);
@@ -496,10 +542,32 @@ namespace VantageLite.UI
         /// 重试：交给 MainForm 打开新标签，让 WebView2 重新发起下载。
         /// </summary>
         public event EventHandler RetryRequested;
+        public event EventHandler SourceRequested;
+        public event EventHandler DeleteFileRequested;
 
         private void RaiseRetry()
         {
             EventHandler handler = RetryRequested;
+
+            if (handler != null)
+            {
+                handler(this, EventArgs.Empty);
+            }
+        }
+
+        private void RaiseSource()
+        {
+            EventHandler handler = SourceRequested;
+
+            if (handler != null)
+            {
+                handler(this, EventArgs.Empty);
+            }
+        }
+
+        private void RaiseDeleteFile()
+        {
+            EventHandler handler = DeleteFileRequested;
 
             if (handler != null)
             {
@@ -529,6 +597,9 @@ namespace VantageLite.UI
             _cancel.Visible = active;
             _delete.Visible = completed || failed;
             _retry.Visible = failed;
+            _copy.Visible = !string.IsNullOrWhiteSpace(item.Url);
+            _source.Visible = completed || failed;
+            _deleteFile.Visible = completed && hasFile && File.Exists(item.FilePath);
 
             _status.ForeColor = item.IsFailed
                 ? Color.FromArgb(217, 83, 79)
@@ -550,7 +621,7 @@ namespace VantageLite.UI
             _progress.ForeColor = palette.Accent;
             _buttons.BackColor = palette.ChromeBackground;
 
-            GlyphButton[] buttons = { _open, _folder, _pause, _cancel, _delete, _retry };
+            GlyphButton[] buttons = { _open, _folder, _pause, _cancel, _delete, _retry, _copy, _source, _deleteFile };
 
             for (int i = 0; i < buttons.Length; i++)
             {

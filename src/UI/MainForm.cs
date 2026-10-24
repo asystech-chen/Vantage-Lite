@@ -38,6 +38,7 @@ namespace VantageLite.UI
         private DownloadManager _privateDownloads;
         private DownloadsForm _downloadsForm;
         private DateTime _downloadsClosedUtc;
+        private int _completedDownloadCount;
         private AppSettings _settings;
         private CoreWebView2Environment _environment;
         private TabManager _normalTabManager;
@@ -456,8 +457,51 @@ namespace VantageLite.UI
             ShowDownloadsPanel();
         }
 
+        private int CountCompletedSessionDownloads()
+        {
+            if (_downloads == null)
+            {
+                return 0;
+            }
+
+            int count = 0;
+
+            for (int i = 0; i < _downloads.Items.Count; i++)
+            {
+                DownloadItem item = _downloads.Items[i];
+
+                if (item.IsSession && item.IsCompleted)
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+        private void RefreshDownloadBadge()
+        {
+            int count = CountCompletedSessionDownloads();
+
+            if (_navigationBar != null &&
+                _downloadsForm == null &&
+                count > _completedDownloadCount)
+            {
+                _navigationBar.SetDownloadBadge(true);
+            }
+
+            _completedDownloadCount = count;
+        }
+
         private void ShowDownloadsPanel()
         {
+            if (_navigationBar != null)
+            {
+                _navigationBar.SetDownloadBadge(false);
+            }
+
+            _completedDownloadCount = CountCompletedSessionDownloads();
+
             if (_downloadsForm != null && !_downloadsForm.IsDisposed)
             {
                 _downloadsForm.RefreshItems();
@@ -479,6 +523,21 @@ namespace VantageLite.UI
             _downloadsForm.RetryRequested += delegate(object sender, DownloadItem item)
             {
                 RetryDownload(item);
+            };
+            _downloadsForm.SourceRequested += delegate(object sender, DownloadItem item)
+            {
+                _downloadsForm.Close();
+                OpenBookmarkInNewTab(item.Url);
+            };
+            _downloadsForm.DeleteFileRequested += delegate(object sender, DownloadItem item)
+            {
+                if (MessageDialog.Show(this,
+                    "删除磁盘文件「" + item.DisplayName + "」？下载记录会保留。",
+                    "删除文件",
+                    MessageBoxButtons.YesNo) == DialogResult.Yes)
+                {
+                    _downloads.DeleteFile(item);
+                }
             };
 
             // 弹出在下载按钮下方，而不是屏幕角落。

@@ -15,6 +15,7 @@ namespace VantageLite.UI
     internal sealed class TabViewItem : Panel
     {
         private readonly Button _closeButton;
+        private readonly Panel _indicator;
         private readonly Timer _spinner;
 
         private BrowserTab _tab;
@@ -56,6 +57,10 @@ namespace VantageLite.UI
                 }
             };
 
+            _indicator = new ClickThroughPanel();
+            _indicator.Dock = DockStyle.Top;
+            _indicator.Height = 2;
+
             _closeButton = new FlatButton();
             _closeButton.Text = IconFont.Close;
             _closeButton.Dock = DockStyle.Right;
@@ -72,6 +77,7 @@ namespace VantageLite.UI
             _closeButton.MouseLeave += OnCloseMouseLeave;
 
             Controls.Add(_closeButton);
+            Controls.Add(_indicator);
 
             Click += delegate
             {
@@ -108,6 +114,11 @@ namespace VantageLite.UI
             if (_closeButton != null)
             {
                 _closeButton.Width = WindowChrome.Scale(this, 22);
+            }
+
+            if (_indicator != null)
+            {
+                _indicator.Height = WindowChrome.Scale(this, 2);
             }
 
             Invalidate();
@@ -245,15 +256,6 @@ namespace VantageLite.UI
         {
             base.OnPaint(e);
 
-            // 活动指示线直接画在标签上；之前用 Dock=Top 的子 Panel，会吞掉标签顶部 2px 的点击。
-            if (_active)
-            {
-                using (SolidBrush accent = new SolidBrush(ThemeManager.Current.Accent))
-                {
-                    e.Graphics.FillRectangle(accent, 0, 0, Width, WindowChrome.Scale(this, 2));
-                }
-            }
-
             int rightPadding = (_closeButton != null && _closeButton.Visible)
                 ? _closeButton.Width + WindowChrome.Scale(this, 14)
                 : WindowChrome.Scale(this, 10);
@@ -373,6 +375,7 @@ namespace VantageLite.UI
             _closeButton.BackColor = background;
             _closeButton.FlatAppearance.MouseOverBackColor = palette.CloseHover;
             _closeButton.FlatAppearance.MouseDownBackColor = palette.CloseHover;
+            _indicator.BackColor = _active ? palette.Accent : background;
 
             if (_tab == null)
             {
@@ -440,6 +443,26 @@ namespace VantageLite.UI
             if (handler != null)
             {
                 handler(this, EventArgs.Empty);
+            }
+        }
+
+        /// <summary>
+        /// 指示条专用：视觉上盖住整条标签（含关闭按钮顶部），但不参与鼠标命中。
+        /// </summary>
+        private sealed class ClickThroughPanel : Panel
+        {
+            private const int WmNcHitTest = 0x0084;
+            private const int HtTransparent = -1;
+
+            protected override void WndProc(ref Message m)
+            {
+                if (m.Msg == WmNcHitTest)
+                {
+                    m.Result = (IntPtr)HtTransparent;
+                    return;
+                }
+
+                base.WndProc(ref m);
             }
         }
     }

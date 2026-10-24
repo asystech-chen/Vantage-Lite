@@ -25,6 +25,9 @@ namespace VantageLite.Theming
         public const string OpenFile = "\uE8E5";
         public const string OpenFolder = "\uE838";
         public const string Delete = "\uE74D";
+        public const string Copy = "\uE8C8";
+        public const string Link = "\uE71B";
+        public const string Undo = "\uE7A7";
         public const string Pause = "\uE769";
         public const string Play = "\uE768";
         public const string Retry = "\uE72C";

@@ -133,8 +133,12 @@ namespace VantageLite.UI
                 .Append(".dl-main{min-width:0;flex:1}")
                 .Append(".dl-name{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}")
                 .Append(".dl-actions{display:flex;gap:4px;flex:0 0 auto}")
-                .Append(".icon-btn{width:30px;height:30px;padding:0;display:flex;align-items:center;justify-content:center;")
+                .Append(".icon-btn{position:relative;width:30px;height:30px;padding:0;display:flex;align-items:center;justify-content:center;")
                 .Append("border:none;background:transparent;color:var(--muted);border-radius:6px;cursor:pointer}")
+                .Append(".icon-btn:hover::after{content:attr(data-tip);position:absolute;top:calc(100% + 5px);right:0;")
+                .Append("background:var(--card);color:var(--fg);border:1px solid var(--border);border-radius:4px;")
+                .Append("padding:3px 6px;font-size:12px;line-height:1.4;white-space:nowrap;z-index:20;pointer-events:none;")
+                .Append("box-shadow:0 4px 12px rgba(0,0,0,.25)}")
                 .Append(".icon-btn:hover{background:var(--btn);color:var(--fg)}")
                 .Append(".icon-btn.danger:hover{color:#d9534f}")
                 .Append(".icon-btn svg{width:16px;height:16px}")
@@ -165,6 +169,11 @@ namespace VantageLite.UI
 
                 body.Append("</div><div class=\"dl-actions\">");
 
+                if (!string.IsNullOrWhiteSpace(item.Url))
+                {
+                    AppendDownloadIcon(body, "copyLink", id, "复制下载链接", IconCopy);
+                }
+
                 if (item.IsActive)
                 {
                     if (item.Paused)
@@ -180,12 +189,24 @@ namespace VantageLite.UI
                 }
                 else if (item.IsCompleted)
                 {
+                    AppendDownloadIcon(body, "source", id, "打开来源页", IconSource);
                     AppendDownloadIcon(body, "open", id, "打开文件", IconOpen);
                     AppendDownloadIcon(body, "folder", id, "打开所在文件夹", IconFolder);
+
+                    if (!string.IsNullOrEmpty(item.FilePath) && File.Exists(item.FilePath))
+                    {
+                        AppendDownloadIcon(body, "deleteFile", id, "删除磁盘文件", IconDeleteFile);
+                    }
+
                     AppendDownloadIcon(body, "delete", id, "删除记录", IconDelete);
                 }
                 else
                 {
+                    if (!string.IsNullOrWhiteSpace(item.Url))
+                    {
+                        AppendDownloadIcon(body, "source", id, "打开来源页", IconSource);
+                    }
+
                     AppendDownloadIcon(body, "retry", id, "重试", IconRetry);
                     AppendDownloadIcon(body, "delete", id, "删除记录", IconDelete);
                 }
@@ -202,7 +223,7 @@ namespace VantageLite.UI
 
             body.Append("<script>");
             body.Append("function post(o){try{window.chrome.webview.postMessage(JSON.stringify(o));}catch(e){}}");
-            body.Append("function act(a,id){post({cmd:'downloadAction',name:a,id:id});}");
+            body.Append("function act(a,id){post({cmd:'downloadAction',name:(a||'').toLowerCase(),id:id});}");
             body.Append("document.addEventListener('click',function(e){"
                 + "var b=e.target&&e.target.closest?e.target.closest('.icon-btn'):null;"
                 + "if(b){act(b.getAttribute('data-action'),b.getAttribute('data-id'));}});");
@@ -223,7 +244,8 @@ namespace VantageLite.UI
 
         private static void AppendDownloadIcon(StringBuilder sb, string action, string id, string title, string svg)
         {
-            sb.Append("<button type=\"button\" class=\"icon-btn\" title=\"").Append(Escape(title))
+            sb.Append("<button type=\"button\" class=\"icon-btn\" data-tip=\"").Append(Escape(title))
+                .Append("\" aria-label=\"").Append(Escape(title))
                 .Append("\" data-action=\"").Append(Escape(action))
                 .Append("\" data-id=\"").Append(id).Append("\">")
                 .Append(svg).Append("</button>");
@@ -304,6 +326,9 @@ namespace VantageLite.UI
         private const string IconPlay = "<svg viewBox=\"0 0 24 24\" fill=\"currentColor\"><path d=\"M8 5l11 7-11 7z\"/></svg>";
         private const string IconCancel = "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"><path d=\"M6 6l12 12M18 6L6 18\"/></svg>";
         private const string IconRetry = "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M20 12a8 8 0 1 1-2.34-5.66\"/><path d=\"M20 4v5h-5\"/></svg>";
+        private const string IconCopy = "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linejoin=\"round\"><rect x=\"9\" y=\"9\" width=\"11\" height=\"11\" rx=\"2\"/><path d=\"M5 15V6a2 2 0 0 1 2-2h9\"/></svg>";
+        private const string IconSource = "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M14 4h6v6\"/><path d=\"M20 4l-9 9\"/><path d=\"M19 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h5\"/></svg>";
+        private const string IconDeleteFile = "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M6 3h8l4 4v14H6z\"/><path d=\"M14 3v4h4\"/><path d=\"M9.5 12l5 5M14.5 12l-5 5\"/></svg>";
 
         private static void AppendHistoryFilter(StringBuilder sb, string key, string label)
         {

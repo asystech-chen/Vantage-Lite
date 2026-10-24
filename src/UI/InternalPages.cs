@@ -37,15 +37,47 @@ namespace VantageLite.UI
 
             body.Append("<ul id=\"histList\">");
 
-            for (int i = 0; i < total; i++)
+            string[] groupKeys = { "today", "yesterday", "earlier" };
+            string[] groupLabels = { "今天", "昨天", "更早" };
+
+            for (int g = 0; g < groupKeys.Length; g++)
             {
-                HistoryEntry item = items[i];
-                body.Append("<li data-ts=\"").Append(item.VisitedUtc).Append("\">")
-                    .Append("<div class=\"row\">").Append(Icon(item.Url, false, i < 40))
-                    .Append("<a href=\"").Append(Escape(item.Url)).Append("\">")
-                    .Append(Escape(DisplayTitle(item.Title, item.Url))).Append("</a></div>")
-                    .Append("<div class=\"url\">").Append(Escape(item.Url))
-                    .Append(" · ").Append(FormatTime(item.VisitedUtc)).Append("</div></li>");
+                bool hasGroup = false;
+
+                for (int i = 0; i < total; i++)
+                {
+                    if (HistoryGroup(items[i].VisitedUtc) == groupKeys[g])
+                    {
+                        hasGroup = true;
+                        break;
+                    }
+                }
+
+                if (!hasGroup)
+                {
+                    continue;
+                }
+
+                body.Append("<li class=\"hist-group\" data-group=\"").Append(groupKeys[g])
+                    .Append("\">").Append(groupLabels[g]).Append("</li>");
+
+                for (int i = 0; i < total; i++)
+                {
+                    HistoryEntry item = items[i];
+
+                    if (HistoryGroup(item.VisitedUtc) != groupKeys[g])
+                    {
+                        continue;
+                    }
+
+                    body.Append("<li data-ts=\"").Append(item.VisitedUtc)
+                        .Append("\" data-group=\"").Append(groupKeys[g]).Append("\">")
+                        .Append("<div class=\"row\">").Append(Icon(item.Url, false, g == 0 && i < 40))
+                        .Append("<a href=\"").Append(Escape(item.Url)).Append("\">")
+                        .Append(Escape(DisplayTitle(item.Title, item.Url))).Append("</a></div>")
+                        .Append("<div class=\"url\">").Append(Escape(item.Url))
+                        .Append(" · ").Append(FormatTime(item.VisitedUtc)).Append("</div></li>");
+                }
             }
 
             body.Append("</ul>");
@@ -66,12 +98,18 @@ namespace VantageLite.UI
                 + "var now=Date.now();var from=0;"
                 + "if(currentRange==='today'){var d=new Date();d.setHours(0,0,0,0);from=d.getTime();}"
                 + "else if(currentRange!=='all'){from=now-RANGE_DAYS[currentRange]*86400000;}"
-                + "var items=document.querySelectorAll('#histList li');var n=0;"
+                + "var items=document.querySelectorAll('#histList li[data-ts]');var n=0;"
                 + "for(var i=0;i<items.length;i++){"
                 + "var ts=parseInt(items[i].getAttribute('data-ts'),10)*1000;"
                 + "var show=(currentRange==='all'||ts>=from);"
                 + "if(show&&q){show=items[i].textContent.toLowerCase().indexOf(q)>=0;}"
                 + "items[i].style.display=show?'':'none';if(show){n++;}}"
+                + "var groups=document.querySelectorAll('.hist-group');"
+                + "for(var g=0;g<groups.length;g++){"
+                + "var key=groups[g].getAttribute('data-group');"
+                + "var rows=document.querySelectorAll('#histList li[data-ts][data-group=\"'+key+'\"]');"
+                + "var visible=0;for(var r=0;r<rows.length;r++){if(rows[r].style.display!=='none'){visible=1;break;}}"
+                + "groups[g].style.display=visible?'':'none';}"
                 + "var bs=document.querySelectorAll('.filter');"
                 + "for(var j=0;j<bs.length;j++){bs[j].className='filter'+(bs[j].getAttribute('data-range')===currentRange?' active':'');}"
                 + "document.getElementById('shown').textContent='显示 '+n+' 条';"
@@ -1324,6 +1362,7 @@ snapshotTree();
                 + ".url{color:var(--muted);font-size:12px;word-break:break-all}"
                 + ".name,.url,.dl-name{overflow-wrap:anywhere}"
                 + ".empty{color:var(--muted);padding:24px 0}"
+                + ".hist-group{padding:14px 0 6px;border-bottom:none;color:var(--muted);font-size:12px;font-weight:600}"
                 + ".tree .tree{padding-left:20px}"
                 + ".row{display:flex;align-items:center;gap:8px}"
                 + ".name{font-weight:600}"
@@ -1471,6 +1510,35 @@ snapshotTree();
         private static string DisplayTitle(string title, string url)
         {
             return string.IsNullOrWhiteSpace(title) ? url : title;
+        }
+
+        private static string HistoryGroup(long unixSeconds)
+        {
+            if (unixSeconds <= 0)
+            {
+                return "earlier";
+            }
+
+            try
+            {
+                DateTime date = DateTimeOffset.FromUnixTimeSeconds(unixSeconds).ToLocalTime().Date;
+                DateTime today = DateTime.Today;
+
+                if (date == today)
+                {
+                    return "today";
+                }
+
+                if (date == today.AddDays(-1))
+                {
+                    return "yesterday";
+                }
+            }
+            catch
+            {
+            }
+
+            return "earlier";
         }
 
         private static string FormatTime(long unixSeconds)

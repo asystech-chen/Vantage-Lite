@@ -23,6 +23,13 @@ namespace VantageLite.UI
 
         private bool _restoreMaximized;
 
+        private bool _isFullscreen;
+        private bool _fullscreenByVideo;
+        private FormWindowState _fullscreenPrevState;
+        private Rectangle _fullscreenPrevBounds;
+        private Padding _fullscreenPrevPadding;
+        private bool _fullscreenPrevTopMost;
+
         private string WindowStatePath
         {
             get { return Path.Combine(AppPaths.DataDirectory, "window.json"); }
@@ -71,6 +78,90 @@ namespace VantageLite.UI
             {
                 // 等布局按新 DPI 重排完再重算玻璃区域。
                 BeginInvoke(new Action(ApplyChrome));
+            }
+        }
+
+        /// <summary>
+        /// F11 或网页视频全屏：隐藏标题栏/地址栏/书签栏，铺满整个屏幕。
+        /// </summary>
+        private void ToggleFullscreen()
+        {
+            if (_isFullscreen)
+            {
+                ExitFullscreen();
+            }
+            else
+            {
+                EnterFullscreen(false);
+            }
+        }
+
+        private void EnterFullscreen(bool byVideo)
+        {
+            if (_isFullscreen)
+            {
+                return;
+            }
+
+            _isFullscreen = true;
+            _fullscreenByVideo = byVideo;
+            _fullscreenPrevState = WindowState;
+            _fullscreenPrevBounds = Bounds;
+            _fullscreenPrevPadding = Padding;
+            _fullscreenPrevTopMost = TopMost;
+
+            _titleBar.Visible = false;
+            _navigationBar.Visible = false;
+            _bookmarksBar.Visible = false;
+            _privacyBanner.Visible = false;
+            Padding = new Padding(0);
+
+            WindowState = FormWindowState.Normal;
+            Bounds = Screen.FromControl(this).Bounds;
+            TopMost = true;
+        }
+
+        private void ExitFullscreen()
+        {
+            if (!_isFullscreen)
+            {
+                return;
+            }
+
+            _isFullscreen = false;
+            _fullscreenByVideo = false;
+            TopMost = _fullscreenPrevTopMost;
+
+            _titleBar.Visible = true;
+            _navigationBar.Visible = true;
+            _bookmarksBar.Visible = _settings != null && _settings.ShowBookmarksBar;
+            _privacyBanner.Visible = _privacyMode;
+            Padding = _fullscreenPrevPadding;
+
+            Bounds = _fullscreenPrevBounds;
+            WindowState = _fullscreenPrevState;
+        }
+
+        private void TabManager_FullScreenChanged(object sender, bool full)
+        {
+            if (!ReferenceEquals(sender, _tabManager))
+            {
+                return;
+            }
+
+            if (full)
+            {
+                if (!_isFullscreen)
+                {
+                    EnterFullscreen(true);
+                }
+
+                return;
+            }
+
+            if (_isFullscreen && _fullscreenByVideo)
+            {
+                ExitFullscreen();
             }
         }
 

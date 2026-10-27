@@ -34,6 +34,59 @@ namespace VantageLite.Browser
             core.WebMessageReceived += Core_WebMessageReceived;
             core.FaviconChanged += Core_FaviconChanged;
             core.DownloadStarting += Core_DownloadStarting;
+            core.IsDocumentPlayingAudioChanged += Core_IsDocumentPlayingAudioChanged;
+            core.IsMutedChanged += Core_IsMutedChanged;
+            core.ContainsFullScreenElementChanged += Core_ContainsFullScreenElementChanged;
+        }
+
+        private void Core_IsDocumentPlayingAudioChanged(object sender, object e)
+        {
+            CoreWebView2 core = sender as CoreWebView2;
+
+            if (core == null || !ReferenceEquals(core, _core))
+            {
+                return;
+            }
+
+            RaiseAudioStateChanged();
+        }
+
+        private void Core_IsMutedChanged(object sender, object e)
+        {
+            CoreWebView2 core = sender as CoreWebView2;
+
+            if (core == null || !ReferenceEquals(core, _core))
+            {
+                return;
+            }
+
+            RaiseAudioStateChanged();
+        }
+
+        private void Core_ContainsFullScreenElementChanged(object sender, object e)
+        {
+            CoreWebView2 core = sender as CoreWebView2;
+
+            if (core == null || !ReferenceEquals(core, _core))
+            {
+                return;
+            }
+
+            bool full = false;
+
+            try
+            {
+                full = core.ContainsFullScreenElement;
+            }
+            catch
+            {
+            }
+
+            EventHandler<bool> handler = FullScreenChanged;
+            if (handler != null)
+            {
+                handler(this, full);
+            }
         }
 
         private void Core_DownloadStarting(object sender, CoreWebView2DownloadStartingEventArgs e)

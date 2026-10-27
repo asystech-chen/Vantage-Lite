@@ -36,6 +36,7 @@ namespace VantageLite.Browser
         public event EventHandler<string> WebMessage;
         public event EventHandler LastTabClosed;
         public event EventHandler<CoreWebView2DownloadStartingEventArgs> DownloadStarting;
+        public event EventHandler<bool> FullScreenChanged;
 
         public TabManager(
             Control host,
@@ -228,6 +229,16 @@ namespace VantageLite.Browser
             tab.Navigated += TabNavigated;
             tab.WebMessage += TabWebMessage;
             tab.DownloadStarting += TabDownloadStarting;
+            tab.FullScreenChanged += TabFullScreenChanged;
+        }
+
+        private void TabFullScreenChanged(object sender, bool full)
+        {
+            EventHandler<bool> handler = FullScreenChanged;
+            if (handler != null)
+            {
+                handler(this, full);
+            }
         }
 
         public async Task ActivateTabAsync(int id)
@@ -388,6 +399,54 @@ namespace VantageLite.Browser
             }
 
             await ActivateTabAsync(_tabs[index].Id);
+        }
+
+        /// <summary>
+        /// 固定/取消固定标签，并把标签移到固定区末尾/非固定区开头。
+        /// </summary>
+        public void SetPinned(int id, bool pinned)
+        {
+            BrowserTab tab = Find(id);
+
+            if (tab == null || tab.IsPinned == pinned)
+            {
+                return;
+            }
+
+            tab.IsPinned = pinned;
+            _tabs.Remove(tab);
+
+            int index = 0;
+            while (index < _tabs.Count && _tabs[index].IsPinned)
+            {
+                index++;
+            }
+
+            _tabs.Insert(index, tab);
+            Log.Info("[tabs] " + (pinned ? "pinned" : "unpinned") + " tab " + id);
+            RaiseTabsChanged();
+        }
+
+        /// <summary>
+        /// 关闭“固定标签”功能时，把所有已固定标签恢复为普通标签。
+        /// </summary>
+        public void ClearPinned()
+        {
+            bool changed = false;
+
+            for (int i = 0; i < _tabs.Count; i++)
+            {
+                if (_tabs[i].IsPinned)
+                {
+                    _tabs[i].IsPinned = false;
+                    changed = true;
+                }
+            }
+
+            if (changed)
+            {
+                RaiseTabsChanged();
+            }
         }
 
         /// <summary>

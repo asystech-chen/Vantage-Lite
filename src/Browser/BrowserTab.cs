@@ -74,6 +74,11 @@ namespace VantageLite.Browser
             get { return _isSuspended; }
         }
 
+        /// <summary>
+        /// 固定标签：固定在标签条左侧，退出时随会话恢复。
+        /// </summary>
+        public bool IsPinned { get; set; }
+
         public bool HasUnsavedInput
         {
             get { return _hasUnsavedInput; }
@@ -144,6 +149,56 @@ namespace VantageLite.Browser
             }
         }
 
+        /// <summary>
+        /// 标签是否被静音；挂起/丢弃的标签没有内核，读取时按未静音处理。
+        /// </summary>
+        public bool IsMuted
+        {
+            get
+            {
+                CoreWebView2 core = _core;
+                WebView2 view = _webView;
+
+                if (core == null || view == null || view.IsDisposed || _disposed)
+                {
+                    return false;
+                }
+
+                try
+                {
+                    return core.IsMuted;
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 切换静音；成功切换后由内核事件统一刷新标签图标。
+        /// </summary>
+        public void ToggleMute()
+        {
+            CoreWebView2 core = _core;
+            WebView2 view = _webView;
+
+            if (core == null || view == null || view.IsDisposed || _disposed)
+            {
+                return;
+            }
+
+            try
+            {
+                core.IsMuted = !core.IsMuted;
+                RaiseAudioStateChanged();
+            }
+            catch (Exception ex)
+            {
+                Log.Warn("[tab " + _id + "] toggle mute failed: " + Log.Describe(ex));
+            }
+        }
+
         public DateTime LastDeactivatedUtc { get; set; }
 
         public string Url
@@ -204,7 +259,18 @@ namespace VantageLite.Browser
         public event EventHandler<NavigationFailedEventArgs> NavigationFailed;
         public event EventHandler<string> WebMessage;
         public event EventHandler FaviconChanged;
+        public event EventHandler AudioStateChanged;
+        public event EventHandler<bool> FullScreenChanged;
         public event EventHandler<CoreWebView2DownloadStartingEventArgs> DownloadStarting;
+
+        private void RaiseAudioStateChanged()
+        {
+            EventHandler handler = AudioStateChanged;
+            if (handler != null)
+            {
+                handler(this, EventArgs.Empty);
+            }
+        }
 
         public BrowserTab(
             int id,

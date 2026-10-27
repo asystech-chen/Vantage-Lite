@@ -75,6 +75,12 @@ namespace VantageLite.UI
 
         private bool TryHandleShortcut(Keys keyData)
         {
+            if (keyData == Keys.F11)
+            {
+                ToggleFullscreen();
+                return true;
+            }
+
             if (keyData == (Keys.Control | Keys.D))
             {
                 ToggleBookmark();

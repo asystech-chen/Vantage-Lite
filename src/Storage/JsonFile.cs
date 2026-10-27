@@ -86,6 +86,15 @@ namespace VantageLite.Storage
         [DataMember(Name = "enableMica", Order = 16)]
         public bool EnableMica { get; set; }
 
+        [DataMember(Name = "tabDoubleClickClose", Order = 17)]
+        public bool TabDoubleClickClose { get; set; }
+
+        [DataMember(Name = "tabMiddleClickClose", Order = 18)]
+        public bool TabMiddleClickClose { get; set; }
+
+        [DataMember(Name = "pinnedTabs", Order = 19)]
+        public bool PinnedTabs { get; set; }
+
         [OnDeserializing]
         private void OnDeserializing(StreamingContext context)
         {
@@ -102,6 +111,9 @@ namespace VantageLite.Storage
             DownloadDirectory = string.Empty;
             RestoreSession = DefaultRestoreSession;
             EnableMica = false;
+            TabDoubleClickClose = true;
+            TabMiddleClickClose = true;
+            PinnedTabs = true;
             // HomeMode 故意不填：旧配置由 MainForm 按 HomeUrl 推断。
         }
 
@@ -124,7 +136,10 @@ namespace VantageLite.Storage
                 CustomSearchEngines = new List<CustomSearchEngine>(),
                 DownloadDirectory = string.Empty,
                 RestoreSession = DefaultRestoreSession,
-                EnableMica = false
+                EnableMica = false,
+                TabDoubleClickClose = true,
+                TabMiddleClickClose = true,
+                PinnedTabs = true
             };
         }
     }

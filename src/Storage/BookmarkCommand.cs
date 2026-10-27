@@ -78,5 +78,14 @@ namespace VantageLite.Storage
 
         [DataMember(Name = "url", Order = 23, EmitDefaultValue = false)]
         public string Url { get; set; }
+
+        [DataMember(Name = "tabDoubleClickClose", Order = 24, EmitDefaultValue = false)]
+        public bool? TabDoubleClickClose { get; set; }
+
+        [DataMember(Name = "tabMiddleClickClose", Order = 25, EmitDefaultValue = false)]
+        public bool? TabMiddleClickClose { get; set; }
+
+        [DataMember(Name = "pinnedTabs", Order = 26, EmitDefaultValue = false)]
+        public bool? PinnedTabs { get; set; }
     }
 }

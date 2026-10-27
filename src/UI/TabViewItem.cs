@@ -15,8 +15,10 @@ namespace VantageLite.UI
     internal sealed class TabViewItem : Panel
     {
         private readonly Button _closeButton;
+        private readonly Button _audioButton;
         private readonly Panel _indicator;
         private readonly Timer _spinner;
+        private readonly Font _pinFont;
 
         private BrowserTab _tab;
         private bool _active;
@@ -36,7 +38,8 @@ namespace VantageLite.UI
             SetStyle(
                 ControlStyles.OptimizedDoubleBuffer |
                 ControlStyles.AllPaintingInWmPaint |
-                ControlStyles.UserPaint,
+                ControlStyles.UserPaint |
+                ControlStyles.StandardDoubleClick,
                 true);
 
             Width = 180;
@@ -44,6 +47,8 @@ namespace VantageLite.UI
             Margin = new Padding(0, 0, 2, 0);
             Font = ThemeFonts.Ui(9F);
             Cursor = Cursors.Default;
+
+            _pinFont = IconFont.CreatePx(10f);
 
             _spinner = new Timer();
             _spinner.Interval = 90;
@@ -76,8 +81,23 @@ namespace VantageLite.UI
             _closeButton.MouseEnter += OnCloseMouseEnter;
             _closeButton.MouseLeave += OnCloseMouseLeave;
 
+            _audioButton = new FlatButton();
+            _audioButton.Text = IconFont.Volume;
+            _audioButton.Width = 20;
+            _audioButton.Height = Height;
+            _audioButton.FlatStyle = FlatStyle.Flat;
+            _audioButton.FlatAppearance.BorderSize = 0;
+            _audioButton.Font = IconFont.CreatePx(11f);
+            _audioButton.TabStop = false;
+            _audioButton.Visible = false;
+            _audioButton.Cursor = Cursors.Default;
+            _audioButton.Click += delegate { Raise(MuteToggleRequested); };
+
+            Controls.Add(_audioButton);
             Controls.Add(_closeButton);
             Controls.Add(_indicator);
+            // 指示条必须盖在喇叭/关闭按钮之上，否则播放音频时顶部蓝条被按钮遮住。
+            _indicator.BringToFront();
 
             Click += delegate
             {
@@ -89,6 +109,7 @@ namespace VantageLite.UI
 
                 Raise(SelectRequested);
             };
+            DoubleClick += delegate { Raise(DoubleClickRequested); };
             MouseDown += OnMouseDown;
             MouseEnter += OnMouseEnter;
             MouseLeave += OnMouseLeave;
@@ -116,6 +137,11 @@ namespace VantageLite.UI
                 _closeButton.Width = WindowChrome.Scale(this, 22);
             }
 
+            if (_audioButton != null)
+            {
+                _audioButton.Width = WindowChrome.Scale(this, 20);
+            }
+
             if (_indicator != null)
             {
                 _indicator.Height = WindowChrome.Scale(this, 2);
@@ -137,6 +163,8 @@ namespace VantageLite.UI
         public event EventHandler SelectRequested;
         public event EventHandler CloseRequested;
         public event EventHandler MiddleCloseRequested;
+        public event EventHandler DoubleClickRequested;
+        public event EventHandler MuteToggleRequested;
 
         public void Update(BrowserTab tab, bool active)
         {
@@ -145,6 +173,8 @@ namespace VantageLite.UI
                 if (_tab != null)
                 {
                     _tab.FaviconChanged -= Tab_FaviconChanged;
+                    _tab.LoadingChanged -= Tab_LoadingChanged;
+                    _tab.AudioStateChanged -= Tab_AudioStateChanged;
                 }
 
                 _tab = tab;
@@ -153,12 +183,14 @@ namespace VantageLite.UI
                 {
                     _tab.FaviconChanged += Tab_FaviconChanged;
                     _tab.LoadingChanged += Tab_LoadingChanged;
+                    _tab.AudioStateChanged += Tab_AudioStateChanged;
                 }
             }
 
             _active = active;
             SetLoading(tab != null && tab.IsLoading);
             UpdateVisual();
+            UpdateAudioButton();
         }
 
         protected override void Dispose(bool disposing)
@@ -169,10 +201,12 @@ namespace VantageLite.UI
                 {
                     _tab.FaviconChanged -= Tab_FaviconChanged;
                     _tab.LoadingChanged -= Tab_LoadingChanged;
+                    _tab.AudioStateChanged -= Tab_AudioStateChanged;
                     _tab = null;
                 }
 
                 _spinner.Dispose();
+                _pinFont.Dispose();
             }
 
             base.Dispose(disposing);
@@ -186,6 +220,42 @@ namespace VantageLite.UI
         private void Tab_LoadingChanged(object sender, bool loading)
         {
             SetLoading(loading);
+        }
+
+        private void Tab_AudioStateChanged(object sender, EventArgs e)
+        {
+            UpdateAudioButton();
+            Invalidate();
+        }
+
+        private void UpdateAudioButton()
+        {
+            if (_audioButton == null)
+            {
+                return;
+            }
+
+            bool audible = _tab != null && (_tab.IsPlayingAudio || _tab.IsMuted);
+            _audioButton.Visible = audible;
+
+            if (!audible)
+            {
+                return;
+            }
+
+            bool muted = _tab.IsMuted;
+            _audioButton.Text = muted ? IconFont.VolumeMuted : IconFont.Volume;
+            _audioButton.ForeColor = muted
+                ? ThemeManager.Current.TextPrimary
+                : ThemeManager.Current.Accent;
+            _audioButton.FlatAppearance.MouseOverBackColor = ThemeManager.Current.ButtonHover;
+
+            int width = WindowChrome.Scale(this, 20);
+            int closeWidth = _closeButton == null ? 0 : _closeButton.Width;
+            _audioButton.Width = width;
+            _audioButton.Height = Height;
+            _audioButton.Left = Math.Max(0, Width - closeWidth - width);
+            _audioButton.Top = 0;
         }
 
         private void SetLoading(bool loading)
@@ -212,6 +282,7 @@ namespace VantageLite.UI
         public void ApplyTheme()
         {
             UpdateVisual();
+            UpdateAudioButton();
         }
 
         /// <summary>
@@ -235,6 +306,7 @@ namespace VantageLite.UI
             base.OnResize(e);
 
             UpdateCloseVisibility();
+            UpdateAudioButton();
             Invalidate();
         }
 
@@ -259,6 +331,11 @@ namespace VantageLite.UI
             int rightPadding = (_closeButton != null && _closeButton.Visible)
                 ? _closeButton.Width + WindowChrome.Scale(this, 14)
                 : WindowChrome.Scale(this, 10);
+
+            if (_audioButton != null && _audioButton.Visible)
+            {
+                rightPadding += _audioButton.Width;
+            }
 
             int iconSize = WindowChrome.Scale(this, 16);
             int left = WindowChrome.Scale(this, 8);
@@ -291,6 +368,19 @@ namespace VantageLite.UI
             }
 
             left += iconSize + WindowChrome.Scale(this, 6);
+
+            if (_tab != null && _tab.IsPinned)
+            {
+                int pinWidth = WindowChrome.Scale(this, 12);
+                TextRenderer.DrawText(
+                    e.Graphics,
+                    IconFont.Pin,
+                    _pinFont,
+                    new Rectangle(left, 0, pinWidth, Height),
+                    ThemeManager.Current.TextSecondary,
+                    TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine);
+                left += pinWidth;
+            }
 
             Rectangle textRect = new Rectangle(
                 left,
@@ -375,6 +465,9 @@ namespace VantageLite.UI
             _closeButton.BackColor = background;
             _closeButton.FlatAppearance.MouseOverBackColor = palette.CloseHover;
             _closeButton.FlatAppearance.MouseDownBackColor = palette.CloseHover;
+            _audioButton.BackColor = background;
+            _audioButton.FlatAppearance.MouseOverBackColor = palette.ButtonHover;
+            _audioButton.FlatAppearance.MouseDownBackColor = palette.ButtonHover;
             _indicator.BackColor = _active ? palette.Accent : background;
 
             if (_tab == null)
@@ -385,7 +478,13 @@ namespace VantageLite.UI
             }
             else
             {
-                string prefix = _tab.IsDiscarded ? "◌ " : string.Empty;
+                string prefix = string.Empty;
+
+                if (_tab.IsDiscarded)
+                {
+                    prefix += "◌ ";
+                }
+
                 _titleText = prefix + _tab.DisplayTitle;
                 _titleColor = _active
                     ? palette.TextPrimary

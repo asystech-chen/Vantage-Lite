@@ -60,6 +60,7 @@ namespace VantageLite.UI
             manager.Navigated += TabManager_Navigated;
             manager.WebMessage += TabManager_WebMessage;
             manager.LastTabClosed += TabManager_LastTabClosed;
+            manager.FullScreenChanged += TabManager_FullScreenChanged;
             manager.DownloadStarting += delegate(object downloadSender, CoreWebView2DownloadStartingEventArgs downloadArgs)
             {
                 if (ReferenceEquals(downloadSender, _normalTabManager))

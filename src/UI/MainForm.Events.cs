@@ -55,6 +55,40 @@ namespace VantageLite.UI
             CloseTabById(id);
         }
 
+        private void ApplyTabMouseSettings()
+        {
+            if (_tabStrip == null || _settings == null)
+            {
+                return;
+            }
+
+            _tabStrip.DoubleClickCloseEnabled = _settings.TabDoubleClickClose;
+            _tabStrip.MiddleClickCloseEnabled = _settings.TabMiddleClickClose;
+
+            if (!_settings.PinnedTabs)
+            {
+                if (_normalTabManager != null)
+                {
+                    _normalTabManager.ClearPinned();
+                }
+
+                if (_privateTabManager != null)
+                {
+                    _privateTabManager.ClearPinned();
+                }
+            }
+        }
+
+        private void TabStrip_TabMuteToggleRequested(object sender, int id)
+        {
+            BrowserTab tab = FindTabById(id);
+
+            if (tab != null)
+            {
+                tab.ToggleMute();
+            }
+        }
+
         private void TabStrip_NewTabRequested(object sender, EventArgs e)
         {
             CreateNewTab();
@@ -94,7 +128,8 @@ namespace VantageLite.UI
             }
 
             menu.Closed += delegate { DisposeMenu(menu); };
-            MenuPositioner.Show(menu, this, e.ScreenPoint);
+            // 标签菜单条目短，保持原生宽度；固定宽度会在右侧留下大片空白。
+            MenuPositioner.Show(menu, this, e.ScreenPoint, false);
         }
 
         private void BuildTabContextMenu(ContextMenuStrip menu, int tabId)
@@ -109,6 +144,17 @@ namespace VantageLite.UI
             int index = IndexOfTab(tabId);
             int count = _tabManager.Tabs.Count;
 
+            if (_settings != null && _settings.PinnedTabs)
+            {
+                menu.Items.Add(AddMenuItem(
+                    tab.IsPinned ? "取消固定标签页" : "固定标签页",
+                    delegate { _tabManager.SetPinned(tabId, !tab.IsPinned); }));
+            }
+
+            menu.Items.Add(AddMenuItem(
+                tab.IsMuted ? "取消静音" : "静音标签页",
+                delegate { tab.ToggleMute(); }));
+            menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add(AddMenuItem("复制标签页", delegate { DuplicateTab(tabId); }));
 
             ToolStripMenuItem closeOthers = AddMenuItem("关闭其他标签页", delegate { CloseOtherTabs(tabId); });

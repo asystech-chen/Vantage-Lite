@@ -21,6 +21,13 @@ namespace VantageLite.UI
         public event EventHandler ToggleMaximizeRequested;
         public event EventHandler<TabContextEventArgs> ContextMenuRequested;
         public event EventHandler<TabReorderEventArgs> TabReorderRequested;
+        public event EventHandler<int> TabMuteToggleRequested;
+
+        /// <summary>双击标签是否关闭；由设置页控制。</summary>
+        public bool DoubleClickCloseEnabled { get; set; }
+
+        /// <summary>中键点击标签是否关闭；由设置页控制。</summary>
+        public bool MiddleClickCloseEnabled { get; set; }
 
         private readonly Panel _viewport;
         private readonly FlowLayoutPanel _panel;
@@ -50,6 +57,9 @@ namespace VantageLite.UI
                 ControlStyles.AllPaintingInWmPaint,
                 true);
             DoubleBuffered = true;
+
+            DoubleClickCloseEnabled = true;
+            MiddleClickCloseEnabled = true;
 
             _items = new Dictionary<int, TabViewItem>();
             _toolTip = new ToolTip();
@@ -277,6 +287,8 @@ namespace VantageLite.UI
                         item.SelectRequested += OnItemSelectRequested;
                         item.CloseRequested += OnItemCloseRequested;
                         item.MiddleCloseRequested += OnItemMiddleCloseRequested;
+                        item.DoubleClickRequested += OnItemDoubleClickRequested;
+                        item.MuteToggleRequested += OnItemMuteToggleRequested;
                         item.MouseDown += OnItemMouseDown;
                         item.MouseMove += OnItemMouseMove;
                         item.MouseUp += OnItemMouseUp;
@@ -407,7 +419,42 @@ namespace VantageLite.UI
             // 标记这次中键按下来自标签；松手时无论间隔多久都不新建标签。
             _middleDownOnTab = true;
 
+            if (!MiddleClickCloseEnabled)
+            {
+                return;
+            }
+
             EventHandler<int> handler = TabCloseRequested;
+            if (handler != null)
+            {
+                handler(this, item.TabId);
+            }
+        }
+
+        private void OnItemDoubleClickRequested(object sender, EventArgs e)
+        {
+            TabViewItem item = sender as TabViewItem;
+            if (item == null || !DoubleClickCloseEnabled)
+            {
+                return;
+            }
+
+            EventHandler<int> handler = TabCloseRequested;
+            if (handler != null)
+            {
+                handler(this, item.TabId);
+            }
+        }
+
+        private void OnItemMuteToggleRequested(object sender, EventArgs e)
+        {
+            TabViewItem item = sender as TabViewItem;
+            if (item == null)
+            {
+                return;
+            }
+
+            EventHandler<int> handler = TabMuteToggleRequested;
             if (handler != null)
             {
                 handler(this, item.TabId);

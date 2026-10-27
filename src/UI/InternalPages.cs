@@ -600,6 +600,20 @@ namespace VantageLite.UI
                 .Append("> 显示书签栏</label>");
             body.Append("</div></section>");
 
+            body.Append("<section class=\"card\"><div class=\"card-head\"><h2>标签页</h2>")
+                .Append("<p>鼠标操作与固定标签</p></div><div class=\"card-body\">");
+            body.Append("<label class=\"check\"><input id=\"tabDblClose\" type=\"checkbox\"")
+                .Append(settings.TabDoubleClickClose ? " checked" : string.Empty)
+                .Append("> 双击标签关闭</label>");
+            body.Append("<label class=\"check\"><input id=\"tabMidClose\" type=\"checkbox\"")
+                .Append(settings.TabMiddleClickClose ? " checked" : string.Empty)
+                .Append("> 中键点击标签关闭</label>");
+            body.Append("<label class=\"check\"><input id=\"pinTabs\" type=\"checkbox\"")
+                .Append(settings.PinnedTabs ? " checked" : string.Empty)
+                .Append("> 允许固定标签页</label>");
+            body.Append("<span class=\"hint\">固定标签会移到标签条左侧，并在下次恢复会话时保留</span>");
+            body.Append("</div></section>");
+
             body.Append("<section class=\"card\"><div class=\"card-head\"><h2>搜索</h2>")
                 .Append("<p>地址栏与新标签页使用的搜索引擎</p></div><div class=\"card-body\">");
             body.Append("<div class=\"field-row\"><span class=\"label\">搜索引擎</span><span class=\"control\">")
@@ -762,11 +776,14 @@ namespace VantageLite.UI
                 + "var newTabUrl=document.getElementById('newTabUrl').value.trim();"
                 + "var ntShortcuts=document.getElementById('ntShortcuts').checked;"
                 + "var bar=document.getElementById('bar').checked;"
+                + "var tabDblClose=document.getElementById('tabDblClose').checked;"
+                + "var tabMidClose=document.getElementById('tabMidClose').checked;"
+                + "var pinnedTabs=document.getElementById('pinTabs').checked;"
                 + "var downloadDir=document.getElementById('downloadDir').value.trim();"
                 + "var engines=[];var rows=document.querySelectorAll('#customEngines .engine-row');"
                 + "for(var i=0;i<rows.length;i++){var n=rows[i].querySelector('.ce-name').value.trim();"
                 + "var u=rows[i].querySelector('.ce-url').value.trim();if(n&&u){engines.push({name:n,url:u});}}"
-                + "post({cmd:'settings',homeMode:homeMode,home:home,customEngines:engines,maxTabs:maxTabs,suspendSeconds:suspend,discardMinutes:discard,search:search,theme:themeMode,clearOnExit:clearOnExit,restoreSession:restoreSession,newTabMode:newTabMode,newTabUrl:newTabUrl,newTabShortcuts:ntShortcuts,bookmarksBar:bar,downloadDir:downloadDir});"
+                + "post({cmd:'settings',homeMode:homeMode,home:home,customEngines:engines,maxTabs:maxTabs,suspendSeconds:suspend,discardMinutes:discard,search:search,theme:themeMode,clearOnExit:clearOnExit,restoreSession:restoreSession,newTabMode:newTabMode,newTabUrl:newTabUrl,newTabShortcuts:ntShortcuts,bookmarksBar:bar,downloadDir:downloadDir,tabDoubleClickClose:tabDblClose,tabMiddleClickClose:tabMidClose,pinnedTabs:pinnedTabs});"
                 + "}");
             body.Append("if(window.chrome&&window.chrome.webview){"
                 + "window.chrome.webview.addEventListener('message',function(e){"

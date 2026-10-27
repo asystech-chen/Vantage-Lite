@@ -17,6 +17,9 @@ namespace VantageLite.Storage
 
         [DataMember(Name = "title", Order = 1)]
         public string Title { get; set; }
+
+        [DataMember(Name = "pinned", Order = 2)]
+        public bool Pinned { get; set; }
     }
 
     /// <summary>

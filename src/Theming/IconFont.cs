@@ -33,6 +33,9 @@ namespace VantageLite.Theming
         public const string Retry = "\uE72C";
         public const string Lock = "\uE72E";
         public const string Unlock = "\uE785";
+        public const string Pin = "\uE840";
+        public const string Volume = "\uE767";
+        public const string VolumeMuted = "\uE74F";
 
         private static readonly string Family = DetectFamily();
 

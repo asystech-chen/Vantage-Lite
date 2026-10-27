@@ -225,6 +225,8 @@ namespace VantageLite.UI
                 _tabStrip.NewTabRequested += TabStrip_NewTabRequested;
                 _tabStrip.ContextMenuRequested += TabStrip_ContextMenuRequested;
                 _tabStrip.TabReorderRequested += TabStrip_TabReorderRequested;
+                _tabStrip.TabMuteToggleRequested += TabStrip_TabMuteToggleRequested;
+                ApplyTabMouseSettings();
 
                 Log.Info("WebView2 environment ready. max live tabs = " + _maxLiveTabs);
 
@@ -304,7 +306,9 @@ namespace VantageLite.UI
                     ? url
                     : null;
 
-                restored.Add(_tabManager.AddPlaceholderTab(url, internalAddress, saved.Title));
+                BrowserTab placeholder = _tabManager.AddPlaceholderTab(url, internalAddress, saved.Title);
+                placeholder.IsPinned = saved.Pinned && _settings.PinnedTabs;
+                restored.Add(placeholder);
             }
 
             if (restored.Count == 0)
@@ -369,7 +373,8 @@ namespace VantageLite.UI
                 tabs.Add(new SessionTab
                 {
                     Url = url,
-                    Title = tab.DisplayTitle
+                    Title = tab.DisplayTitle,
+                    Pinned = tab.IsPinned
                 });
             }
 

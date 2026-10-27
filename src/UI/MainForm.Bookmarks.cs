@@ -877,6 +877,21 @@ namespace VantageLite.UI
                 _settings.NewTabShortcuts = command.NewTabShortcuts.Value;
             }
 
+            if (command.TabDoubleClickClose.HasValue)
+            {
+                _settings.TabDoubleClickClose = command.TabDoubleClickClose.Value;
+            }
+
+            if (command.TabMiddleClickClose.HasValue)
+            {
+                _settings.TabMiddleClickClose = command.TabMiddleClickClose.Value;
+            }
+
+            if (command.PinnedTabs.HasValue)
+            {
+                _settings.PinnedTabs = command.PinnedTabs.Value;
+            }
+
             if (!string.IsNullOrWhiteSpace(command.ThemeMode))
             {
                 _settings.ThemeMode = command.ThemeMode.Trim().ToLowerInvariant();
@@ -978,6 +993,7 @@ namespace VantageLite.UI
                 _tabManager.SetDownloadDirectory(_settings.DownloadDirectory);
             }
 
+            ApplyTabMouseSettings();
             VantageLite.Theming.ThemeManager.SetMode(_settings.ThemeMode);
             SyncSearchEngineToPages(_settings.SearchEngine);
             RefreshNewTabPages();

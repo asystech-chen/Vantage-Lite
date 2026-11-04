@@ -34,7 +34,8 @@ namespace VantageLite.UI
         private readonly Button _newTabButton;
         private readonly Dictionary<int, TabViewItem> _items;
         private readonly ToolTip _toolTip;
-        private readonly Font _measureFont;
+        private Font _measureFont;
+        private double _measureFontScale = -1;
         private readonly Panel _dropIndicator;
         private readonly Timer _dragScrollTimer;
 
@@ -144,6 +145,8 @@ namespace VantageLite.UI
 
         private void ApplyMetrics()
         {
+            ApplyMeasureFont();
+
             int side = WindowChrome.Scale(this, 8);
             Padding = new Padding(side, 0, side, WindowChrome.Scale(this, 4));
 
@@ -159,6 +162,25 @@ namespace VantageLite.UI
             }
 
             Invalidate();
+        }
+
+        private void ApplyMeasureFont()
+        {
+            double scale = WindowChrome.ScaleFactor;
+
+            if (_measureFont != null && Math.Abs(_measureFontScale - scale) < 0.001)
+            {
+                return;
+            }
+
+            Font old = _measureFont;
+            _measureFont = ThemeFonts.UiPx(9F);
+            _measureFontScale = scale;
+
+            if (old != null)
+            {
+                old.Dispose();
+            }
         }
 
         /// <summary>缩放系数变化时由宿主调用，重新计算标签条与每个标签的尺寸。</summary>

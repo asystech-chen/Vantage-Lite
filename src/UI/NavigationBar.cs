@@ -40,6 +40,8 @@ namespace VantageLite.UI
         private FlowLayoutPanel _buttonsPanel;
         private FlowLayoutPanel _rightButtonsPanel;
         private bool _isLoading;
+        private Font _addressFont;
+        private double _addressFontScale = -1;
 
         public NavigationBar()
         {
@@ -62,6 +64,12 @@ namespace VantageLite.UI
             {
                 ThemeManager.ThemeChanged -= ThemeManager_ThemeChanged;
                 _toolTip.Dispose();
+
+                if (_addressFont != null)
+                {
+                    _addressFont.Dispose();
+                    _addressFont = null;
+                }
             }
 
             base.Dispose(disposing);
@@ -218,7 +226,7 @@ namespace VantageLite.UI
 
             _addressBox = new TextBox();
             _addressBox.BorderStyle = BorderStyle.None;
-            _addressBox.Font = ThemeFonts.Ui(10.5F);
+            _addressBox.Font = ThemeFonts.UiPx(10.5F);
             _addressBox.Dock = DockStyle.None;
             _addressBox.AutoSize = false;
             _addressBox.KeyDown += AddressBox_KeyDown;
@@ -277,6 +285,8 @@ namespace VantageLite.UI
 
         private void ApplyMetrics()
         {
+            ApplyAddressFont();
+
             int buttonHeight = WindowChrome.Scale(this, 32);
             int textHeight = TextRenderer.MeasureText("国Ag", _addressBox == null ? Font : _addressBox.Font).Height;
             int innerHeight = Math.Max(buttonHeight, textHeight + WindowChrome.Scale(10));
@@ -322,6 +332,31 @@ namespace VantageLite.UI
             }
 
             Invalidate();
+        }
+
+        private void ApplyAddressFont()
+        {
+            if (_addressBox == null)
+            {
+                return;
+            }
+
+            double scale = WindowChrome.ScaleFactor;
+
+            if (_addressFont != null && Math.Abs(_addressFontScale - scale) < 0.001)
+            {
+                return;
+            }
+
+            Font old = _addressFont;
+            _addressFont = ThemeFonts.UiPx(10.5F);
+            _addressFontScale = scale;
+            _addressBox.Font = _addressFont;
+
+            if (old != null)
+            {
+                old.Dispose();
+            }
         }
 
         /// <summary>缩放系数变化时由宿主调用。</summary>

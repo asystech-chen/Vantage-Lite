@@ -50,14 +50,14 @@ namespace VantageLite.UI
             _privacyLabel.TextAlign = ContentAlignment.MiddleLeft;
             _privacyLabel.Padding = new Padding(32, 0, 8, 0);
             _privacyLabel.BackColor = Color.Transparent;
-            _privacyLabel.Font = VantageLite.Theming.ThemeFonts.Ui(9F, FontStyle.Bold);
+            _privacyLabel.Font = VantageLite.Theming.ThemeFonts.UiPx(9F, FontStyle.Bold);
             _privacyLabel.Text = "隐私浏览模式 · 不保存历史、Cookie、缓存和下载记录";
 
             _privacyExitButton = new FlatButton();
             _privacyExitButton.Text = "退出并清除";
             _privacyExitButton.Dock = DockStyle.Right;
             _privacyExitButton.Width = 100;
-            _privacyExitButton.Font = VantageLite.Theming.ThemeFonts.Ui(8.5F);
+            _privacyExitButton.Font = VantageLite.Theming.ThemeFonts.UiPx(8.5F);
             _privacyExitButton.Click += delegate { _ = ExitPrivacyModeAsync(); };
 
             _privacyBanner.Controls.Add(_privacyLabel);

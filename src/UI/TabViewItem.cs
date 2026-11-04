@@ -19,6 +19,8 @@ namespace VantageLite.UI
         private readonly Panel _indicator;
         private readonly Timer _spinner;
         private readonly Font _pinFont;
+        private Font _uiFont;
+        private double _uiFontScale = -1;
 
         private BrowserTab _tab;
         private bool _active;
@@ -134,6 +136,8 @@ namespace VantageLite.UI
 
         private void ApplyMetrics()
         {
+            ApplyUiFont();
+
             if (_closeButton != null)
             {
                 _closeButton.Width = WindowChrome.Scale(this, 22);
@@ -231,6 +235,29 @@ namespace VantageLite.UI
         {
             UpdateAudioButton();
             Invalidate();
+        }
+
+        /// <summary>
+        /// 标题字体跟随界面缩放；点单位在高 DPI/文本缩放下不可靠。
+        /// </summary>
+        private void ApplyUiFont()
+        {
+            double scale = WindowChrome.ScaleFactor;
+
+            if (_uiFont != null && Math.Abs(_uiFontScale - scale) < 0.001)
+            {
+                return;
+            }
+
+            Font old = _uiFont;
+            _uiFont = ThemeFonts.UiPx(9F);
+            _uiFontScale = scale;
+            Font = _uiFont;
+
+            if (old != null)
+            {
+                old.Dispose();
+            }
         }
 
         /// <summary>

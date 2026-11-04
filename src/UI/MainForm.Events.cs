@@ -114,7 +114,7 @@ namespace VantageLite.UI
 
             ContextMenuStrip menu = new ContextMenuStrip();
             menu.ShowImageMargin = false;
-            menu.Font = VantageLite.Theming.ThemeFonts.Ui(9.5F);
+            menu.Font = VantageLite.Theming.ThemeFonts.UiPx(9.5F);
             VantageLite.Theming.ThemeManager.ApplyMenuTheme(menu);
 
             if (e.TabId > 0)

@@ -24,6 +24,9 @@ namespace VantageLite.UI
         private bool _restoreMaximized;
         private bool _hasSavedBounds;
         private Timer _scaleSettleTimer;
+        private Font _privacyLabelFont;
+        private Font _privacyExitFont;
+        private double _privacyFontScale = -1;
 
         private bool _isFullscreen;
         private bool _fullscreenByVideo;
@@ -170,7 +173,44 @@ namespace VantageLite.UI
                 _privacyExitButton.Width = WindowChrome.Scale(this, 100);
             }
 
+            ApplyPrivacyFonts();
             UpdateWindowChromeState();
+        }
+
+        private void ApplyPrivacyFonts()
+        {
+            double scale = WindowChrome.ScaleFactor;
+
+            if (_privacyFontScale >= 0 && Math.Abs(_privacyFontScale - scale) < 0.001)
+            {
+                return;
+            }
+
+            Font oldLabel = _privacyLabelFont;
+            Font oldButton = _privacyExitFont;
+            _privacyLabelFont = VantageLite.Theming.ThemeFonts.UiPx(9F, FontStyle.Bold);
+            _privacyExitFont = VantageLite.Theming.ThemeFonts.UiPx(8.5F);
+            _privacyFontScale = scale;
+
+            if (_privacyLabel != null)
+            {
+                _privacyLabel.Font = _privacyLabelFont;
+            }
+
+            if (_privacyExitButton != null)
+            {
+                _privacyExitButton.Font = _privacyExitFont;
+            }
+
+            if (oldLabel != null)
+            {
+                oldLabel.Dispose();
+            }
+
+            if (oldButton != null)
+            {
+                oldButton.Dispose();
+            }
         }
 
         private void ApplyDefaultBounds()

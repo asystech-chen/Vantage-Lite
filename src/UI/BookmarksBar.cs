@@ -32,6 +32,8 @@ namespace VantageLite.UI
         private readonly Panel _dropLine;
         private BookmarkStore _store;
         private Label _hintLabel;
+        private Font _itemFont;
+        private double _itemFontScale = -1;
         private BookmarkNode _dragNode;
         private BookmarkNode _dropTarget;
         private string _dropMode;
@@ -77,6 +79,7 @@ namespace VantageLite.UI
                 _relayoutTimer.Stop();
                 Relayout();
             };
+            _itemFont = ThemeFonts.UiPx(9.5F);
             _toolTip = new ToolTip();
             ThemeManager.ApplyToolTip(_toolTip);
 
@@ -152,6 +155,8 @@ namespace VantageLite.UI
 
         private void ApplyMetrics()
         {
+            Font oldFont = UpdateItemFont();
+
             Height = WindowChrome.Scale(this, 30);
             Padding = new Padding(
                 WindowChrome.Scale(this, 6),
@@ -173,6 +178,31 @@ namespace VantageLite.UI
             {
                 ApplyButtonMetrics(_buttons[i]);
             }
+
+            if (_hintLabel != null)
+            {
+                _hintLabel.Font = _itemFont;
+            }
+
+            if (oldFont != null)
+            {
+                oldFont.Dispose();
+            }
+        }
+
+        private Font UpdateItemFont()
+        {
+            double scale = WindowChrome.ScaleFactor;
+
+            if (_itemFont != null && Math.Abs(_itemFontScale - scale) < 0.001)
+            {
+                return null;
+            }
+
+            Font old = _itemFont;
+            _itemFont = ThemeFonts.UiPx(9.5F);
+            _itemFontScale = scale;
+            return old;
         }
 
         /// <summary>缩放系数变化时由宿主调用。</summary>
@@ -192,6 +222,7 @@ namespace VantageLite.UI
             button.Height = WindowChrome.Scale(this, 24);
             button.Padding = new Padding(WindowChrome.Scale(this, 4), 0, WindowChrome.Scale(this, 4), 0);
             button.Margin = new Padding(0, 0, WindowChrome.Scale(this, 2), 0);
+            button.Font = _itemFont;
         }
 
         protected override void Dispose(bool disposing)
@@ -238,7 +269,7 @@ namespace VantageLite.UI
                 _hintLabel.Text = "书签工具栏 · 按 Ctrl+D 添加书签";
                 _hintLabel.AutoSize = true;
                 _hintLabel.ForeColor = ThemeManager.Current.TextDisabled;
-                _hintLabel.Font = ThemeFonts.Ui(9F);
+                _hintLabel.Font = _itemFont;
                 _hintLabel.Margin = new Padding(4, 6, 0, 0);
                 _panel.Controls.Add(_hintLabel);
                 _overflowButton.Visible = false;
@@ -302,7 +333,7 @@ namespace VantageLite.UI
             button.FlatAppearance.BorderSize = 0;
             button.TabStop = false;
             button.Cursor = Cursors.Default;
-            button.Font = ThemeFonts.Ui(9.5F);
+            button.Font = _itemFont;
 
             button.ImageAlign = ContentAlignment.MiddleLeft;
             button.TextImageRelation = TextImageRelation.ImageBeforeText;
@@ -833,7 +864,7 @@ namespace VantageLite.UI
             menu.ShowImageMargin = showIcons;
             menu.ShowCheckMargin = false;
             menu.ImageScalingSize = new Size(WindowChrome.Scale(16), WindowChrome.Scale(16));
-            menu.Font = ThemeFonts.Ui(9.5F);
+            menu.Font = ThemeFonts.UiPx(9.5F);
             ThemeManager.ApplyMenuTheme(menu);
             return menu;
         }
@@ -1408,7 +1439,7 @@ namespace VantageLite.UI
                 StartPosition = FormStartPosition.Manual;
                 BackColor = ThemeManager.Current.Accent;
                 ForeColor = Color.White;
-                Font = ThemeFonts.Ui(9F);
+                Font = ThemeFonts.UiPx(9F);
 
                 int width = TextRenderer.MeasureText(text ?? string.Empty, Font).Width + WindowChrome.Scale(24);
                 Width = Math.Max(WindowChrome.Scale(80), Math.Min(WindowChrome.Scale(280), width));
@@ -1646,7 +1677,7 @@ namespace VantageLite.UI
                     Margin = new Padding(0, 0, 0, WindowChrome.Scale(2));
                     FlatStyle = FlatStyle.Flat;
                     FlatAppearance.BorderSize = 0;
-                    Font = ThemeFonts.Ui(9.5F);
+                    Font = ThemeFonts.UiPx(9.5F);
                     TabStop = false;
                     Cursor = Cursors.Default;
                     AllowDrop = true;

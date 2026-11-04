@@ -67,7 +67,7 @@ namespace VantageLite.UI
             MinimizeBox = false;
             MaximizeBox = false;
             KeyPreview = true;
-            Font = ThemeFonts.Ui(9.5F);
+            Font = ThemeFonts.UiPx(9.5F);
 
             KeyDown += delegate(object sender, KeyEventArgs e)
             {
@@ -90,7 +90,7 @@ namespace VantageLite.UI
             _title = new Label();
             _title.Text = "本次下载";
             _title.AutoSize = true;
-            _title.Font = ThemeFonts.Ui(11F);
+            _title.Font = ThemeFonts.UiPx(11F);
             _title.SetBounds(S(14), S(12), S(200), S(22));
 
             _clearButton = new FlatButton();
@@ -100,7 +100,7 @@ namespace VantageLite.UI
             _clearButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             _clearButton.FlatStyle = FlatStyle.Flat;
             _clearButton.FlatAppearance.BorderSize = 0;
-            _clearButton.Font = ThemeFonts.Ui(9F);
+            _clearButton.Font = ThemeFonts.UiPx(9F);
             _clearButton.TabStop = false;
             _clearButton.Cursor = Cursors.Default;
             _clearButton.Click += delegate { _manager.ClearFinished(); };
@@ -134,7 +134,7 @@ namespace VantageLite.UI
             _viewAll.Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom;
             _viewAll.FlatStyle = FlatStyle.Flat;
             _viewAll.FlatAppearance.BorderSize = 0;
-            _viewAll.Font = ThemeFonts.Ui(9F);
+            _viewAll.Font = ThemeFonts.UiPx(9F);
             _viewAll.TabStop = false;
             _viewAll.Cursor = Cursors.Default;
             _viewAll.Click += delegate
@@ -447,13 +447,13 @@ namespace VantageLite.UI
             _name = new Label();
             _name.AutoSize = false;
             _name.AutoEllipsis = true;
-            _name.Font = ThemeFonts.Ui(9.5F);
+            _name.Font = ThemeFonts.UiPx(9.5F);
             _name.SetBounds(S(10), S(8), S(300), S(20));
 
             _status = new Label();
             _status.AutoSize = false;
             _status.AutoEllipsis = true;
-            _status.Font = ThemeFonts.Ui(8.5F);
+            _status.Font = ThemeFonts.UiPx(8.5F);
             _status.SetBounds(S(10), S(28), S(300), S(16));
 
             _progress = new ProgressLine();

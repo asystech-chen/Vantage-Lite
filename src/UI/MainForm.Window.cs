@@ -23,6 +23,7 @@ namespace VantageLite.UI
 
         private bool _restoreMaximized;
         private bool _hasSavedBounds;
+        private Timer _scaleSettleTimer;
 
         private bool _isFullscreen;
         private bool _fullscreenByVideo;
@@ -96,6 +97,14 @@ namespace VantageLite.UI
         protected override void OnHandleDestroyed(EventArgs e)
         {
             WindowChrome.ScaleChanged -= WindowChrome_ScaleChanged;
+
+            if (_scaleSettleTimer != null)
+            {
+                _scaleSettleTimer.Stop();
+                _scaleSettleTimer.Dispose();
+                _scaleSettleTimer = null;
+            }
+
             base.OnHandleDestroyed(e);
         }
 
@@ -106,8 +115,20 @@ namespace VantageLite.UI
                 return;
             }
 
-            // WebView2 的缩放事件可能发生在控件创建过程中，推迟到本轮消息结束后再重排。
-            BeginInvoke(new Action(ApplyScaleToControls));
+            // WebView2 新建时可能连续上报两次缩放，先去抖再重排，避免新标签页抖动。
+            if (_scaleSettleTimer == null)
+            {
+                _scaleSettleTimer = new Timer();
+                _scaleSettleTimer.Interval = 200;
+                _scaleSettleTimer.Tick += delegate
+                {
+                    _scaleSettleTimer.Stop();
+                    ApplyScaleToControls();
+                };
+            }
+
+            _scaleSettleTimer.Stop();
+            _scaleSettleTimer.Start();
         }
 
         /// <summary>

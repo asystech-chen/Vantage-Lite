@@ -109,6 +109,16 @@ namespace VantageLite.UI
                 return;
             }
 
+            // 新建 WebView2 时可能先报 1.0，再报到真实比例；
+            // 低于窗口 DPI 缩放的值一律忽略，避免新标签页导致界面先缩后放。
+            if (scale < _dpiScale - 0.01)
+            {
+                VantageLite.Diagnostics.Log.Debug(
+                    "ignore rasterization scale " + scale.ToString("0.###") +
+                    " < dpi scale " + _dpiScale.ToString("0.###"));
+                return;
+            }
+
             _hasRasterizationScale = true;
             ApplyScale(scale);
         }
@@ -119,6 +129,9 @@ namespace VantageLite.UI
             {
                 return;
             }
+
+            VantageLite.Diagnostics.Log.Info(
+                "ui scale: " + _scaleFactor.ToString("0.###") + " -> " + scale.ToString("0.###"));
 
             _scaleFactor = scale;
             GlobalDpi = (int)Math.Round(96.0 * scale);

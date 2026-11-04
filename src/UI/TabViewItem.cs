@@ -63,7 +63,9 @@ namespace VantageLite.UI
             };
 
             _indicator = new ClickThroughPanel();
-            _indicator.Dock = DockStyle.Top;
+            // 不用 Dock：停靠布局会把关闭按钮占用的宽度让出来，导致蓝条被“截断”在按钮前面。
+            // 显式铺满整个标签宽度，再靠 Z 序盖在按钮上方。
+            _indicator.Dock = DockStyle.None;
             _indicator.Height = 2;
 
             _closeButton = new FlatButton();
@@ -142,12 +144,7 @@ namespace VantageLite.UI
                 _audioButton.Width = WindowChrome.Scale(this, 20);
             }
 
-            if (_indicator != null)
-            {
-                _indicator.Height = WindowChrome.Scale(this, 2);
-                // 缩放重排会重新布局子控件，指示条必须重新提到最前。
-                _indicator.BringToFront();
-            }
+            LayoutIndicator();
 
             Invalidate();
         }
@@ -236,6 +233,21 @@ namespace VantageLite.UI
             Invalidate();
         }
 
+        /// <summary>
+        /// 指示条铺满标签顶部整个宽度，并保持最前；
+        /// 不能依赖 Dock.Top，否则会被关闭按钮的停靠区域裁掉。
+        /// </summary>
+        private void LayoutIndicator()
+        {
+            if (_indicator == null)
+            {
+                return;
+            }
+
+            _indicator.SetBounds(0, 0, Width, WindowChrome.Scale(this, 2));
+            _indicator.BringToFront();
+        }
+
         private void UpdateAudioButton()
         {
             if (_audioButton == null)
@@ -249,9 +261,9 @@ namespace VantageLite.UI
 
             if (!audible)
             {
-                if (visibilityChanged && _indicator != null)
+                if (visibilityChanged)
                 {
-                    _indicator.BringToFront();
+                    LayoutIndicator();
                 }
 
                 return;
@@ -271,9 +283,9 @@ namespace VantageLite.UI
             _audioButton.Left = Math.Max(0, Width - closeWidth - width);
             _audioButton.Top = 0;
 
-            if (visibilityChanged && _indicator != null)
+            if (visibilityChanged)
             {
-                _indicator.BringToFront();
+                LayoutIndicator();
             }
         }
 
@@ -326,6 +338,7 @@ namespace VantageLite.UI
 
             UpdateCloseVisibility();
             UpdateAudioButton();
+            LayoutIndicator();
             Invalidate();
         }
 
@@ -346,11 +359,8 @@ namespace VantageLite.UI
             {
                 _closeButton.Visible = visible;
 
-                // 控件显示/隐藏会重建句柄，指示条需要重新提到最前。
-                if (_indicator != null)
-                {
-                    _indicator.BringToFront();
-                }
+                // 控件显示/隐藏会重建句柄，指示条需要重新铺满并提到最前。
+                LayoutIndicator();
             }
         }
 

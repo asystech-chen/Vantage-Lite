@@ -20,6 +20,8 @@ namespace VantageLite.UI
             _store = store;
 
             Text = "书签管理器";
+            AutoScaleMode = AutoScaleMode.Dpi;
+            AutoScaleDimensions = new SizeF(96F, 96F);
             StartPosition = FormStartPosition.CenterParent;
             ClientSize = new Size(560, 520);
             MinimumSize = new Size(420, 360);

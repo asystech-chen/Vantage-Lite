@@ -43,10 +43,97 @@ namespace VantageLite.UI
         /// <summary>主窗口当前 DPI，供运行时创建的菜单/浮层换算尺寸。</summary>
         public static int GlobalDpi = 96;
 
-        /// <summary>按全局 DPI 换算像素值（无控件上下文时使用）。</summary>
+        private static double _scaleFactor = 1.0;
+        private static double _dpiScale = 1.0;
+        private static bool _hasRasterizationScale;
+
+        /// <summary>缩放系数变化时触发；宿主窗口据此重排所有控件。</summary>
+        public static event EventHandler ScaleChanged;
+
+        /// <summary>
+        /// 当前 UI 缩放系数。优先使用 WebView2 的 RasterizationScale（显示器 DPI × 文本缩放），
+        /// WebView2 尚未创建时退回窗口 DPI。
+        /// </summary>
+        public static double ScaleFactor
+        {
+            get { return _scaleFactor; }
+        }
+
+        /// <summary>WebView2 是否已经报告过 RasterizationScale。</summary>
+        public static bool HasRasterizationScale
+        {
+            get { return _hasRasterizationScale; }
+        }
+
+        /// <summary>
+        /// 记录窗口 DPI。WebView2 已报告缩放时以它为准，避免两套来源叠加。
+        /// </summary>
+        public static void SetDpiScale(int dpi)
+        {
+            SetDpiScale(dpi, false);
+        }
+
+        /// <summary>
+        /// preferDpi=true 时立即按窗口 DPI 重排，并等待 WebView2 重新上报缩放。
+        /// 跨显示器拖动时即使所有标签都已丢弃，界面也不会停在旧缩放上。
+        /// </summary>
+        public static void SetDpiScale(int dpi, bool preferDpi)
+        {
+            if (dpi <= 0)
+            {
+                return;
+            }
+
+            _dpiScale = dpi / 96.0;
+
+            if (preferDpi)
+            {
+                _hasRasterizationScale = false;
+            }
+
+            if (!_hasRasterizationScale)
+            {
+                GlobalDpi = dpi;
+                ApplyScale(_dpiScale);
+            }
+        }
+
+        /// <summary>
+        /// WebView2 报告的栅格化缩放 = 显示器 DPI 缩放 × 用户文本缩放。
+        /// 作为 UI 的唯一缩放来源，不再额外读取 Windows 的缩放设置。
+        /// </summary>
+        public static void ReportRasterizationScale(double scale)
+        {
+            if (scale <= 0.1 || scale > 8.0)
+            {
+                return;
+            }
+
+            _hasRasterizationScale = true;
+            ApplyScale(scale);
+        }
+
+        private static void ApplyScale(double scale)
+        {
+            if (Math.Abs(scale - _scaleFactor) < 0.001)
+            {
+                return;
+            }
+
+            _scaleFactor = scale;
+            GlobalDpi = (int)Math.Round(96.0 * scale);
+
+            EventHandler handler = ScaleChanged;
+            if (handler != null)
+            {
+                handler(null, EventArgs.Empty);
+            }
+        }
+
+        /// <summary>按当前缩放系数换算像素值（无控件上下文时使用）。</summary>
         public static int Scale(int value)
         {
-            return (int)Math.Round(value * GlobalDpi / 96.0);
+            return (int)Math.Round(value * _scaleFactor);
         }
 
         /// <summary>
@@ -137,18 +224,16 @@ namespace VantageLite.UI
             DwmExtendFrameIntoClientArea(form.Handle, ref margins);
         }
 
-        /// <summary>按当前 DPI 换算像素值。</summary>
+        /// <summary>按当前缩放系数换算像素值（与 WebView2 使用同一来源）。</summary>
         public static int Scale(Control control, int value)
         {
-            int dpi = control == null ? 96 : control.DeviceDpi;
-            return (int)Math.Round(value * dpi / 96.0);
+            return (int)Math.Round(value * _scaleFactor);
         }
 
-        /// <summary>缩放边框宽度：按当前 DPI 换算，保证高 DPI 下仍好抓。</summary>
+        /// <summary>缩放边框宽度：按当前缩放系数换算，保证高 DPI 下仍好抓。</summary>
         public static int GetResizeBorder(Control control)
         {
-            int dpi = control == null ? 96 : control.DeviceDpi;
-            int scaled = (int)Math.Round(ResizeBorder * dpi / 96.0);
+            int scaled = (int)Math.Round(ResizeBorder * _scaleFactor);
             return Math.Max(4, scaled);
         }
 

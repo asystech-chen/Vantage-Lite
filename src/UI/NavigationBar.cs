@@ -324,6 +324,13 @@ namespace VantageLite.UI
             Invalidate();
         }
 
+        /// <summary>缩放系数变化时由宿主调用。</summary>
+        public void RefreshMetrics()
+        {
+            ApplyMetrics();
+            ApplyTheme();
+        }
+
         /// <summary>
         /// 地址框垂直居中，高度按字体实测，避免高 DPI 下文字被上下裁切。
         /// </summary>

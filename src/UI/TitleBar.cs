@@ -85,6 +85,17 @@ namespace VantageLite.UI
             Invalidate();
         }
 
+        /// <summary>缩放系数变化时由宿主调用，重新计算标题栏与标签条尺寸。</summary>
+        public void RefreshMetrics()
+        {
+            ApplyMetrics();
+
+            if (_tabs != null)
+            {
+                _tabs.RefreshMetrics();
+            }
+        }
+
         /// <summary>标签条本体，MainForm 直接接线。</summary>
         public TabStrip Tabs
         {

@@ -150,6 +150,12 @@ namespace VantageLite.UI
             Invalidate();
         }
 
+        /// <summary>缩放系数变化时由标签条调用。</summary>
+        public void RefreshMetrics()
+        {
+            ApplyMetrics();
+        }
+
         public int TabId { get; private set; }
 
         /// <summary>

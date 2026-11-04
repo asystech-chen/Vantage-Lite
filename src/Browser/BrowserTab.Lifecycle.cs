@@ -321,6 +321,11 @@ namespace VantageLite.Browser
                 _overrideFavicon = null;
             }
 
+            if (disposing)
+            {
+                DetachRasterizationScale();
+            }
+
             if (disposing && _webView != null)
             {
                 Controls.Remove(_webView);
@@ -336,6 +341,7 @@ namespace VantageLite.Browser
         {
             if (_webView != null && _webView.IsDisposed)
             {
+                DetachRasterizationScale();
                 _webView = null;
                 _core = null;
                 _isSuspended = false;
@@ -354,6 +360,7 @@ namespace VantageLite.Browser
                 return;
             }
 
+            DetachRasterizationScale();
             _webView = null;
             _core = null;
             _isSuspended = false;

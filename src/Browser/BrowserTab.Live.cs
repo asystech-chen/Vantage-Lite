@@ -5,6 +5,7 @@ using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 using VantageLite.Diagnostics;
 using VantageLite.Theming;
+using VantageLite.UI;
 
 namespace VantageLite.Browser
 {
@@ -16,6 +17,7 @@ namespace VantageLite.Browser
     {
         private readonly object _liveGate = new object();
         private Task _liveTask;
+        private CoreWebView2Controller _controller;
 
         /// <summary>
         /// 确保 WebView2 已创建；并发调用共享同一个初始化任务。
@@ -41,6 +43,110 @@ namespace VantageLite.Browser
 
                 _liveTask = CreateLiveAsync();
                 return _liveTask;
+            }
+        }
+
+        /// <summary>
+        /// 订阅 WebView2 的栅格化缩放：它是显示器 DPI 与文本缩放的合成值，
+        /// 宿主界面与网页内容共用这一来源，不再额外叠加 Windows 设置。
+        /// </summary>
+        private void AttachRasterizationScale(WebView2 view)
+        {
+            try
+            {
+                // WinForms 包装控件不公开 Controller，只能从内部字段取；
+                // 取不到就不订阅，界面退回 DeviceDpi 缩放。
+                CoreWebView2Controller controller = FindController(view);
+                if (controller == null)
+                {
+                    Log.Warn("[tab " + _id + "] controller not found; ui scale falls back to dpi");
+                    return;
+                }
+
+                DetachRasterizationScale();
+                _controller = controller;
+                controller.RasterizationScaleChanged += Controller_RasterizationScaleChanged;
+                WindowChrome.ReportRasterizationScale(controller.RasterizationScale);
+                Log.Info("[tab " + _id + "] rasterization scale = " + controller.RasterizationScale.ToString("0.###"));
+            }
+            catch (Exception ex)
+            {
+                Log.Warn("[tab " + _id + "] rasterization scale unavailable: " + Log.Describe(ex));
+            }
+        }
+
+        private static CoreWebView2Controller FindController(WebView2 view)
+        {
+            if (view == null)
+            {
+                return null;
+            }
+
+            const System.Reflection.BindingFlags Flags =
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+
+            System.Reflection.FieldInfo field = typeof(WebView2).GetField("_coreWebView2Controller", Flags);
+
+            if (field != null)
+            {
+                CoreWebView2Controller controller = field.GetValue(view) as CoreWebView2Controller;
+                if (controller != null)
+                {
+                    return controller;
+                }
+            }
+
+            // 字段名随版本变化时按类型扫一遍，避免直接失效。
+            System.Reflection.FieldInfo[] fields = typeof(WebView2).GetFields(Flags);
+            for (int i = 0; i < fields.Length; i++)
+            {
+                if (typeof(CoreWebView2Controller).IsAssignableFrom(fields[i].FieldType))
+                {
+                    CoreWebView2Controller controller = fields[i].GetValue(view) as CoreWebView2Controller;
+                    if (controller != null)
+                    {
+                        return controller;
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        private void DetachRasterizationScale()
+        {
+            if (_controller == null)
+            {
+                return;
+            }
+
+            try
+            {
+                _controller.RasterizationScaleChanged -= Controller_RasterizationScaleChanged;
+            }
+            catch
+            {
+            }
+
+            _controller = null;
+        }
+
+        private void Controller_RasterizationScaleChanged(object sender, object e)
+        {
+            CoreWebView2Controller controller = sender as CoreWebView2Controller;
+
+            if (controller == null)
+            {
+                return;
+            }
+
+            try
+            {
+                WindowChrome.ReportRasterizationScale(controller.RasterizationScale);
+            }
+            catch (Exception ex)
+            {
+                Log.Warn("[tab " + _id + "] rasterization scale change failed: " + Log.Describe(ex));
             }
         }
 
@@ -86,6 +192,7 @@ namespace VantageLite.Browser
                 _webView = view;
                 _core = core;
                 ConfigureCore(core);
+                AttachRasterizationScale(view);
                 _isSuspended = false;
                 _isThrottled = false;
                 _statusBarSuppressed = false;

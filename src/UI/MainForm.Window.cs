@@ -22,6 +22,7 @@ namespace VantageLite.UI
         private const int HtCaption = 2;
 
         private bool _restoreMaximized;
+        private bool _hasSavedBounds;
 
         private bool _isFullscreen;
         private bool _fullscreenByVideo;
@@ -62,7 +63,17 @@ namespace VantageLite.UI
         {
             base.OnHandleCreated(e);
 
-            WindowChrome.GlobalDpi = DeviceDpi;
+            WindowChrome.ScaleChanged -= WindowChrome_ScaleChanged;
+            WindowChrome.ScaleChanged += WindowChrome_ScaleChanged;
+
+            WindowChrome.SetDpiScale(DeviceDpi);
+            ApplyScaleToControls();
+
+            if (!_hasSavedBounds)
+            {
+                ApplyDefaultBounds();
+            }
+
             ApplyChrome();
             ApplyTheme();
         }
@@ -71,7 +82,8 @@ namespace VantageLite.UI
         {
             base.OnDpiChanged(e);
 
-            WindowChrome.GlobalDpi = e.DeviceDpiNew;
+            WindowChrome.SetDpiScale(e.DeviceDpiNew, true);
+            ApplyScaleToControls();
             UpdateWindowChromeState();
 
             if (IsHandleCreated)
@@ -79,6 +91,77 @@ namespace VantageLite.UI
                 // 等布局按新 DPI 重排完再重算玻璃区域。
                 BeginInvoke(new Action(ApplyChrome));
             }
+        }
+
+        protected override void OnHandleDestroyed(EventArgs e)
+        {
+            WindowChrome.ScaleChanged -= WindowChrome_ScaleChanged;
+            base.OnHandleDestroyed(e);
+        }
+
+        private void WindowChrome_ScaleChanged(object sender, EventArgs e)
+        {
+            if (IsDisposed || !IsHandleCreated)
+            {
+                return;
+            }
+
+            // WebView2 的缩放事件可能发生在控件创建过程中，推迟到本轮消息结束后再重排。
+            BeginInvoke(new Action(ApplyScaleToControls));
+        }
+
+        /// <summary>
+        /// 缩放系数变化后重排主界面。各控件按 96 DPI 常量重新计算，重复调用是幂等的。
+        /// </summary>
+        private void ApplyScaleToControls()
+        {
+            if (!IsHandleCreated)
+            {
+                return;
+            }
+
+            MinimumSize = new Size(
+                WindowChrome.Scale(this, 800),
+                WindowChrome.Scale(this, 560));
+
+            if (_titleBar != null)
+            {
+                _titleBar.RefreshMetrics();
+            }
+
+            if (_navigationBar != null)
+            {
+                _navigationBar.RefreshMetrics();
+            }
+
+            if (_bookmarksBar != null)
+            {
+                _bookmarksBar.RefreshMetrics();
+            }
+
+            if (_privacyBanner != null)
+            {
+                _privacyBanner.Height = WindowChrome.Scale(this, 30);
+            }
+
+            if (_privacyExitButton != null)
+            {
+                _privacyExitButton.Width = WindowChrome.Scale(this, 100);
+            }
+
+            UpdateWindowChromeState();
+        }
+
+        private void ApplyDefaultBounds()
+        {
+            Rectangle area = Screen.FromHandle(Handle).WorkingArea;
+            int width = Math.Min(WindowChrome.Scale(this, 1200), area.Width);
+            int height = Math.Min(WindowChrome.Scale(this, 800), area.Height);
+
+            ClientSize = new Size(width, height);
+            Location = new Point(
+                area.Left + (area.Width - Width) / 2,
+                area.Top + (area.Height - Height) / 2);
         }
 
         /// <summary>
@@ -183,7 +266,9 @@ namespace VantageLite.UI
             {
                 _privacyExitButton.Width = WindowChrome.Scale(this, 100);
             }
-            VantageLite.Diagnostics.Log.Info("dpi=" + DeviceDpi + " titleBar=" + (_titleBar == null ? 0 : _titleBar.Height) +
+            VantageLite.Diagnostics.Log.Info("dpi=" + DeviceDpi + " scale=" + WindowChrome.ScaleFactor.ToString("0.###") +
+                " (webview=" + WindowChrome.HasRasterizationScale + ")" +
+                " titleBar=" + (_titleBar == null ? 0 : _titleBar.Height) +
                 " navBar=" + (_navigationBar == null ? 0 : _navigationBar.Height) +
                 " bookmarksBar=" + (_bookmarksBar == null ? 0 : _bookmarksBar.Height));
             WindowChrome.Apply(this, glassHeight, _settings != null && _settings.EnableMica);
@@ -317,6 +402,7 @@ namespace VantageLite.UI
                 data = null;
             }
 
+            _hasSavedBounds = data != null;
             StartPosition = FormStartPosition.Manual;
             Bounds = bounds;
             _restoreMaximized = data != null && data.Maximized;

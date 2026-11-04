@@ -175,6 +175,13 @@ namespace VantageLite.UI
             }
         }
 
+        /// <summary>缩放系数变化时由宿主调用。</summary>
+        public void RefreshMetrics()
+        {
+            ApplyMetrics();
+            Relayout();
+        }
+
         private void ApplyButtonMetrics(Button button)
         {
             if (button == null)

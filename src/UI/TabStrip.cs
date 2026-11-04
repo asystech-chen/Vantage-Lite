@@ -161,6 +161,19 @@ namespace VantageLite.UI
             Invalidate();
         }
 
+        /// <summary>缩放系数变化时由宿主调用，重新计算标签条与每个标签的尺寸。</summary>
+        public void RefreshMetrics()
+        {
+            ApplyMetrics();
+
+            foreach (TabViewItem item in _items.Values)
+            {
+                item.RefreshMetrics();
+            }
+
+            LayoutTabs(true);
+        }
+
         protected override void Dispose(bool disposing)
         {
             if (disposing)

@@ -145,6 +145,8 @@ namespace VantageLite.UI
             if (_indicator != null)
             {
                 _indicator.Height = WindowChrome.Scale(this, 2);
+                // 缩放重排会重新布局子控件，指示条必须重新提到最前。
+                _indicator.BringToFront();
             }
 
             Invalidate();
@@ -242,10 +244,16 @@ namespace VantageLite.UI
             }
 
             bool audible = _tab != null && (_tab.IsPlayingAudio || _tab.IsMuted);
+            bool visibilityChanged = _audioButton.Visible != audible;
             _audioButton.Visible = audible;
 
             if (!audible)
             {
+                if (visibilityChanged && _indicator != null)
+                {
+                    _indicator.BringToFront();
+                }
+
                 return;
             }
 
@@ -262,6 +270,11 @@ namespace VantageLite.UI
             _audioButton.Height = Height;
             _audioButton.Left = Math.Max(0, Width - closeWidth - width);
             _audioButton.Top = 0;
+
+            if (visibilityChanged && _indicator != null)
+            {
+                _indicator.BringToFront();
+            }
         }
 
         private void SetLoading(bool loading)
@@ -325,9 +338,20 @@ namespace VantageLite.UI
 
             // 宽标签一直显示；窄标签（溢出时）鼠标移上去才显示，避免常驻挤掉标题。
             bool over = ClientRectangle.Contains(PointToClient(Cursor.Position));
-            _closeButton.Visible =
+            bool visible =
                 (Width >= WindowChrome.Scale(this, 88) || over) &&
                 _fadeLeft + _fadeRight < Width - WindowChrome.Scale(this, 24);
+
+            if (_closeButton.Visible != visible)
+            {
+                _closeButton.Visible = visible;
+
+                // 控件显示/隐藏会重建句柄，指示条需要重新提到最前。
+                if (_indicator != null)
+                {
+                    _indicator.BringToFront();
+                }
+            }
         }
 
         protected override void OnPaint(PaintEventArgs e)

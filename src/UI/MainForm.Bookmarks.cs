@@ -673,6 +673,10 @@ namespace VantageLite.UI
                 {
                     ReopenClosedTab();
                 }
+                else if (string.Equals(command.Name, "fullscreen", StringComparison.OrdinalIgnoreCase))
+                {
+                    ToggleFullscreen();
+                }
 
                 return;
             }

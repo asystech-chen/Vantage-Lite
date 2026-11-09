@@ -28,6 +28,13 @@ namespace VantageLite.Browser
     if (document.head) { add(); } else { document.addEventListener('DOMContentLoaded', add); }
   })();
   document.addEventListener('keydown', function(e){
+    // WebView2 页面内收不到 WinForms 的消息过滤器，F11 也在这里转发。
+    if (e.key === 'F11' && !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey) {
+      e.preventDefault();
+      e.stopPropagation();
+      try { window.chrome.webview.postMessage(JSON.stringify({ cmd: 'shortcut', name: 'fullscreen' })); } catch (err) { }
+      return;
+    }
     if (!e.ctrlKey || e.metaKey) { return; }
     var key = (e.key || '').toLowerCase();
     var name = null;

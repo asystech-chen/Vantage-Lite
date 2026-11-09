@@ -36,6 +36,9 @@ namespace VantageLite.UI
         private const int DwmsbtNone = 1;
         private const int DwmsbtMainWindow = 2;
         private const int DwmwcpRound = 2;
+        private const int DwmwcpDoNotRound = 1;
+        private const int DwmwaBorderColor = 34;
+        private const int DwmColorNone = unchecked((int)0xFFFFFFFE);
 
         /// <summary>Mica 是否已成功启用；失败时退回主题纯色。</summary>
         public static bool MicaEnabled { get; private set; }
@@ -173,8 +176,8 @@ namespace VantageLite.UI
             if (build >= 22000)
             {
                 // 去掉 DWM 自带的窗口边框（未激活时会明显显示出来）。
-                int noBorder = unchecked((int)0xFFFFFFFE);
-                DwmSetWindowAttribute(form.Handle, 34, ref noBorder, sizeof(int));
+                int noBorder = DwmColorNone;
+                DwmSetWindowAttribute(form.Handle, DwmwaBorderColor, ref noBorder, sizeof(int));
 
                 // 圆角与 Mica 独立：即使不开材质也尽量贴合 Win11 窗口风格。
                 int corners = DwmwcpRound;
@@ -235,6 +238,29 @@ namespace VantageLite.UI
 
             MARGINS margins = new MARGINS();
             DwmExtendFrameIntoClientArea(form.Handle, ref margins);
+        }
+
+        /// <summary>
+        /// 全屏时去掉 DWM 圆角与边框：窗口铺满屏幕后，圆角会把四角切掉，
+        /// 露出桌面并形成一圈 1-2px 的亮边。退出时恢复圆角。
+        /// </summary>
+        public static void SetFullscreenFrame(Form form, bool fullscreen)
+        {
+            if (form == null || !form.IsHandleCreated)
+            {
+                return;
+            }
+
+            if (Environment.OSVersion.Version.Build < 22000)
+            {
+                return;
+            }
+
+            int corners = fullscreen ? DwmwcpDoNotRound : DwmwcpRound;
+            DwmSetWindowAttribute(form.Handle, DwmWindowCornerPreference, ref corners, sizeof(int));
+
+            int noBorder = DwmColorNone;
+            DwmSetWindowAttribute(form.Handle, DwmwaBorderColor, ref noBorder, sizeof(int));
         }
 
         /// <summary>按当前缩放系数换算像素值（与 WebView2 使用同一来源）。</summary>

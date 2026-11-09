@@ -3,6 +3,7 @@ using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
 using VantageLite.App;
+using VantageLite.Browser;
 using VantageLite.Storage;
 
 namespace VantageLite.UI
@@ -232,12 +233,21 @@ namespace VantageLite.UI
         {
             if (_isFullscreen)
             {
+                if (_fullscreenByVideo)
+                {
+                    // 页面视频全屏：先让页面退出全屏，否则窗口恢复后视频仍铺满窗口。
+                    BrowserTab tab = ActiveTab;
+                    if (tab != null && tab.IsLive)
+                    {
+                        tab.ExecuteScript("if(document.fullscreenElement){document.exitFullscreen();}");
+                    }
+                }
+
                 ExitFullscreen();
+                return;
             }
-            else
-            {
-                EnterFullscreen(false);
-            }
+
+            EnterFullscreen(false);
         }
 
         private void EnterFullscreen(bool byVideo)
@@ -250,7 +260,9 @@ namespace VantageLite.UI
             _isFullscreen = true;
             _fullscreenByVideo = byVideo;
             _fullscreenPrevState = WindowState;
-            _fullscreenPrevBounds = Bounds;
+            // 最大化时 Bounds 是最大化矩形，真正的还原尺寸在 RestoreBounds 里；
+            // 存错会导致退出全屏后窗口停在“介于最大化与还原之间”的状态。
+            _fullscreenPrevBounds = WindowState == FormWindowState.Normal ? Bounds : RestoreBounds;
             _fullscreenPrevPadding = Padding;
             _fullscreenPrevTopMost = TopMost;
 
@@ -260,9 +272,15 @@ namespace VantageLite.UI
             _privacyBanner.Visible = false;
             Padding = new Padding(0);
 
-            WindowState = FormWindowState.Normal;
+            if (WindowState != FormWindowState.Normal)
+            {
+                WindowState = FormWindowState.Normal;
+            }
+
             Bounds = Screen.FromControl(this).Bounds;
             TopMost = true;
+            WindowChrome.SetFullscreenFrame(this, true);
+            UpdateWindowChromeState();
         }
 
         private void ExitFullscreen()
@@ -282,8 +300,28 @@ namespace VantageLite.UI
             _privacyBanner.Visible = _privacyMode;
             Padding = _fullscreenPrevPadding;
 
-            Bounds = _fullscreenPrevBounds;
-            WindowState = _fullscreenPrevState;
+            Rectangle restore = _fullscreenPrevBounds;
+            if (restore.Width <= 0 || restore.Height <= 0)
+            {
+                restore = RestoreBounds;
+            }
+
+            if (_fullscreenPrevState == FormWindowState.Maximized)
+            {
+                // 先退回还原尺寸再最大化：直接设最大化时尺寸没有实际变化，
+                // 既不触发 Resize（标题栏按钮字形停住），也会保留全屏尺寸。
+                Bounds = restore;
+                WindowState = FormWindowState.Maximized;
+            }
+            else
+            {
+                WindowState = FormWindowState.Normal;
+                Bounds = restore;
+            }
+
+            // 显式刷新内边距与最大化按钮字形，不依赖 WM_SIZE。
+            WindowChrome.SetFullscreenFrame(this, false);
+            UpdateWindowChromeState();
         }
 
         private void TabManager_FullScreenChanged(object sender, bool full)
@@ -411,14 +449,14 @@ namespace VantageLite.UI
             }
 
             bool maximized = WindowState == FormWindowState.Maximized;
-            int border = maximized ? 0 : WindowChrome.GetResizeBorder(this);
+            int border = maximized || _isFullscreen ? 0 : WindowChrome.GetResizeBorder(this);
 
             if (Padding.Top != 0 || Padding.Left != border)
             {
                 Padding = new Padding(border, 0, border, border);
             }
 
-            if (!maximized && IsHandleCreated)
+            if (!maximized && !_isFullscreen && IsHandleCreated)
             {
                 // 记住当前显示器的工作区，最大化时不会盖住任务栏。
                 MaximizedBounds = Screen.FromHandle(Handle).WorkingArea;

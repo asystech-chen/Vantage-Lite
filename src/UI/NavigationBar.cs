@@ -21,6 +21,8 @@ namespace VantageLite.UI
         public event EventHandler DownloadsRequested;
         public event EventHandler MenuRequested;
         public event EventHandler ReopenClosedTabRequested;
+        public event EventHandler ZoomResetRequested;
+        public event EventHandler<int> ZoomStepRequested;
 
         private readonly ToolTip _toolTip;
         private GlyphButton _backButton;
@@ -34,6 +36,12 @@ namespace VantageLite.UI
         private Panel _addressHost;
         private TextBox _addressBox;
         private Label _securityIcon;
+        private Label _zoomLabel;
+        private Label _zoomOutButton;
+        private Label _zoomInButton;
+        private bool _showZoomControls;
+        private double _zoomFactor = 1.0;
+        private double _defaultZoomFactor = 1.0;
         private string _currentUrl;
         private bool _settingAddress;
         private bool _addressEdited;
@@ -87,6 +95,24 @@ namespace VantageLite.UI
             if (_securityIcon != null)
             {
                 _securityIcon.BackColor = palette.AddressBackground;
+            }
+
+            if (_zoomLabel != null)
+            {
+                _zoomLabel.BackColor = palette.AddressBackground;
+                _zoomLabel.ForeColor = palette.TextSecondary;
+            }
+
+            if (_zoomOutButton != null)
+            {
+                _zoomOutButton.BackColor = palette.AddressBackground;
+                _zoomOutButton.ForeColor = palette.TextSecondary;
+            }
+
+            if (_zoomInButton != null)
+            {
+                _zoomInButton.BackColor = palette.AddressBackground;
+                _zoomInButton.ForeColor = palette.TextSecondary;
             }
 
             UpdateSecurityIcon();
@@ -258,6 +284,48 @@ namespace VantageLite.UI
             _securityIcon.Visible = false;
             _securityIcon.Cursor = Cursors.Default;
             _addressHost.Controls.Add(_securityIcon);
+
+            _zoomLabel = new Label();
+            _zoomLabel.AutoSize = false;
+            _zoomLabel.TextAlign = ContentAlignment.MiddleCenter;
+            _zoomLabel.Font = ThemeFonts.UiPx(8.5F);
+            _zoomLabel.Cursor = Cursors.Hand;
+            _zoomLabel.Visible = false;
+            _zoomLabel.Click += delegate { Raise(ZoomResetRequested); };
+            _zoomLabel.MouseEnter += delegate { SetZoomHover(_zoomLabel, true); };
+            _zoomLabel.MouseLeave += delegate { SetZoomHover(_zoomLabel, false); };
+            _toolTip.SetToolTip(_zoomLabel, "当前页面缩放；点击恢复默认比例");
+            _addressHost.Controls.Add(_zoomLabel);
+
+            _zoomOutButton = new Label();
+            _zoomOutButton.AutoSize = false;
+            _zoomOutButton.Text = "\u2212";
+            _zoomOutButton.TextAlign = ContentAlignment.MiddleCenter;
+            _zoomOutButton.Font = ThemeFonts.UiPx(11F);
+            _zoomOutButton.Cursor = Cursors.Hand;
+            _zoomOutButton.Visible = false;
+            _zoomOutButton.Click += delegate { RaiseZoomStep(-1); };
+            _zoomOutButton.MouseEnter += delegate { SetZoomHover(_zoomOutButton, true); };
+            _zoomOutButton.MouseLeave += delegate { SetZoomHover(_zoomOutButton, false); };
+            _toolTip.SetToolTip(_zoomOutButton, "缩小");
+            _addressHost.Controls.Add(_zoomOutButton);
+
+            _zoomInButton = new Label();
+            _zoomInButton.AutoSize = false;
+            _zoomInButton.Text = "+";
+            _zoomInButton.TextAlign = ContentAlignment.MiddleCenter;
+            _zoomInButton.Font = ThemeFonts.UiPx(11F);
+            _zoomInButton.Cursor = Cursors.Hand;
+            _zoomInButton.Visible = false;
+            _zoomInButton.Click += delegate { RaiseZoomStep(1); };
+            _zoomInButton.MouseEnter += delegate { SetZoomHover(_zoomInButton, true); };
+            _zoomInButton.MouseLeave += delegate { SetZoomHover(_zoomInButton, false); };
+            _toolTip.SetToolTip(_zoomInButton, "放大");
+            _addressHost.Controls.Add(_zoomInButton);
+
+            _zoomLabel.BringToFront();
+            _zoomOutButton.BringToFront();
+            _zoomInButton.BringToFront();
             _addressHost.Resize += delegate
             {
                 LayoutAddressBox();
@@ -377,6 +445,7 @@ namespace VantageLite.UI
             }
 
             int left = _addressHost.Padding.Left;
+            int right = _addressHost.Padding.Right;
             int top = _addressHost.Padding.Top;
             int available = Math.Max(1, _addressHost.ClientSize.Height - top - _addressHost.Padding.Bottom);
             int textHeight = TextRenderer.MeasureText("国Ag", _addressBox.Font).Height;
@@ -390,8 +459,104 @@ namespace VantageLite.UI
                 left += iconWidth + WindowChrome.Scale(this, 4);
             }
 
-            int width = Math.Max(0, _addressHost.ClientSize.Width - left - _addressHost.Padding.Right);
+            // 缩放控件（− 比例 +）放在地址框右侧；未开启控件时只在非默认比例显示百分比。
+            int zoomButton = WindowChrome.Scale(this, 18);
+            int zoomText = TextRenderer.MeasureText("1000%", _zoomLabel.Font).Width + WindowChrome.Scale(this, 6);
+            int zoomWidth = 0;
+
+            if (_showZoomControls)
+            {
+                zoomWidth = zoomButton * 2 + zoomText + WindowChrome.Scale(this, 4);
+            }
+            else if (_zoomLabel.Visible)
+            {
+                zoomWidth = zoomText;
+            }
+
+            if (zoomWidth > 0)
+            {
+                right += zoomWidth + WindowChrome.Scale(this, 4);
+            }
+
+            int width = Math.Max(0, _addressHost.ClientSize.Width - left - right);
             _addressBox.SetBounds(left, y, width, boxHeight);
+
+            if (zoomWidth > 0)
+            {
+                int zoomX = _addressHost.ClientSize.Width - _addressHost.Padding.Right - zoomWidth;
+
+                if (_showZoomControls)
+                {
+                    _zoomOutButton.SetBounds(zoomX, y, zoomButton, boxHeight);
+                    _zoomLabel.SetBounds(zoomX + zoomButton, y, zoomText, boxHeight);
+                    _zoomInButton.SetBounds(zoomX + zoomButton + zoomText, y, zoomButton, boxHeight);
+                }
+                else
+                {
+                    _zoomLabel.SetBounds(zoomX, y, zoomText, boxHeight);
+                }
+            }
+        }
+
+        private void RaiseZoomStep(int direction)
+        {
+            EventHandler<int> handler = ZoomStepRequested;
+            if (handler != null)
+            {
+                handler(this, direction);
+            }
+        }
+
+        private void SetZoomHover(Label label, bool hover)
+        {
+            if (label == null)
+            {
+                return;
+            }
+
+            ThemePalette palette = ThemeManager.Current;
+            label.BackColor = hover ? palette.ButtonHover : palette.AddressBackground;
+            label.ForeColor = hover ? palette.TextPrimary : palette.TextSecondary;
+        }
+
+        /// <summary>
+        /// 设置缩放控件的展示方式：showControls=true 时始终显示 −/比例/+；
+        /// false 时仅在当前比例与默认比例不同时显示百分比。
+        /// </summary>
+        public void SetZoomMode(bool showControls, double defaultFactor)
+        {
+            _showZoomControls = showControls;
+            _defaultZoomFactor = defaultFactor > 0 ? defaultFactor : 1.0;
+            ApplyZoomVisibility();
+        }
+
+        /// <summary>
+        /// 显示当前页面缩放比例。由宿主在缩放或切换标签时调用。
+        /// </summary>
+        public void SetZoom(double factor)
+        {
+            if (_zoomLabel == null)
+            {
+                return;
+            }
+
+            _zoomFactor = factor;
+            ApplyZoomVisibility();
+        }
+
+        private void ApplyZoomVisibility()
+        {
+            if (_zoomLabel == null)
+            {
+                return;
+            }
+
+            _zoomLabel.Text = ((int)Math.Round(_zoomFactor * 100)) + "%";
+            _zoomLabel.Visible = _showZoomControls || Math.Abs(_zoomFactor - _defaultZoomFactor) > 0.001;
+            _zoomOutButton.Visible = _showZoomControls;
+            _zoomInButton.Visible = _showZoomControls;
+            LayoutAddressBox();
+            _addressHost.Invalidate();
         }
 
         /// <summary>

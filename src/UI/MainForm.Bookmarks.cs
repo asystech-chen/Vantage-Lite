@@ -842,6 +842,9 @@ namespace VantageLite.UI
 
         private void ApplySettings(BookmarkCommand command)
         {
+            bool zoomChanged = false;
+            bool zoomModeChanged = false;
+
             _settings.HomeUrl = string.IsNullOrWhiteSpace(command.Home)
                 ? AppSettings.DefaultHomeUrl
                 : command.Home.Trim();
@@ -894,6 +897,24 @@ namespace VantageLite.UI
             if (command.PinnedTabs.HasValue)
             {
                 _settings.PinnedTabs = command.PinnedTabs.Value;
+            }
+
+            if (command.DefaultZoom.HasValue)
+            {
+                int zoom = Math.Max(25, Math.Min(500, command.DefaultZoom.Value));
+
+                if (zoom != _settings.DefaultZoomPercent)
+                {
+                    _settings.DefaultZoomPercent = zoom;
+                    zoomChanged = true;
+                }
+            }
+
+            if (command.ShowZoomControls.HasValue &&
+                command.ShowZoomControls.Value != _settings.ShowZoomControls)
+            {
+                _settings.ShowZoomControls = command.ShowZoomControls.Value;
+                zoomModeChanged = true;
             }
 
             if (!string.IsNullOrWhiteSpace(command.ThemeMode))
@@ -998,6 +1019,12 @@ namespace VantageLite.UI
             }
 
             ApplyTabMouseSettings();
+
+            if (zoomChanged || zoomModeChanged)
+            {
+                ApplyDefaultZoom();
+                ApplyZoomMode();
+            }
             VantageLite.Theming.ThemeManager.SetMode(_settings.ThemeMode);
             SyncSearchEngineToPages(_settings.SearchEngine);
             RefreshNewTabPages();

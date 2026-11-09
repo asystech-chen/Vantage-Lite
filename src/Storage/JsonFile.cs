@@ -37,6 +37,7 @@ namespace VantageLite.Storage
         public const string DefaultThemeMode = "system";
         public const string DefaultHomeMode = "asys";
         public const bool DefaultRestoreSession = false;
+        public const int DefaultZoomPercentValue = 100;
 
         [DataMember(Name = "home", Order = 0)]
         public string HomeUrl { get; set; }
@@ -95,6 +96,12 @@ namespace VantageLite.Storage
         [DataMember(Name = "pinnedTabs", Order = 19)]
         public bool PinnedTabs { get; set; }
 
+        [DataMember(Name = "defaultZoom", Order = 20)]
+        public int DefaultZoomPercent { get; set; }
+
+        [DataMember(Name = "showZoomControls", Order = 21)]
+        public bool ShowZoomControls { get; set; }
+
         [OnDeserializing]
         private void OnDeserializing(StreamingContext context)
         {
@@ -114,6 +121,8 @@ namespace VantageLite.Storage
             TabDoubleClickClose = true;
             TabMiddleClickClose = true;
             PinnedTabs = true;
+            DefaultZoomPercent = DefaultZoomPercentValue;
+            ShowZoomControls = false;
             // HomeMode 故意不填：旧配置由 MainForm 按 HomeUrl 推断。
         }
 
@@ -139,7 +148,9 @@ namespace VantageLite.Storage
                 EnableMica = false,
                 TabDoubleClickClose = true,
                 TabMiddleClickClose = true,
-                PinnedTabs = true
+                PinnedTabs = true,
+                DefaultZoomPercent = DefaultZoomPercentValue,
+                ShowZoomControls = false
             };
         }
     }

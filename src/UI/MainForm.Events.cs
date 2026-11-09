@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.Web.WebView2.Core;
 using VantageLite.Browser;
@@ -14,6 +15,8 @@ namespace VantageLite.UI
     {
         private void TabManager_TabsChanged(object sender, EventArgs e)
         {
+            MarkSessionDirty(sender);
+
             if (!ReferenceEquals(sender, _tabManager))
             {
                 return;
@@ -27,6 +30,8 @@ namespace VantageLite.UI
 
         private void TabManager_ActiveTabChanged(object sender, EventArgs e)
         {
+            MarkSessionDirty(sender);
+
             if (!ReferenceEquals(sender, _tabManager))
             {
                 return;
@@ -35,6 +40,7 @@ namespace VantageLite.UI
             AttachActiveTab();
             UpdateFromActiveTab();
             ApplyInternalPageTheme(ActiveTab);
+            UpdateZoomIndicator(ActiveTab);
 
             BrowserTab active = ActiveTab;
 
@@ -50,9 +56,130 @@ namespace VantageLite.UI
             ActivateTabById(id);
         }
 
+        private void TabManager_ZoomFactorChanged(object sender, double factor)
+        {
+            BrowserTab tab = sender as BrowserTab;
+
+            if (tab == null || !ReferenceEquals(tab, ActiveTab))
+            {
+                return;
+            }
+
+            UpdateZoomIndicator(tab);
+        }
+
+        private void UpdateZoomIndicator(BrowserTab tab)
+        {
+            if (_navigationBar != null)
+            {
+                _navigationBar.SetZoom(tab == null ? 1.0 : tab.ZoomFactor);
+            }
+        }
+
+        private static readonly double[] ZoomSteps =
+        {
+            0.25, 0.33, 0.5, 0.67, 0.75, 0.8, 0.9, 1.0,
+            1.1, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0, 4.0, 5.0
+        };
+
+        private async void StepActiveTabZoom(int direction)
+        {
+            BrowserTab tab = ActiveTab;
+
+            if (tab == null || direction == 0)
+            {
+                return;
+            }
+
+            double current = tab.ZoomFactor;
+            int nearest = 0;
+
+            for (int i = 1; i < ZoomSteps.Length; i++)
+            {
+                if (Math.Abs(ZoomSteps[i] - current) < Math.Abs(ZoomSteps[nearest] - current))
+                {
+                    nearest = i;
+                }
+            }
+
+            int target = Math.Max(0, Math.Min(ZoomSteps.Length - 1, nearest + (direction > 0 ? 1 : -1)));
+            double factor = ZoomSteps[target];
+
+            tab.SetZoomFactor(factor);
+            _navigationBar.SetZoom(factor);
+
+            await Task.Delay(150);
+
+            if (!IsDisposed && ReferenceEquals(tab, ActiveTab))
+            {
+                UpdateZoomIndicator(tab);
+            }
+        }
+
+        private async void ResetActiveTabZoom()
+        {
+            BrowserTab tab = ActiveTab;
+
+            if (tab == null)
+            {
+                return;
+            }
+
+            double target = _settings == null
+                ? 1.0
+                : _settings.DefaultZoomPercent / 100.0;
+
+            tab.SetZoomFactor(target);
+
+            // 不依赖事件：先直接把指示器归零，随后再按内核真实值校正一次。
+            _navigationBar.SetZoom(target);
+
+            await Task.Delay(150);
+
+            if (!IsDisposed && ReferenceEquals(tab, ActiveTab))
+            {
+                UpdateZoomIndicator(tab);
+            }
+        }
+
         private void TabStrip_TabCloseRequested(object sender, int id)
         {
             CloseTabById(id);
+        }
+
+        private void ApplyDefaultZoom()
+        {
+            if (_settings == null)
+            {
+                return;
+            }
+
+            double factor = _settings.DefaultZoomPercent / 100.0;
+
+            if (_normalTabManager != null)
+            {
+                _normalTabManager.SetDefaultZoomFactor(factor);
+            }
+
+            if (_privateTabManager != null)
+            {
+                _privateTabManager.SetDefaultZoomFactor(factor);
+            }
+
+            UpdateZoomIndicator(ActiveTab);
+        }
+
+        private void ApplyZoomMode()
+        {
+            if (_navigationBar == null || _settings == null)
+            {
+                return;
+            }
+
+            _navigationBar.SetZoomMode(
+                _settings.ShowZoomControls,
+                _settings.DefaultZoomPercent / 100.0);
+            UpdateZoomIndicator(ActiveTab);
         }
 
         private void ApplyTabMouseSettings()
@@ -380,6 +507,8 @@ namespace VantageLite.UI
 
         private void TabManager_Navigated(object sender, NavigatedEventArgs e)
         {
+            MarkSessionDirty(sender);
+
             if (!ReferenceEquals(sender, _tabManager))
             {
                 return;

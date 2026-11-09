@@ -20,6 +20,7 @@ namespace VantageLite.Browser
         private int _maxLiveTabs;
         private int _suspendAfterSeconds;
         private int _discardAfterMinutes;
+        private double _defaultZoomFactor = 1.0;
         private readonly List<BrowserTab> _tabs;
         private readonly Timer _maintenanceTimer;
 
@@ -37,6 +38,7 @@ namespace VantageLite.Browser
         public event EventHandler LastTabClosed;
         public event EventHandler<CoreWebView2DownloadStartingEventArgs> DownloadStarting;
         public event EventHandler<bool> FullScreenChanged;
+        public event EventHandler<double> ZoomFactorChanged;
 
         public TabManager(
             Control host,
@@ -112,6 +114,32 @@ namespace VantageLite.Browser
         }
 
         /// <summary>
+        /// 全局默认缩放：立即应用到现有标签，新/恢复的标签创建时继承。
+        /// </summary>
+        public void SetDefaultZoomFactor(double factor)
+        {
+            double clamped = factor < 0.25 ? 0.25 : (factor > 5.0 ? 5.0 : factor);
+
+            if (Math.Abs(_defaultZoomFactor - clamped) < 0.001)
+            {
+                return;
+            }
+
+            _defaultZoomFactor = clamped;
+
+            for (int i = 0; i < _tabs.Count; i++)
+            {
+                BrowserTab tab = _tabs[i];
+                tab.DefaultZoomFactor = _defaultZoomFactor;
+
+                if (tab.IsLive)
+                {
+                    tab.SetZoomFactor(_defaultZoomFactor);
+                }
+            }
+        }
+
+        /// <summary>
         /// 任取一个存活标签的 Profile；全部挂起/丢弃时返回 null。
         /// </summary>
         public CoreWebView2Profile GetProfile()
@@ -136,6 +164,7 @@ namespace VantageLite.Browser
         public async Task<BrowserTab> CreateTabAsync(string url, string internalAddress, string internalHtml)
         {
             BrowserTab tab = new BrowserTab(_nextId++, _environment, _enableDevTools, url, internalAddress, internalHtml, _privateMode);
+            tab.DefaultZoomFactor = _defaultZoomFactor;
             tab.InternalHtmlProvider = InternalHtmlProvider;
             WireTab(tab);
             _tabs.Add(tab);
@@ -207,6 +236,7 @@ namespace VantageLite.Browser
         public BrowserTab AddPlaceholderTab(string url, string internalAddress, string title)
         {
             BrowserTab tab = new BrowserTab(_nextId++, _environment, _enableDevTools, url, internalAddress, null, _privateMode);
+            tab.DefaultZoomFactor = _defaultZoomFactor;
             tab.InternalHtmlProvider = InternalHtmlProvider;
 
             if (!string.IsNullOrWhiteSpace(title))
@@ -230,6 +260,7 @@ namespace VantageLite.Browser
             tab.WebMessage += TabWebMessage;
             tab.DownloadStarting += TabDownloadStarting;
             tab.FullScreenChanged += TabFullScreenChanged;
+            tab.ZoomFactorChanged += TabZoomFactorChanged;
         }
 
         private void TabFullScreenChanged(object sender, bool full)
@@ -238,6 +269,16 @@ namespace VantageLite.Browser
             if (handler != null)
             {
                 handler(this, full);
+            }
+        }
+
+        private void TabZoomFactorChanged(object sender, double factor)
+        {
+            EventHandler<double> handler = ZoomFactorChanged;
+            if (handler != null)
+            {
+                // 转发时保留标签作为 sender，宿主可以过滤掉非活动标签的缩放变化。
+                handler(sender, factor);
             }
         }
 

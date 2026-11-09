@@ -20,6 +20,7 @@ namespace VantageLite.UI
     public sealed partial class MainForm : Form, IMessageFilter
     {
         private const string DefaultHomeUrl = "https://asystech.cn/start/index.html";
+        private const int SessionSnapshotSeconds = 15;
 
         private readonly CommandLineOptions _options;
 
@@ -55,6 +56,8 @@ namespace VantageLite.UI
         private Timer _resizeSettleTimer;
         private Timer _faviconRefreshTimer;
         private Timer _privacyReclaimTimer;
+        private Timer _sessionSnapshotTimer;
+        private bool _sessionDirty;
         private string _faviconRefreshAddress;
         private int _faviconRefreshVersion;
 
@@ -119,6 +122,11 @@ namespace VantageLite.UI
                 _settings.RestoreSession = false;
             }
 
+            if (_settings.DefaultZoomPercent < 25 || _settings.DefaultZoomPercent > 500)
+            {
+                _settings.DefaultZoomPercent = AppSettings.DefaultZoomPercentValue;
+            }
+
             if (string.IsNullOrWhiteSpace(_settings.ThemeMode))
             {
                 _settings.ThemeMode = AppSettings.DefaultThemeMode;
@@ -160,6 +168,12 @@ namespace VantageLite.UI
             _privacyReclaimTimer = new Timer();
             _privacyReclaimTimer.Interval = 5 * 60 * 1000;
             _privacyReclaimTimer.Tick += PrivacyReclaimTimer_Tick;
+
+            // 定时快照：崩溃/强杀时也能恢复到最近一次记录，不依赖正常关闭。
+            _sessionSnapshotTimer = new Timer();
+            _sessionSnapshotTimer.Interval = SessionSnapshotSeconds * 1000;
+            _sessionSnapshotTimer.Tick += SessionSnapshotTimer_Tick;
+            _sessionSnapshotTimer.Start();
 
             Application.AddMessageFilter(this);
 
@@ -219,6 +233,8 @@ namespace VantageLite.UI
                 WireTabManager(_normalTabManager);
                 _normalTabManager.InternalHtmlProvider = BuildInternalPageHtml;
                 _normalTabManager.SetDownloadDirectory(_settings.DownloadDirectory);
+                _normalTabManager.SetDefaultZoomFactor(_settings.DefaultZoomPercent / 100.0);
+                ApplyZoomMode();
 
                 _tabStrip.TabSelected += TabStrip_TabSelected;
                 _tabStrip.TabCloseRequested += TabStrip_TabCloseRequested;
@@ -239,7 +255,13 @@ namespace VantageLite.UI
 
                 if (session != null && session.Tabs != null && session.Tabs.Count > 0)
                 {
-                    await RestoreSessionAsync(session);
+                    int restoredCount = await RestoreSessionAsync(session);
+
+                    if (session.Clean == false && restoredCount > 0)
+                    {
+                        int count = restoredCount;
+                        BeginInvoke(new Action(delegate { ShowSessionRestoredNotice(count); }));
+                    }
                 }
                 else
                 {
@@ -282,7 +304,7 @@ namespace VantageLite.UI
         /// <summary>
         /// 恢复上次会话：先全部以丢弃态占位，只拉起活动标签的 WebView2。
         /// </summary>
-        private async Task RestoreSessionAsync(SessionData session)
+        private async Task<int> RestoreSessionAsync(SessionData session)
         {
             List<BrowserTab> restored = new List<BrowserTab>();
 
@@ -314,7 +336,7 @@ namespace VantageLite.UI
             if (restored.Count == 0)
             {
                 await OpenInitialTabAsync();
-                return;
+                return 0;
             }
 
             int activeIndex = Math.Max(0, Math.Min(session.ActiveIndex, restored.Count - 1));
@@ -335,12 +357,61 @@ namespace VantageLite.UI
             {
                 await OpenInitialTabAsync();
             }
+
+            return restored.Count;
         }
 
         /// <summary>
-        /// 保存当前会话；开启关闭时清空或未启用会话恢复时删除会话文件。
+        /// 上次是崩溃/强杀后的恢复提示；只在确实用到快照时显示一次。
         /// </summary>
-        private void SaveSession()
+        private void ShowSessionRestoredNotice(int count)
+        {
+            try
+            {
+                MessageDialog.Show(
+                    this,
+                    "上次未正常退出，已恢复 " + count + " 个标签页。",
+                    "Vantage Lite",
+                    MessageBoxButtons.OK);
+            }
+            catch (Exception ex)
+            {
+                Log.Warn("会话恢复提示失败：" + Log.Describe(ex));
+            }
+        }
+
+        private void SessionSnapshotTimer_Tick(object sender, EventArgs e)
+        {
+            if (!_sessionDirty)
+            {
+                return;
+            }
+
+            _sessionDirty = false;
+
+            if (_settings == null || !_settings.RestoreSession || _settings.ClearOnExit)
+            {
+                return;
+            }
+
+            SaveSession(false);
+        }
+
+        /// <summary>
+        /// 只有普通标签管理器（非隐私工作区）的变化才需要写会话快照。
+        /// </summary>
+        private void MarkSessionDirty(object sender)
+        {
+            if (ReferenceEquals(sender, _normalTabManager))
+            {
+                _sessionDirty = true;
+            }
+        }
+
+        /// <summary>
+        /// 保存当前会话；clean 表示是否为正常退出。
+        /// </summary>
+        private void SaveSession(bool clean)
         {
             string path = SessionPath;
 
@@ -387,7 +458,8 @@ namespace VantageLite.UI
             SessionStore.Save(path, new SessionData
             {
                 Tabs = tabs,
-                ActiveIndex = Math.Min(activeIndex, tabs.Count - 1)
+                ActiveIndex = Math.Min(activeIndex, tabs.Count - 1),
+                Clean = clean
             });
         }
 
@@ -405,7 +477,7 @@ namespace VantageLite.UI
                 _normalDownloads.MarkActiveInterrupted();
             }
 
-            SaveSession();
+            SaveSession(true);
 
             if (_settings == null || !_settings.ClearOnExit)
             {
@@ -588,6 +660,12 @@ namespace VantageLite.UI
             {
                 _privacyReclaimTimer.Stop();
                 _privacyReclaimTimer.Dispose();
+            }
+
+            if (_sessionSnapshotTimer != null)
+            {
+                _sessionSnapshotTimer.Stop();
+                _sessionSnapshotTimer.Dispose();
             }
             _history.Save();
             _bookmarks.Save();

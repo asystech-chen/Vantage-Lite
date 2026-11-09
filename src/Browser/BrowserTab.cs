@@ -199,6 +199,56 @@ namespace VantageLite.Browser
             }
         }
 
+        /// <summary>
+        /// 当前页面缩放比例；没有内核（占位/丢弃）时按 100% 处理。
+        /// </summary>
+        public double ZoomFactor
+        {
+            get
+            {
+                CoreWebView2Controller controller = _controller;
+                if (controller == null)
+                {
+                    return 1.0;
+                }
+
+                try
+                {
+                    return controller.ZoomFactor;
+                }
+                catch
+                {
+                    return 1.0;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 设置页面缩放比例，由宿主还原 100% 时使用。
+        /// </summary>
+        public void SetZoomFactor(double factor)
+        {
+            CoreWebView2Controller controller = _controller;
+            if (controller == null)
+            {
+                return;
+            }
+
+            try
+            {
+                controller.ZoomFactor = factor;
+            }
+            catch (Exception ex)
+            {
+                Log.Warn("[tab " + _id + "] set zoom failed: " + Log.Describe(ex));
+            }
+        }
+
+        /// <summary>
+        /// 全局默认缩放比例（1.0 = 100%）；新标签页与导航后按需应用。
+        /// </summary>
+        public double DefaultZoomFactor { get; set; }
+
         public DateTime LastDeactivatedUtc { get; set; }
 
         public string Url
@@ -261,6 +311,7 @@ namespace VantageLite.Browser
         public event EventHandler FaviconChanged;
         public event EventHandler AudioStateChanged;
         public event EventHandler<bool> FullScreenChanged;
+        public event EventHandler<double> ZoomFactorChanged;
         public event EventHandler<CoreWebView2DownloadStartingEventArgs> DownloadStarting;
 
         private void RaiseAudioStateChanged()
@@ -310,6 +361,7 @@ namespace VantageLite.Browser
             _internalAddress = internalAddress;
             _pendingInternalAddress = internalAddress;
             _pendingInternalHtml = internalHtml;
+            DefaultZoomFactor = 1.0;
             LastActivatedUtc = DateTime.UtcNow;
             LastDeactivatedUtc = DateTime.MinValue;
 

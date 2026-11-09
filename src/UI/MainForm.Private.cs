@@ -61,6 +61,7 @@ namespace VantageLite.UI
             manager.WebMessage += TabManager_WebMessage;
             manager.LastTabClosed += TabManager_LastTabClosed;
             manager.FullScreenChanged += TabManager_FullScreenChanged;
+            manager.ZoomFactorChanged += TabManager_ZoomFactorChanged;
             manager.DownloadStarting += delegate(object downloadSender, CoreWebView2DownloadStartingEventArgs downloadArgs)
             {
                 if (ReferenceEquals(downloadSender, _normalTabManager))
@@ -116,6 +117,7 @@ namespace VantageLite.UI
                     true);
                 privateManager.InternalHtmlProvider = BuildInternalPageHtml;
                 privateManager.SetDownloadDirectory(_settings.DownloadDirectory);
+                privateManager.SetDefaultZoomFactor(_settings.DefaultZoomPercent / 100.0);
                 WireTabManager(privateManager);
 
                 privateDownloads = new DownloadManager(

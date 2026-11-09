@@ -595,6 +595,20 @@ namespace VantageLite.UI
             AppendThemeOption(body, settings.ThemeMode, "light", "浅色");
             AppendThemeOption(body, settings.ThemeMode, "dark", "深色");
             body.Append("</select><span class=\"hint\">跟随系统会随 Windows 应用模式自动切换</span></span></div>");
+            string currentZoom = settings.DefaultZoomPercent.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            body.Append("<div class=\"field-row\"><span class=\"label\">默认缩放</span><span class=\"control\">")
+                .Append("<span style=\"display:inline-flex;align-items:center;gap:6px\">")
+                .Append("<button type=\"button\" onclick=\"stepZoom(-1)\">\u2212</button>")
+                .Append("<span id=\"defaultZoomValue\" style=\"min-width:56px;text-align:center\">")
+                .Append(currentZoom).Append("%</span>")
+                .Append("<button type=\"button\" onclick=\"stepZoom(1)\">+</button>")
+                .Append("</span>")
+                .Append("<input id=\"defaultZoom\" type=\"hidden\" value=\"").Append(currentZoom).Append("\">")
+                .Append("<span class=\"hint\">新标签页与导航后的默认比例；Ctrl+0 可临时恢复 100%</span></span></div>");
+            body.Append("<label class=\"check\"><input id=\"showZoomControls\" type=\"checkbox\"")
+                .Append(settings.ShowZoomControls ? " checked" : string.Empty)
+                .Append("> 在地址栏显示缩放控件（− / 比例 / +）</label>");
+            body.Append("<span class=\"hint\">关闭时仅在缩放与默认值不同时显示百分比，点击百分比恢复默认比例</span>");
             body.Append("<label class=\"check\"><input id=\"bar\" type=\"checkbox\"")
                 .Append(settings.ShowBookmarksBar ? " checked" : string.Empty)
                 .Append("> 显示书签栏</label>");
@@ -746,6 +760,13 @@ namespace VantageLite.UI
                 + "document.getElementById('newTabUrlRow').style.display=(m==='custom')?'flex':'none';"
                 + "document.getElementById('newTabShortcutRow').style.display=(m==='builtin')?'flex':'none';}");
             body.Append("syncNewTabFields();");
+            body.Append("var ZOOM_STEPS=[50,67,75,80,90,100,110,125,150,175,200,250,300];");
+            body.Append("function stepZoom(dir){var input=document.getElementById('defaultZoom');"
+                + "var v=parseInt(input.value,10)||100;var i=0;var best=Math.abs(ZOOM_STEPS[0]-v);"
+                + "for(var k=1;k<ZOOM_STEPS.length;k++){var d=Math.abs(ZOOM_STEPS[k]-v);if(d<best){best=d;i=k;}}"
+                + "i=Math.max(0,Math.min(ZOOM_STEPS.length-1,i+dir));"
+                + "input.value=ZOOM_STEPS[i];var label=document.getElementById('defaultZoomValue');"
+                + "if(label){label.textContent=ZOOM_STEPS[i]+'%';}saveSettings();}");
             body.Append("function pickDownloadDir(){post({cmd:'pickDownloadDir'});}");
             body.Append("function importBookmarks(){post({cmd:'importBookmarks'});}");
             body.Append("var saveTimer=null;"
@@ -779,11 +800,13 @@ namespace VantageLite.UI
                 + "var tabDblClose=document.getElementById('tabDblClose').checked;"
                 + "var tabMidClose=document.getElementById('tabMidClose').checked;"
                 + "var pinnedTabs=document.getElementById('pinTabs').checked;"
+                + "var defaultZoom=parseInt(document.getElementById('defaultZoom').value,10);"
+                + "var showZoomControls=document.getElementById('showZoomControls').checked;"
                 + "var downloadDir=document.getElementById('downloadDir').value.trim();"
                 + "var engines=[];var rows=document.querySelectorAll('#customEngines .engine-row');"
                 + "for(var i=0;i<rows.length;i++){var n=rows[i].querySelector('.ce-name').value.trim();"
                 + "var u=rows[i].querySelector('.ce-url').value.trim();if(n&&u){engines.push({name:n,url:u});}}"
-                + "post({cmd:'settings',homeMode:homeMode,home:home,customEngines:engines,maxTabs:maxTabs,suspendSeconds:suspend,discardMinutes:discard,search:search,theme:themeMode,clearOnExit:clearOnExit,restoreSession:restoreSession,newTabMode:newTabMode,newTabUrl:newTabUrl,newTabShortcuts:ntShortcuts,bookmarksBar:bar,downloadDir:downloadDir,tabDoubleClickClose:tabDblClose,tabMiddleClickClose:tabMidClose,pinnedTabs:pinnedTabs});"
+                + "post({cmd:'settings',homeMode:homeMode,home:home,customEngines:engines,maxTabs:maxTabs,suspendSeconds:suspend,discardMinutes:discard,search:search,theme:themeMode,clearOnExit:clearOnExit,restoreSession:restoreSession,newTabMode:newTabMode,newTabUrl:newTabUrl,newTabShortcuts:ntShortcuts,bookmarksBar:bar,downloadDir:downloadDir,tabDoubleClickClose:tabDblClose,tabMiddleClickClose:tabMidClose,pinnedTabs:pinnedTabs,defaultZoom:defaultZoom,showZoomControls:showZoomControls});"
                 + "}");
             body.Append("if(window.chrome&&window.chrome.webview){"
                 + "window.chrome.webview.addEventListener('message',function(e){"

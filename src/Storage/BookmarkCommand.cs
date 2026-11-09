@@ -87,5 +87,11 @@ namespace VantageLite.Storage
 
         [DataMember(Name = "pinnedTabs", Order = 26, EmitDefaultValue = false)]
         public bool? PinnedTabs { get; set; }
+
+        [DataMember(Name = "defaultZoom", Order = 27, EmitDefaultValue = false)]
+        public int? DefaultZoom { get; set; }
+
+        [DataMember(Name = "showZoomControls", Order = 28, EmitDefaultValue = false)]
+        public bool? ShowZoomControls { get; set; }
     }
 }

@@ -66,6 +66,7 @@ namespace VantageLite.Browser
                 DetachRasterizationScale();
                 _controller = controller;
                 controller.RasterizationScaleChanged += Controller_RasterizationScaleChanged;
+                controller.ZoomFactorChanged += Controller_ZoomFactorChanged;
                 WindowChrome.ReportRasterizationScale(controller.RasterizationScale);
                 Log.Info("[tab " + _id + "] rasterization scale = " + controller.RasterizationScale.ToString("0.###"));
             }
@@ -123,12 +124,71 @@ namespace VantageLite.Browser
             try
             {
                 _controller.RasterizationScaleChanged -= Controller_RasterizationScaleChanged;
+                _controller.ZoomFactorChanged -= Controller_ZoomFactorChanged;
             }
             catch
             {
             }
 
             _controller = null;
+        }
+
+        private void Controller_ZoomFactorChanged(object sender, object e)
+        {            CoreWebView2Controller controller = sender as CoreWebView2Controller;
+
+            if (controller == null || !ReferenceEquals(controller, _controller))
+            {
+                return;
+            }
+
+            double factor = 1.0;
+
+            try
+            {
+                factor = controller.ZoomFactor;
+            }
+            catch
+            {
+            }
+
+            EventHandler<double> handler = ZoomFactorChanged;
+            if (handler != null)
+            {
+                handler(this, factor);
+            }
+        }
+
+        /// <summary>
+        /// 应用全局默认缩放。onlyWhenReset=true 时仅在当前为 100% 时应用，
+        /// 避免覆盖用户在页面上的手动缩放。
+        /// </summary>
+        private void ApplyDefaultZoom(bool onlyWhenReset)
+        {
+            CoreWebView2Controller controller = _controller;
+
+            if (controller == null)
+            {
+                return;
+            }
+
+            double target = DefaultZoomFactor > 0 ? DefaultZoomFactor : 1.0;
+
+            try
+            {
+                if (onlyWhenReset && Math.Abs(controller.ZoomFactor - 1.0) > 0.001)
+                {
+                    return;
+                }
+
+                if (Math.Abs(controller.ZoomFactor - target) > 0.001)
+                {
+                    controller.ZoomFactor = target;
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Warn("[tab " + _id + "] apply default zoom failed: " + Log.Describe(ex));
+            }
         }
 
         private void Controller_RasterizationScaleChanged(object sender, object e)
@@ -193,6 +253,7 @@ namespace VantageLite.Browser
                 _core = core;
                 ConfigureCore(core);
                 AttachRasterizationScale(view);
+                ApplyDefaultZoom(false);
                 _isSuspended = false;
                 _isThrottled = false;
                 _statusBarSuppressed = false;

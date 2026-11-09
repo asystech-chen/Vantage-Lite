@@ -33,6 +33,13 @@ namespace VantageLite.Storage
 
         [DataMember(Name = "active", Order = 1)]
         public int ActiveIndex { get; set; }
+
+        /// <summary>
+        /// 是否为正常退出时保存。定时快照写 false，正常关闭写 true；
+        /// 旧版本没有这个字段，反序列化为 null，按正常退出处理，不误报崩溃。
+        /// </summary>
+        [DataMember(Name = "clean", Order = 2, EmitDefaultValue = false)]
+        public bool? Clean { get; set; }
     }
 
     /// <summary>

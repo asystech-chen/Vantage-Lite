@@ -246,6 +246,7 @@ namespace VantageLite.Browser
             }
 
             RaiseLoading(false);
+            ApplyDefaultZoom(true);
 
             if (e.IsSuccess)
             {
